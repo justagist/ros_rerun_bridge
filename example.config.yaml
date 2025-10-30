@@ -1,0 +1,73 @@
+global_frame: map
+
+modules:
+  # Camera intrinsics → Pinhole at map/robot/camera/img
+  - name: camera_info
+    module: camera_info
+    topic: /intel_realsense_r200_depth/camera_info
+    entity_path: map/robot/camera/img
+
+  # RGB image + transform for the camera rig
+  - name: rgb_image
+    module: image
+    topic: /intel_realsense_r200_depth/image_raw
+    entity_path: map/robot/camera/img
+    extra:
+      # optional: desired cv_bridge encoding
+      encoding_override: null
+      tf_paths:
+        # This mirrors: self.log_tf_as_transform3d("map/robot/camera", time)
+        - path: map/robot/camera
+          child_frame: camera_rgb_optical_frame
+          parent_frame: base_footprint
+
+  # Depth point cloud: log once under camera-centric path and once under map
+  - name: depth_points
+    module: pointcloud2
+    topic: /intel_realsense_r200_depth/points
+    entity_path: map/robot/camera/points
+    extra:
+      color_mode: rgb_packed
+      tf_paths:
+        # Robot-centric (camera frame relative to camera optical frame)
+        - path: map/robot/camera/points
+          child_frame: camera_depth_frame
+          parent_frame: camera_rgb_optical_frame
+        # Map-centric (same child, placed under map)
+        - path: map/points
+          child_frame: camera_depth_frame
+          parent_frame: map
+
+  # Laser scan → line strips + transform for the scanner
+  - name: scan
+    module: laserscan
+    topic: /scan
+    entity_path: map/robot/scan
+    extra:
+      mode: lines
+      origin_scale: 0.3
+      radius: 0.0025
+      tf_paths:
+        - path: map/robot/scan
+          child_frame: base_scan
+          parent_frame: base_footprint
+
+  # Odometry → scalar plots + robot pose under map
+  - name: odom
+    module: odometry
+    topic: /odom
+    entity_path: odometry
+    extra:
+      tf_paths:
+        - path: map/robot
+          child_frame: base_footprint
+          parent_frame: map
+
+  # URDF logged once (latching /robot_description)
+  - name: urdf
+    module: urdf
+    topic: /robot_description
+    entity_path: map/robot/urdf
+    qos: { depth: 1, durability: transient_local }
+    extra:
+      fix_camera_link_scale: 0.00254

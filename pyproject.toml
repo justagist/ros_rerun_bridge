@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rerun-ros-bridge"
+version = "0.1.0"
+description = "Config-driven, pluggable ROS2 → Rerun bridge"
+authors = [{ name = "Saif Sidhik", email = "mail@saifsidhik.page" }]
+requires-python = ">=3.10"
+dependencies = [
+    "rerun-sdk",
+    "numpy",
+    "pyyaml",
+    # ROS2 deps are system-provided; python-only extras below
+    "opencv-python", # for cv_bridge conversion runtime (cv_bridge still required from ROS)
+    "trimesh",
+    "yourdfpy",
+]
+
+[project.scripts]
+rerun-ros-bridge = "rerun_ros_bridge:run"
+
+[tool.setuptools]
+packages = ["rerun_ros_bridge", "rerun_ros_bridge.modules"]
