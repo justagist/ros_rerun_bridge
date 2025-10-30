@@ -9,6 +9,7 @@ from rclpy.qos import QoSProfile
 
 import rerun as rr
 
+from .context import BridgeContext
 from .qos import make_qos
 from .time_utils import set_rr_time_from_ros
 
@@ -33,8 +34,9 @@ class TopicToComponentModule:
       * optionally use `self.extra` for module-specific parameters
     """
 
-    def __init__(self, node: Node, spec: ModuleSpec) -> None:
+    def __init__(self, node: Node, spec: ModuleSpec, context: BridgeContext) -> None:
         self.node = node
+        self.context = context
         self.spec = spec
         self.entity_path = spec.entity_path
         self.extra = spec.extra or {}

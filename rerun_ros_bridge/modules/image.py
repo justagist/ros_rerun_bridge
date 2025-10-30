@@ -32,7 +32,7 @@ class ImageModule(TopicToComponentModule):
 
         stamp = self._extract_time(msg)
         for tfp in self.extra.get("tf_paths", []):
-            self.node.tf.log_tf_path(
+            self.context.tf.log_tf_path(
                 path=tfp["path"],  # entity path to attach transform on
                 child_frame=tfp["child_frame"],  # TF child
                 parent_frame=tfp["parent_frame"],  # TF parent

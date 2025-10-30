@@ -8,6 +8,7 @@ from rclpy.node import Node
 
 import rerun as rr
 
+from .context import BridgeContext
 from .loader import BridgeBuilder, load_yaml
 from .tf_utils import TFHelper
 
@@ -19,8 +20,8 @@ class BridgeNode(Node):
         # Allow concurrent callbacks
         self.callback_group = ReentrantCallbackGroup()
 
-        # Optional TF helper accessible to modules via node.get_parameters or by storing here
-        self.tf = TFHelper(self)
+        # Optional shared context. Currently only holds TF helper.
+        bridge_context = BridgeContext(tf=TFHelper(self))
 
         # Load config
         cfg = load_yaml(config_path)
@@ -34,7 +35,7 @@ class BridgeNode(Node):
 
         # build modules
         builder = BridgeBuilder(self)
-        self.modules = builder.build_from_config(cfg)
+        self.modules = builder.build_modules(cfg, bridge_context)
 
 
 def run(argv: list[str] | None = None) -> None:

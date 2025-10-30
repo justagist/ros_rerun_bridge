@@ -8,6 +8,7 @@ import yaml
 from rclpy.node import Node
 
 from .base import ModuleSpec, TopicToComponentModule, _import_by_path
+from .context import BridgeContext
 from .registry import REGISTRY
 
 
@@ -20,7 +21,7 @@ class BridgeBuilder:
         except Exception as e:
             node.get_logger().warn(f"Failed to import built-in modules: {e}")
 
-    def build_from_config(self, cfg: Dict[str, Any]) -> List[TopicToComponentModule]:
+    def build_modules(self, cfg: Dict[str, Any], context: BridgeContext) -> List[TopicToComponentModule]:
         modules_cfg = cfg.get("modules", [])
         instances: List[TopicToComponentModule] = []
         for m in modules_cfg:
@@ -34,7 +35,7 @@ class BridgeBuilder:
                 extra=m.get("extra", {}),
             )
             cls = self._resolve_class(spec.module)
-            inst = cls(self.node, spec)
+            inst = cls(self.node, spec, context=context)
             instances.append(inst)
         return instances
 

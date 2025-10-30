@@ -49,7 +49,7 @@ class PointCloud2Module(TopicToComponentModule):
 
         stamp = self._extract_time(msg)
         for tfp in self.extra.get("tf_paths", []):
-            self.node.tf.log_tf_path(
+            self.context.tf.log_tf_path(
                 path=tfp["path"],
                 child_frame=tfp["child_frame"],
                 parent_frame=tfp["parent_frame"],
