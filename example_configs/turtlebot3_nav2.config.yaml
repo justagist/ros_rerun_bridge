@@ -16,7 +16,7 @@ modules:
     module: image
     topic: /intel_realsense_r200_depth/image_raw
     entity_path: map/robot/camera/img
-    extra:
+    params:
       # optional: desired cv_bridge encoding
       encoding_override: null
       tf_paths:
@@ -29,8 +29,8 @@ modules:
     module: pointcloud2
     topic: /intel_realsense_r200_depth/points
     entity_path: map/robot/camera/points
-    extra:
-      color_mode: rgb_packed
+    params:
+      colour_mode: rgb_packed
       tf_paths:
         # Robot-centric (camera frame relative to camera optical frame)
         - path: map/robot/camera/points
@@ -46,11 +46,11 @@ modules:
     module: particle_cloud
     topic: /particle_cloud
     entity_path: map/particlecloud_arrows
-    extra:
+    params:
       mode: arrows
       arrow_axis: x # use body X as heading
       arrow_len: 0.05 # meters, scaled by weight
-      arrow_radius: 0.002
+      radius: 0.002
       colour: [0, 255, 0, 255] # green
 
   # Laser scan → line strips + transform for the scanner
@@ -58,7 +58,7 @@ modules:
     module: laserscan
     topic: /scan
     entity_path: map/robot/scan
-    extra:
+    params:
       mode: lines
       origin_scale: 0.3
       radius: 0.0025
@@ -72,7 +72,7 @@ modules:
     module: odometry
     topic: /odom
     entity_path: odometry
-    extra:
+    params:
       tf_paths:
         - path: map/robot
           child_frame: base_footprint
@@ -84,6 +84,6 @@ modules:
     topic: /robot_description
     entity_path: map/robot/urdf
     qos: { depth: 1, durability: transient_local }
-    extra:
+    params:
       link_scales:
         camera_link: 0.00254

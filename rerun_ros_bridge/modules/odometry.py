@@ -2,19 +2,24 @@ from __future__ import annotations
 
 from typing import Any
 
-from nav_msgs.msg import Odometry
 from rclpy.time import Time
 
 import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
+from ..types import BaseModelWithTFPaths
 
 
 @REGISTRY.register("odometry")
 class OdometryModule(TopicToComponentModule):
+    PARAMS = BaseModelWithTFPaths
+    params: BaseModelWithTFPaths  # type hint for self.params
+
     @classmethod
     def ros_msg_type(cls):
+        from nav_msgs.msg import Odometry
+
         return Odometry
 
     def _extract_time(self, msg) -> Time | None:  # type: ignore[override]
@@ -26,10 +31,8 @@ class OdometryModule(TopicToComponentModule):
         rr.log(self.entity_path + "/ang_vel", rr.Scalars(msg.twist.twist.angular.z))
 
         stamp = self._extract_time(msg)
-        for tfp in self.extra.get("tf_paths", []):
+        for tfp in self.params.tf_paths:
             self.context.tf.log_tf_path(
-                path=tfp["path"],
-                child_frame=tfp["child_frame"],
-                parent_frame=tfp["parent_frame"],
+                tf_path=tfp,
                 time=stamp,
             )

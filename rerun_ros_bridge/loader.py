@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 import yaml
 
-from .base import ModuleSpec, TopicToComponentModule, _import_by_path
+from .base import TopicToComponentModule, _import_module_by_path
 from .registry import REGISTRY
 
 if TYPE_CHECKING:
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
     from rclpy.node import Node
 
+    from .base import BridgeConfig
     from .context import BridgeContext
 
 
@@ -25,28 +26,18 @@ class BridgeBuilder:
         except Exception as e:
             node.get_logger().warn(f"Failed to import built-in modules: {e}")
 
-    def build_modules(self, cfg: Dict[str, Any], context: BridgeContext) -> List[TopicToComponentModule]:
-        modules_cfg = cfg.get("modules", [])
+    def build_modules(self, cfg: BridgeConfig, context: BridgeContext) -> List[TopicToComponentModule]:
         instances: List[TopicToComponentModule] = []
-        for m in modules_cfg:
-            spec = ModuleSpec(
-                name=m["name"],
-                module=m["module"],
-                topic=m["topic"],
-                entity_path=m["entity_path"],
-                msg_type=m.get("msg_type"),
-                qos=m.get("qos", {}),
-                extra=m.get("extra", {}),
-            )
-            cls = self._resolve_class(spec.module)
-            inst = cls(self.node, spec, context=context)
+        for module_spec in cfg.modules:
+            cls = self._resolve_class(module_spec.module)
+            inst = cls(self.node, module_spec, context=context)
             instances.append(inst)
         return instances
 
     def _resolve_class(self, module_id: str):
         if REGISTRY.has(module_id):
             return REGISTRY.get(module_id)
-        return _import_by_path(module_id)
+        return _import_module_by_path(module_id)
 
 
 def load_yaml(path: str | Path) -> Dict[str, Any]:

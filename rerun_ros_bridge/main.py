@@ -8,6 +8,7 @@ from rclpy.node import Node
 
 import rerun as rr
 
+from .base import BridgeConfig
 from .context import BridgeContext
 from .loader import BridgeBuilder, load_yaml
 from .utils.tf_utils import TFHelper
@@ -24,11 +25,11 @@ class BridgeNode(Node):
         bridge_context = BridgeContext(tf=TFHelper(self))
 
         # Load config
-        cfg = load_yaml(config_path)
+        cfg = BridgeConfig.model_validate(load_yaml(config_path))
 
         # TODO: Log the real map once https://github.com/rerun-io/rerun/issues/1531 is merged
         rr.log(
-            f"{cfg.get('global_frame', 'map')}/box",
+            f"{cfg.global_frame}/box",
             rr.Boxes3D(half_sizes=[3, 3, 1], centers=[0, 0, 1], colors=[255, 255, 255, 255]),
             static=True,
         )

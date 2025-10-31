@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 import laser_geometry
 import numpy as np
@@ -13,10 +13,20 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
+from ..types import BaseModelWithTFPaths
+
+
+class LaserScanParams(BaseModelWithTFPaths):
+    mode: Literal["lines", "points"] = "lines"
+    origin_scale: float = 0.3
+    radius: float = 0.0025
 
 
 @REGISTRY.register("laserscan")
 class LaserScanModule(TopicToComponentModule):
+    PARAMS = LaserScanParams
+    params: LaserScanParams  # type hint for self.params
+
     @classmethod
     def ros_msg_type(cls):
         return LaserScan
@@ -31,19 +41,16 @@ class LaserScanModule(TopicToComponentModule):
         pts = structured_to_unstructured(pts_iter)
 
         # Optional rendering mode via extra: lines | points
-        mode = self.extra.get("mode", "lines")
-        if mode == "lines":
-            origin = (pts / np.linalg.norm(pts, axis=1).reshape(-1, 1)) * self.extra.get("origin_scale", 0.3)
+        if self.params.mode == "lines":
+            origin = (pts / np.linalg.norm(pts, axis=1).reshape(-1, 1)) * self.params.origin_scale
             segs = np.hstack([origin, pts]).reshape(pts.shape[0] * 2, 3)
-            rr.log(self.entity_path, rr.LineStrips3D(segs, radii=self.extra.get("radius", 0.0025)))
+            rr.log(self.entity_path, rr.LineStrips3D(segs, radii=self.params.radius))
         else:
             rr.log(self.entity_path, rr.Points3D(pts))
 
         stamp = self._extract_time(msg)
-        for tfp in self.extra.get("tf_paths", []):
+        for tfp in self.params.tf_paths:
             self.context.tf.log_tf_path(
-                path=tfp["path"],
-                child_frame=tfp["child_frame"],
-                parent_frame=tfp["parent_frame"],
+                tf_path=tfp,
                 time=stamp,
             )

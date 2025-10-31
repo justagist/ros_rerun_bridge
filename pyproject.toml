@@ -16,6 +16,7 @@ dependencies = [
     "opencv-python", # for cv_bridge conversion runtime (cv_bridge still required from ROS)
     "trimesh",
     "yourdfpy",
+    "pydantic>=2.0",
 ]
 
 [project.scripts]
