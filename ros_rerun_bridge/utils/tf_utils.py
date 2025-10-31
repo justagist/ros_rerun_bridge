@@ -16,13 +16,27 @@ if TYPE_CHECKING:
 
 
 class TFHelper:
+    """Helper for TF operations."""
+
     def __init__(self, node: Node) -> None:
+        """Initialize the TF helper.
+
+        Args:
+            node: The ROS node to use for TF listening & logging.
+        """
         self.buffer = Buffer()
 
         self.listener = TransformListener(self.buffer, node)
         self.node = node
 
-    def log_tf_path(self, tf_path: TFPath, time: Time, *, timeout_sec: float = 0.1) -> None:
+    def log_tf_path(self, tf_path: TFPath, time: Time, timeout_sec: float = 0.1) -> None:
+        """Log a TF path at a given time.
+
+        Args:
+            tf_path: The TFPath object defining the frames and Rerun path for logging.
+            time: The time at which to log the TF.
+            timeout_sec: Timeout in seconds for the TF lookup. Defaults to 0.1s.
+        """
         try:
             tf = self.buffer.lookup_transform(
                 tf_path.parent_frame, tf_path.child_frame, time, timeout=Duration(seconds=timeout_sec)

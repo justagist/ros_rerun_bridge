@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 import laser_geometry
 import numpy as np
@@ -17,24 +17,41 @@ from ..types import BaseModelWithTFPaths
 
 
 class LaserScanParams(BaseModelWithTFPaths):
+    """Parameters for the LaserScanModule."""
+
     mode: Literal["lines", "points"] = "lines"
+    """Rendering mode: "lines" to render as line segments, "points" to render as points."""
     origin_scale: float = 0.3
+    """Scale factor for the laser origin when rendering lines. This is how far from (0,0,0) the line segments start."""
     radius: float = 0.0025
+    """Radius for line segments when rendering in 'lines' mode."""
 
 
 @REGISTRY.register("laserscan")
 class LaserScanModule(TopicToComponentModule):
+    """Module for handling LaserScan messages and logging to Rerun.
+
+    Module-specific extra configuration parameters:
+      - mode: "lines" | "points"  (default: "lines")
+            - lines: render as line segments from origin to points
+            - points: render as points
+      - origin_scale: float (default: 0.3)
+            - scale factor for the laser origin when rendering lines
+      - radius: float (default: 0.0025)
+            - radius for line segments when rendering in 'lines' mode
+    """
+
     PARAMS = LaserScanParams
     params: LaserScanParams  # type hint for self.params
 
     @classmethod
-    def ros_msg_type(cls):
+    def ros_msg_type(cls):  # noqa: D102
         return LaserScan
 
-    def _extract_time(self, msg) -> Time | None:  # type: ignore[override]
+    def _extract_time(self, msg: LaserScan) -> Time | None:  # type: ignore[override]
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: Any) -> None:
+    def handle(self, msg: LaserScan) -> None:  # noqa: D102
         proj = laser_geometry.laser_geometry.LaserProjection()
         cloud = proj.projectLaser(msg)
         pts_iter = point_cloud2.read_points(cloud, field_names=["x", "y", "z"], skip_nans=True)

@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rerun-ros-bridge"
-version = "0.1.0"
+name = "ros-rerun-bridge"
+version = "0.0.1"
 description = "Config-driven, pluggable ROS2 → Rerun bridge"
 authors = [{ name = "Saif Sidhik", email = "mail@saifsidhik.page" }]
 requires-python = ">=3.10"
@@ -20,7 +20,11 @@ dependencies = [
 ]
 
 [project.scripts]
-rerun-ros-bridge = "rerun_ros_bridge:run"
+ros-rerun-bridge = "ros_rerun_bridge:run"
 
 [tool.setuptools]
-packages = ["rerun_ros_bridge", "rerun_ros_bridge.modules"]
+packages = [
+    "ros_rerun_bridge",
+    "ros_rerun_bridge.modules",
+    "ros_rerun_bridge.utils",
+]

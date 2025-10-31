@@ -1,6 +1,6 @@
 # this can be used with the example from nav2 starter doc: https://docs.nav2.org/getting_started/index.html
 # Run that example, and in another terminal run:
-# rerun_ros_bridge --config <path_to_rerun_ros_bridge>/example_configs/turtlebot3_nav2.config.yaml
+# ros_rerun_bridge --config <path_to_ros_rerun_bridge>/example_configs/turtlebot3_nav2.config.yaml
 
 global_frame: map
 

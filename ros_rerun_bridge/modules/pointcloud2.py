@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from numpy.lib.recfunctions import structured_to_unstructured
 from rclpy.time import Time
@@ -15,23 +15,41 @@ from ..types import BaseModelWithTFPaths
 
 
 class PointCloud2Params(BaseModelWithTFPaths):
+    """Parameters for the PointCloud2Module."""
+
     colour_mode: Literal["rgb_packed", "fields", "none"] = "rgb_packed"
+    """Color extraction mode. Options:
+    - "rgb_packed": Extract RGB from packed float field named 'rgb'.
+    - "fields": Extract RGB from separate fields specified in `colour_fields`.
+    - "none": No color extraction; points will be logged without color.
+    """
     colour_fields: list[str] = ["r", "g", "b"]
+    """List of field names to extract colors from when `colour_mode` is "fields"."""
 
 
 @REGISTRY.register("pointcloud2")
 class PointCloud2Module(TopicToComponentModule):
+    """Module for handling PointCloud2 messages and logging to Rerun.
+
+    Module-specific extra configuration parameters:
+      - colour_mode: "rgb_packed" | "fields" | "none"  (default: "rgb_packed")
+            - rgb_packed: extract RGB from packed float field named 'rgb'
+            - fields: extract RGB from separate fields specified in `colour_fields`
+            - none: no color extraction
+      - colour_fields: list of field names for colors when colour_mode is "fields". (default: ["r", "g", "b"])
+    """
+
     PARAMS = PointCloud2Params
     params: PointCloud2Params  # type hint for self.params
 
     @classmethod
-    def ros_msg_type(cls):
+    def ros_msg_type(cls):  # noqa: D102
         return PointCloud2
 
-    def _extract_time(self, msg) -> Time | None:  # type: ignore[override]
+    def _extract_time(self, msg: PointCloud2) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: Any) -> None:
+    def handle(self, msg: PointCloud2) -> None:  # noqa: D102
         # Configure color extraction (module extra supports multiple patterns)
         field_names = ["x", "y", "z"]
         pts_iter = point_cloud2.read_points(msg, field_names=field_names, skip_nans=True)

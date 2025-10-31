@@ -20,24 +20,24 @@ def _rpy_to_mat(rpy) -> np.ndarray:
 
 
 def _origin_to_mat(origin) -> np.ndarray:
-    T = np.eye(4)
+    tf_mat = np.eye(4)
     if origin is not None and origin.xyz is not None:
-        T[:3, 3] = origin.xyz
+        tf_mat[:3, 3] = origin.xyz
     if origin is not None and origin.rpy is not None:
-        T[:3, :3] = _rpy_to_mat(origin.rpy)
-    return T
+        tf_mat[:3, :3] = _rpy_to_mat(origin.rpy)
+    return tf_mat
 
 
 def _axis_twist(axis, value, joint_type: str) -> np.ndarray:
     """Return a 4x4 transform for revolute/continuous/prismatic along 'axis' given value (rad or m)."""
-    T = np.eye(4)
+    tf_mat = np.eye(4)
     axis = np.array(axis if axis is not None else [0, 0, 1], dtype=float)
     if joint_type in ("revolute", "continuous"):
-        R = st.Rotation.from_rotvec(axis / (np.linalg.norm(axis) + 1e-12) * value).as_matrix()
-        T[:3, :3] = R
+        rot_mat = st.Rotation.from_rotvec(axis / (np.linalg.norm(axis) + 1e-12) * value).as_matrix()
+        tf_mat[:3, :3] = rot_mat
     elif joint_type == "prismatic":
-        T[:3, 3] = axis * value
-    return T
+        tf_mat[:3, 3] = axis * value
+    return tf_mat
 
 
 class UrdfKinematics:
@@ -48,6 +48,13 @@ class UrdfKinematics:
     """
 
     def __init__(self, urdf: urdf_parser.URDF, root_path: str = "", link_scales: dict[str, float] | None = None) -> None:
+        """Initialize URDF kinematics.
+
+        Args:
+            urdf: The URDF model.
+            root_path: The Rerun entity path prefix for the robot root.
+            link_scales: Optional per-link uniform scale factors.
+        """
         self.urdf = urdf
         self.root_path = root_path.rstrip("/")
         self.link_scales = link_scales or {}
@@ -83,28 +90,30 @@ class UrdfKinematics:
 
     # ——— Public API used by JointState module ———
     def set_joint(self, name: str, value: float) -> None:
+        """Set a joint to a given value (radians for revolute/continuous, meters for prismatic)."""
         info = self.joint_info.get(name)
         if not info:
             return
-        T = info["origin_T"] @ _axis_twist(info["axis"], value, info["type"])
+        tf_mat = info["origin_T"] @ _axis_twist(info["axis"], value, info["type"])
         rr.log(
             info["entity_path"],
-            rr.Transform3D(translation=T[:3, 3], mat3x3=T[:3, :3]),
+            rr.Transform3D(translation=tf_mat[:3, 3], mat3x3=tf_mat[:3, :3]),
         )
 
     def set_joints(self, names: list[str], values: list[float]) -> None:
+        """Set multiple joints at once.
+
+        Args:
+            names: List of joint names.
+            values: Corresponding list of joint values (radians/meters).
+        """
         for n, v in zip(names, values):
             self.set_joint(n, float(v))
 
     # ——— One-time mesh logging (called by the URDF module when the model is received) ———
-    def log_visuals(self) -> None:
-        rr.log(self.root_path or "", rr.ViewCoordinates.RIGHT_HAND_Z_UP)
-        for link in self.urdf.links:
-            path = self._chain_entity_path_for_link(link)
-            for i, visual in enumerate(link.visuals):
-                self._log_visual(f"{path}/visual_{i}", visual, link_name=link.name)
 
     def log_visuals(self) -> None:
+        """Log all visuals in the URDF to Rerun."""
         rr.log(self.root_path or "", rr.ViewCoordinates.RIGHT_HAND_Z_UP)
         for link in self.urdf.links:
             path = self._chain_entity_path_for_link(link)
@@ -114,12 +123,12 @@ class UrdfKinematics:
 
     def _log_visual(self, entity_path: str, visual: urdf_parser.Visual, *, link_name: str) -> None:
         # Compose visual-local transform
-        T = _origin_to_mat(visual.origin)
+        tf_mat = _origin_to_mat(visual.origin)
 
         # NEW: apply per-link uniform scale BEFORE geometry-specific transforms
         s_link = float(self.link_scales.get(link_name, 0.0) or 0.0)
         if s_link > 0.0:
-            T[:3, :3] *= s_link
+            tf_mat[:3, :3] *= s_link
 
         # Geometry loading (mesh/box/cyl/sphere)
         if isinstance(visual.geometry, urdf_parser.Mesh):
@@ -140,7 +149,7 @@ class UrdfKinematics:
 
             # If the mesh has its own <scale>, multiply it as well
             if visual.geometry.scale is not None:
-                T[:3, :3] = T[:3, :3] * np.array(visual.geometry.scale)
+                tf_mat[:3, :3] = tf_mat[:3, :3] * np.array(visual.geometry.scale)
 
         elif isinstance(visual.geometry, urdf_parser.Box):
             mesh_or_scene = trimesh.creation.box(extents=visual.geometry.size)
@@ -152,7 +161,7 @@ class UrdfKinematics:
             rr.log(entity_path, rr.TextLog(f"Unsupported geometry: {type(visual.geometry)}"))
             mesh_or_scene = trimesh.Trimesh()
 
-        mesh_or_scene.apply_transform(T)
+        mesh_or_scene.apply_transform(tf_mat)
 
         def _log_mesh(ep: str, mesh: trimesh.Trimesh) -> None:
             vertex_colors = None

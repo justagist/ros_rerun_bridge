@@ -1,105 +1,160 @@
-# rerun-ros-bridge
 
-A modular and config-driven ROS2 → Rerun bridge. Define topic mappings in YAML and
-compose behavior via small plugin modules (one topic ↦ one rerun component).
+# ros-rerun-bridge
 
-## Install (dev)
+A **config-driven, modular ROS 2 → Rerun** bridge. You describe what to subscribe to and how to visualize it in a YAML file; the bridge loads a set of lightweight **modules** (one topic → one Rerun component) and streams everything into the Rerun viewer.
+
+> 🚧 Project Status: Active Development
+> 
+> **Note:** This repository is under active development. Features, interfaces, and behavior may change, and bugs or incomplete functionality could be present.
+
+---
+
+## Highlights
+
+* **Modular by design:** add/remove per-topic handlers as plugins.
+* **Config-first:** ship a single YAML that declares topics, QoS, entity paths, and per-module parameters.
+* **Zero-copy-ish visuals:** modules translate ROS messages to Rerun primitives directly.
+* **TF & URDF aware:** optional helpers to visualize frames and robot geometry; `joint_states` can animate URDF.
+* **Module-specific params:** Each module can have module-specific params. Module params are validated with Pydantic (v2) for stricter typing.
+
+---
+
+## Installation (dev)
+
 ```bash
+# From the repo root
 pip install -e .
 
-# Ensure your ROS2 distro is installed & sourced (e.g., Humble):
+# Make sure your ROS 2 distro is installed & sourced (e.g. Humble):
 #   source /opt/ros/humble/setup.bash
 ```
 
-## Run
+> Python deps are declared in `pyproject.toml` (e.g. `pydantic`, `pyyaml`, `opencv-python`, `trimesh`, `yourdfpy`). ROS-supplied Python packages (e.g. message types) come from your sourced ROS environment.
+
+---
+
+## Running
+
+The package exposes a console script:
+
 ```bash
-rerun-ros-bridge --config example.config.yaml --spawn-viewer
+ros-rerun-bridge --config path/to/config.yaml [RERUN_ARGS …] -- [RCLPY_ARGS …]
 ```
-Any remaining CLI args after `--` are forwarded to `rclpy`.
 
-## Config schema
+* `--config` points to your YAML (schema below).
+* **RERUN_ARGS** are forwarded to `rerun.script_setup(...)` (e.g. `--spawn`, `--connect`, `--save` etc.).
+* After a literal `--`, any **RCLPY_ARGS** are passed through to rclpy/ROS 2.
+* `--version` prints the package version and exits.
+
+Example:
+
+```bash
+# Spawn a Rerun viewer and start the bridge.
+ros-rerun-bridge --config example_configs/turtlebot3_nav2.config.yaml --spawn
+
+# Or connect to an already-running viewer
+ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml --connect 127.0.0.1:9876
+```
+
+---
+
+## Configuration schema
+
+At the top level:
+
 ```yaml
-modules:
-  - name: rgb
-    module: image              # registry key or python path to class
-    topic: /camera/color/image_raw
-    entity_path: map/robot/camera/img
-    # optional: override ROS msg class
-    # msg_type: sensor_msgs.msg.Image
-    qos: { depth: 10, reliability: reliable }
-    extra: { encoding_override: null }
-
-  - name: rgb_camera_info
-    module: camera_info
-    topic: /camera/color/camera_info
-    entity_path: map/robot/camera
-
-  - name: depth_points
-    module: pointcloud2
-    topic: /camera/depth/points
-    entity_path: map/robot/camera/points
-    extra:
-      color_mode: rgb_packed   # rgb_packed | fields | none
-      # color_fields: [r, g, b]
-
-  - name: scan
-    module: laserscan
-    topic: /scan
-    entity_path: map/robot/scan
-    extra: { mode: lines, origin_scale: 0.3, radius: 0.0025 }
-
-  - name: odom
-    module: odometry
-    topic: /odom
-    entity_path: odometry
-
-  - name: urdf
-    module: urdf
-    topic: /robot_description
-    entity_path: map/robot/urdf
-    qos: { depth: 1, durability: transient_local }
-    extra: { fix_camera_link_scale: 0.00254 }
+global_frame: map   # (optional) default TF global frame for helpers
+modules:            # list of module specs (loaded in order)
+  - name: <string>          # required, human-friendly
+    module: <id-or-path>    # required, registry key OR python path (see below)
+    topic: <ros-topic>      # required, ROS topic to subscribe
+    entity_path: <rerun/entity>  # required, where to log in Rerun
+    msg_type: <pkg/msg>     # optional override; module has a default
+    qos:                    # optional QoS (all fields optional)
+      depth: 10
+      reliability: best_effort | reliable
+      durability: volatile | transient_local
+      history: keep_last | keep_all
+    params: {}              # optional, module-specific settings
 ```
 
-### Notes
-- `module` can be a registry key (e.g., `image`) or a full Python path
-  like `rerun_ros_bridge.modules.image:ImageModule`.
-- `msg_type` is optional; modules default to their canonical ROS msg class.
-  You can override this (e.g., for custom message aliases).
-- `extra` is module-specific config.
-- Basic QoS knobs are exposed (`depth`, `reliability`, `durability`, `history`).
+### Module resolution
 
-## Extending
-To add a new module:
-```python
-from rerun_ros_bridge.base import TopicToComponentModule
-from rerun_ros_bridge.registry import REGISTRY
-import rerun as rr
+* Use a **registry key** (e.g. `image`, `pointcloud2`) to load a built‑in module, **or**
+* Provide a **Python path** to a class (`package.module:ClassName` or `package.module.ClassName`).
 
-@REGISTRY.register("my_pose")
-class PoseModule(TopicToComponentModule):
-    @classmethod
-    def ros_msg_type(cls):
-        from geometry_msgs.msg import PoseStamped
-        return PoseStamped
+### Shared helpers available to modules
 
-    def _extract_time(self, msg):
-        from rclpy.time import Time
-        return Time.from_msg(msg.header.stamp)
+* **TF helper** (`node.tf`): modules that include `tf_paths` in their params can log transforms per message timestamp.
+* **URDF kinematics** (`context.urdf_kinematics`): exposed once the `urdf` module loads; used by `joint_states` to animate links.
 
-    def handle(self, msg):
-        t = msg.pose.position
-        q = msg.pose.orientation
-        rr.log(self.entity_path, rr.Transform3D(translation=[t.x,t.y,t.z], rotation=rr.Quaternion(xyzw=[q.x,q.y,q.z,q.w])))
+> Internally, params inherit from a strict `BaseModel` so unknown fields error out instead of being ignored.
+
+---
+
+## Built‑in modules
+
+Below is the current set of bundled modules and their notable params.
+
+> All modules accept `entity_path` and (unless otherwise stated) support optional `params.tf_paths: [ {path, child_frame, parent_frame}, … ]` to log transforms alongside the primary visualization.
+
+### `image`  — `sensor_msgs/Image`
+
+* Converts via `cv_bridge` and logs `rr.Image`.
+* **Params**
+
+  * `encoding_override: <string>` – force a cv_bridge target encoding.
+
+### `camera_info`  — `sensor_msgs/CameraInfo`
+
+* Uses `image_geometry.PinholeCameraModel` to log intrinsics to Rerun (`rr.Pinhole`), aligned with your `entity_path`.
+
+### `laserscan`  — `sensor_msgs/LaserScan`
+
+* Converts a scan to points or lines using `laser_geometry`/`sensor_msgs_py.point_cloud2`.
+* **Params**
+
+  * `render_mode: points | lines` (default `points`)
+  * `min_range` / `max_range` – clamp distances
+  * `decimation: int` – sample every Nth ray
+  * `radius: float` – line radius when `render_mode=lines`
+
+### `pointcloud2`  — `sensor_msgs/PointCloud2`
+
+* Logs `rr.Points3D` with optional RGB extraction.
+* **Params**
+
+  * `colour_mode: rgb_packed | fields | none` (default `rgb_packed`)
+  * `colour_fields: [r, g, b]` – when `colour_mode=fields`
+
+### `odometry`  — `nav_msgs/Odometry` (optional dep)
+
+* Logs scalar time‑series for linear/angular velocities and supports TF path logging via `tf_paths`.
+
+### `urdf`  — `std_msgs/String` (XML from `/robot_description`)
+
+* Parses the URDF, logs link visuals, and exposes kinematics in `context.urdf_kinematics`.
+* **Params**
+
+  * `link_scales: { <link_name>: <scale> }` – per‑link scale factors for visuals.
+
+### `joint_states`  — `sensor_msgs/JointState`
+
+* Updates joint positions in the URDF scene (requires `urdf` module to be loaded first).
+
+---
+
+## Examples
+
+The repo includes two sample configs in `example_configs/`:
+
+* `robot_joint_states.config.yaml` – load URDF once, then animate with `/joint_states`. This should work with any robot publishing /robot_description and /joint_states. 
+* `turtlebot3_nav2.config.yaml` – camera, laser scan, odometry, point clouds, etc. This can be used with the example from nav2 starter doc: https://docs.nav2.org/getting_started/index.html.
+
+Run either as:
+
+```bash
+ros-rerun-bridge --config example_configs/turtlebot3_nav2.config.yaml --spawn
 ```
-Then update your YAML:
-```yaml
-- name: pose
-  module: my_pose
-  topic: /pose
-  entity_path: map/robot
-```
 
-## TF usage
-A `TFHelper` is available on the node (`node.tf`) for modules needing tf lookups.
-You can inject frame ids via `extra` and call `node.tf.log_tf_path(…)` inside your module.
+---

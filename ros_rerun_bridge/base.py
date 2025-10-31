@@ -1,35 +1,47 @@
 from __future__ import annotations
 
 import importlib
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Optional, Type
 
 from pydantic import BaseModel, Field, ValidationError
 
 from .types import StrictParamsModel
-from .utils.qos import make_qos
-from .utils.time_utils import set_rr_time_from_ros
+from .utils.utils import _import_module_by_path, make_qos, set_rr_time_from_ros
 
 if TYPE_CHECKING:
     from rclpy.node import Node
     from rclpy.qos import QoSProfile
+    from rclpy.time import Time
 
     from .context import BridgeContext
 
 
 class ModuleConfig(StrictParamsModel):
-    name: str  # logical name for this subscription
-    module: str  # registry key or python path to class
-    topic: str  # ROS topic to subscribe to
-    entity_path: str  # Rerun entity path for logging
-    msg_type: str | None = None  # python path to ROS msg class (overrides module default if provided)
-    qos: dict = Field(default_factory=dict)  # depth, reliability, durability, history
+    """Configuration for a single bridge module."""
+
+    name: str
+    """Name of the module."""
+    module: str
+    """registry key or python path to the module class. e.g. 'image' or 'my_pkg.my_mod:MyModule'"""
+    topic: str
+    """ROS topic to subscribe to."""
+    entity_path: str
+    """Rerun entity path for logging."""
+    msg_type: str | None = None
+    """Python path to ROS msg class (overrides module default if provided)."""
+    qos: dict = Field(default_factory=dict)
+    """Quality of Service settings (depth, reliability, durability, history)."""
     params: dict = Field(default_factory=dict)
+    """Additional parameters for the module."""
 
 
 class BridgeConfig(StrictParamsModel):
+    """Configuration for the ROS→Rerun bridge."""
+
     global_frame: str = "map"
+    """Global frame for TF logging."""
     modules: list[ModuleConfig]
+    """List of bridge modules."""
 
 
 class TopicToComponentModule:
@@ -42,17 +54,34 @@ class TopicToComponentModule:
     Subclasses MAY define `PARAMS` = <PydanticModelSubclass>.
     If present, `self.params` will be an instance of that type (validated),
     otherwise it remains a plain dict.
+
+    Subclasses MAY implement `_extract_time(msg) -> Optional[Time]` to extract
+    a ROS time stamp from the message. If implemented, the bridge will set
+    Rerun's global time to that stamp before calling `handle()`.
     """
 
     PARAMS: Optional[BaseModel] = None  # subclasses can override
 
     def __init__(self, node: Node, config: ModuleConfig, context: BridgeContext) -> None:
+        """Initialize the module.
+
+        Args:
+            node: The ROS node to use for subscriptions & logging.
+            config: The module configuration.
+            context: Shared context for all modules.
+        """
         self.node = node
+        """The ROS node to use for subscriptions & logging."""
         self.context = context
+        """Shared context for all modules."""
         self.name = config.name
+        """Name of the module."""
         self.msg_type = config.msg_type
+        """Python path to ROS msg class (overrides module default if provided)."""
         self.entity_path = config.entity_path
+        """Rerun entity path for logging."""
         self.params = config.params.copy() or {}
+        """Additional parameters specific to the module."""
         if self.PARAMS is not None:
             try:
                 self.params = self.PARAMS.model_validate(self.params)
@@ -76,7 +105,7 @@ class TopicToComponentModule:
         raise NotImplementedError
 
     def handle(self, msg: Any) -> None:
-        """Process & log to Rerun. Must be implemented by subclasses."""
+        """Process & log to Rerun. This method is called when a new message is received. Subclasses must override."""
         raise NotImplementedError
 
     # ——— Internals ———
@@ -98,18 +127,3 @@ class TopicToComponentModule:
         if self.msg_type:
             return _import_module_by_path(self.msg_type)
         return self.ros_msg_type()
-
-
-def _import_module_by_path(path: str):
-    # Utility: import a dotted path "a.b.c:Class" or "a.b.c.Class"
-    if ":" in path:
-        mod, attr = path.split(":", 1)
-        return getattr(importlib.import_module(mod), attr)
-    if "." in path:
-        mod, attr = path.rsplit(".", 1)
-        return getattr(importlib.import_module(mod), attr)
-    raise ValueError(
-        f"Invalid module path '{path}'. Expected 'pkg.mod:Class' or 'pkg.mod.Class'. "
-        "If you intended a registry key (e.g. 'image'), ensure 'rerun_ros_bridge.modules' "
-        "is imported so the key is registered."
-    )
