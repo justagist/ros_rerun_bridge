@@ -41,6 +41,18 @@ modules:
           child_frame: camera_depth_frame
           parent_frame: map
 
+  # Particle cloud → arrows + transform for the particle cloud
+  - name: particles_arrows
+    module: particle_cloud
+    topic: /particle_cloud
+    entity_path: map/particlecloud_arrows
+    extra:
+      mode: arrows
+      arrow_axis: x # use body X as heading
+      arrow_len: 0.05 # meters, scaled by weight
+      arrow_radius: 0.002
+      colour: [0, 255, 0, 255] # green
+
   # Laser scan → line strips + transform for the scanner
   - name: scan
     module: laserscan
