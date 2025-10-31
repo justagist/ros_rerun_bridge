@@ -1,0 +1,17 @@
+# Example configuration for logging robot joint states and URDF. This should work with any robot publishing /robot_description and /joint_states.
+
+global_frame: map
+
+modules:
+  # URDF logged once (latching /robot_description)
+  - name: urdf
+    module: urdf
+    topic: /robot_description
+    entity_path: map/robot/urdf
+    qos: { depth: 1, durability: transient_local }
+
+  # Joint states updating the URDF kinematics (urdf module must be loaded as well)
+  - name: joints
+    module: joint_states
+    topic: /joint_states
+    entity_path: map/robot/urdf # not used directly, but consistent root for clarity

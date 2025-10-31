@@ -1,3 +1,7 @@
+# this can be used with the example from nav2 starter doc: https://docs.nav2.org/getting_started/index.html
+# Run that example, and in another terminal run:
+# rerun_ros_bridge --config <path_to_rerun_ros_bridge>/example_configs/turtlebot3_nav2.config.yaml
+
 global_frame: map
 
 modules:
@@ -16,7 +20,6 @@ modules:
       # optional: desired cv_bridge encoding
       encoding_override: null
       tf_paths:
-        # This mirrors: self.log_tf_as_transform3d("map/robot/camera", time)
         - path: map/robot/camera
           child_frame: camera_rgb_optical_frame
           parent_frame: base_footprint
@@ -70,4 +73,5 @@ modules:
     entity_path: map/robot/urdf
     qos: { depth: 1, durability: transient_local }
     extra:
-      fix_camera_link_scale: 0.00254
+      link_scales:
+        camera_link: 0.00254

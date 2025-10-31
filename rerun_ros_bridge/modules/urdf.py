@@ -2,33 +2,33 @@ from __future__ import annotations
 
 from typing import Any
 
-import trimesh
 from std_msgs.msg import String
+from urdf_parser_py import urdf as urdf_parser
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..utils.urdf_utils import load_urdf_from_msg, log_scene
+from ..utils.urdf_utils import UrdfKinematics
 
 
 @REGISTRY.register("urdf")
 class URDFModule(TopicToComponentModule):
+    """Subscribe to /robot_description (std_msgs/String), parse URDF, log visuals, and expose kinematics."""
+
     @classmethod
     def ros_msg_type(cls):
         return String
 
     def handle(self, msg: Any) -> None:
-        urdf = load_urdf_from_msg(msg)
+        model: urdf_parser.URDF = urdf_parser.URDF.from_xml_string(msg.data)
 
-        # Optional fixup for camera scale (example carried over; configurable)
-        fix_camera = self.extra.get("fix_camera_link_scale", 0.0)
-        if fix_camera:
-            scene = urdf.scene
-            orig, _ = scene.graph.get("camera_link")
+        link_scales = dict(self.extra.get("link_scales", {}))
 
-            scene.graph.update(frame_to="camera_link", matrix=orig.dot(trimesh.transformations.scale_matrix(fix_camera)))
-            scaled = scene.scaled(1.0)
-        else:
-            scaled = urdf.scene
+        kin = UrdfKinematics(model, root_path=self.entity_path, link_scales=link_scales)
 
-        base_link = urdf.base_link or self.extra.get("base_link", "base_link")
-        log_scene(scene=scaled, node=base_link, path=self.entity_path, static=True)
+        # Log once & expose kinematics to the joint states module
+        kin.log_visuals()
+        self.context.urdf_kinematics = kin
+
+        # Initialize joints to zeros so transforms exist
+        for j in model.joints:
+            kin.set_joint(j.name, 0.0)
