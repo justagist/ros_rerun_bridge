@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
 
 import yaml
-from rclpy.node import Node
 
 from .base import ModuleSpec, TopicToComponentModule, _import_by_path
-from .context import BridgeContext
 from .registry import REGISTRY
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from rclpy.node import Node
+
+    from .context import BridgeContext
 
 
 class BridgeBuilder:

@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import importlib
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Type
+from typing import TYPE_CHECKING, Any, Callable, Optional, Type
 
-from rclpy.node import Node
-from rclpy.qos import QoSProfile
+from .utils.qos import make_qos
+from .utils.time_utils import set_rr_time_from_ros
 
-import rerun as rr
+if TYPE_CHECKING:
+    from rclpy.node import Node
+    from rclpy.qos import QoSProfile
 
-from .context import BridgeContext
-from .qos import make_qos
-from .time_utils import set_rr_time_from_ros
+    from .context import BridgeContext
 
 
 @dataclass

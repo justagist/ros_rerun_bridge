@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .tf_utils import TFHelper
+from .utils.tf_utils import TFHelper
 
 
 @dataclass

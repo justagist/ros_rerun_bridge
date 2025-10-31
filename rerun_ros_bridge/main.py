@@ -10,7 +10,7 @@ import rerun as rr
 
 from .context import BridgeContext
 from .loader import BridgeBuilder, load_yaml
-from .tf_utils import TFHelper
+from .utils.tf_utils import TFHelper
 
 
 class BridgeNode(Node):

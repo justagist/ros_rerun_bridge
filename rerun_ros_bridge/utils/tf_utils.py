@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from rclpy.node import Node
+from typing import TYPE_CHECKING
+
 from rclpy.time import Duration, Time
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
 import rerun as rr
+
+if TYPE_CHECKING:
+    from rclpy.node import Node
 
 
 class TFHelper:
