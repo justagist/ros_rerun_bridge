@@ -79,10 +79,10 @@ modules:
           parent_frame: map
 
   # URDF logged once (latching /robot_description)
-  - name: urdf
-    module: urdf
+  - name: robot_description
+    module: robot_description
     topic: /robot_description
-    entity_path: map/robot/urdf
+    entity_path: map/robot/robot_description
     qos: { depth: 1, durability: transient_local }
     params:
       link_scales:

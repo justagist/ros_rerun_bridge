@@ -4,14 +4,14 @@ global_frame: map
 
 modules:
   # URDF logged once (latching /robot_description)
-  - name: urdf
-    module: urdf
+  - name: robot_description
+    module: robot_description
     topic: /robot_description
-    entity_path: map/robot/urdf
+    entity_path: map/robot/robot_description
     qos: { depth: 1, durability: transient_local }
 
-  # Joint states updating the URDF kinematics (urdf module must be loaded as well)
+  # Joint states updating the URDF kinematics (robot_description module must be loaded as well)
   - name: joints
     module: joint_states
     topic: /joint_states
-    entity_path: map/robot/urdf # not used directly, but consistent root for clarity
+    entity_path: map/robot/robot_description # not used directly, but consistent root for clarity

@@ -3,9 +3,11 @@
 
 A **config-driven, modular ROS 2 → Rerun** bridge. You describe what to subscribe to and how to visualize it in a YAML file; the bridge loads a set of lightweight **modules** (one topic → one Rerun component) and streams everything into the Rerun viewer.
 
-> 🚧 Project Status: Active Development
+> 🚧 In Active Development
 > 
-> **Note:** This repository is under active development. Features, interfaces, and behavior may change, and bugs or incomplete functionality could be present.
+> **Note:** This repository is created primarily so that I can get familiar with rerun and to try using it for some of my personal ROS projects. It is under active development; so features, interfaces, and behavior may change, and bugs or incomplete functionality could be present.
+
+**Tested with Rerun sdk v0.26.2 and ROS Jazzy.**
 
 ---
 
@@ -94,53 +96,65 @@ modules:            # list of module specs (loaded in order)
 
 ## Built‑in modules
 
-Below is the current set of bundled modules and their notable params.
+Below is the current set of bundled modules and their notable params. See params in their corresponding src file for full details.
 
 > All modules accept `entity_path` and (unless otherwise stated) support optional `params.tf_paths: [ {path, child_frame, parent_frame}, … ]` to log transforms alongside the primary visualization.
 
-### `image`  — `sensor_msgs/Image`
+### `image`  -- `sensor_msgs/Image`
 
 * Converts via `cv_bridge` and logs `rr.Image`.
 * **Params**
 
-  * `encoding_override: <string>` – force a cv_bridge target encoding.
+  * `encoding_override: <string>` -- force a cv_bridge target encoding.
 
-### `camera_info`  — `sensor_msgs/CameraInfo`
+### `camera_info`  -- `sensor_msgs/CameraInfo`
 
 * Uses `image_geometry.PinholeCameraModel` to log intrinsics to Rerun (`rr.Pinhole`), aligned with your `entity_path`.
 
-### `laserscan`  — `sensor_msgs/LaserScan`
+### `laserscan`  -- `sensor_msgs/LaserScan`
 
 * Converts a scan to points or lines using `laser_geometry`/`sensor_msgs_py.point_cloud2`.
 * **Params**
 
-  * `render_mode: points | lines` (default `points`)
-  * `min_range` / `max_range` – clamp distances
-  * `decimation: int` – sample every Nth ray
-  * `radius: float` – line radius when `render_mode=lines`
+  * `mode: points | lines` (default `points`)
+  * `origin_scale`  -- Scale factor for the laser origin when rendering lines (default: 0.3 m) 
+  * `radius: float` -- line radius when `render_mode=lines`
 
-### `pointcloud2`  — `sensor_msgs/PointCloud2`
+### `pointcloud2`  -- `sensor_msgs/PointCloud2`
 
 * Logs `rr.Points3D` with optional RGB extraction.
 * **Params**
 
   * `colour_mode: rgb_packed | fields | none` (default `rgb_packed`)
-  * `colour_fields: [r, g, b]` – when `colour_mode=fields`
+  * `colour_fields: [r, g, b]` -- when `colour_mode=fields`
 
-### `odometry`  — `nav_msgs/Odometry` (optional dep)
+### `particle_cloud`  -- `nav2_msgs/ParticleCloud`
+
+* Visualizes a particle cloud as either points or arrows, depending on configuration.
+* **Params**
+
+  * `mode: "points" | "arrows"` -- Visualization mode. `'points'` uses `rr.Points3D`, `'arrows'` uses `rr.Arrows3D`.
+  * `radius: float` -- Base radius for points or arrows (default: 0.0015).
+  * `colour: [r, g, b, a]` -- Base RGBA colour (default: `[255, 255, 255, 255]`).
+  * `colour_by_weight: bool` -- Whether to modulate colour alpha by particle weight.
+  * `w_min` / `w_max`: Optional normalization bounds for weights.
+  * `arrow_len: float` -- Base arrow length (default: 0.05).
+  * `arrow_axis: "x" | "y" | "z"` -- Which body axis defines heading for arrows (default: x).
+
+### `odometry`  -- `nav_msgs/Odometry` (optional dep)
 
 * Logs scalar time‑series for linear/angular velocities and supports TF path logging via `tf_paths`.
 
-### `urdf`  — `std_msgs/String` (XML from `/robot_description`)
+### `robot_description`  -- `std_msgs/String` (XML from `/robot_description`)
 
-* Parses the URDF, logs link visuals, and exposes kinematics in `context.urdf_kinematics`.
+* Parses the URDF from the /robot_description topic, logs link visuals, and exposes kinematics in `context.urdf_kinematics` (which can be used by other modules).
 * **Params**
 
-  * `link_scales: { <link_name>: <scale> }` – per‑link scale factors for visuals.
+  * `link_scales: { <link_name>: <scale> }` -- per‑link scale factors for visuals.
 
-### `joint_states`  — `sensor_msgs/JointState`
+### `joint_states`  -- `sensor_msgs/JointState`
 
-* Updates joint positions in the URDF scene (requires `urdf` module to be loaded first).
+* Updates joint positions in the URDF scene (requires `robot_description` module to be loaded first) based on the published /joint_states topic.
 
 ---
 
@@ -148,8 +162,8 @@ Below is the current set of bundled modules and their notable params.
 
 The repo includes two sample configs in `example_configs/`:
 
-* `robot_joint_states.config.yaml` – load URDF once, then animate with `/joint_states`. This should work with any robot publishing /robot_description and /joint_states. 
-* `turtlebot3_nav2.config.yaml` – camera, laser scan, odometry, point clouds, etc. This can be used with the example from nav2 starter doc: https://docs.nav2.org/getting_started/index.html.
+* `robot_joint_states.config.yaml` -- load URDF once, then animate with `/joint_states`. This should work with any robot publishing /robot_description and /joint_states. 
+* `turtlebot3_nav2.config.yaml` -- camera, laser scan, odometry, point clouds, etc. This can be used with the example from nav2 starter doc: https://docs.nav2.org/getting_started/index.html.
 
 Run either as:
 

@@ -12,23 +12,23 @@ from ..types import BaseModelWithTFPaths
 from ..utils.urdf_utils import UrdfKinematics
 
 
-class URDFParams(BaseModelWithTFPaths):
-    """Parameters for the URDFModule."""
+class RobotDescriptionParams(BaseModelWithTFPaths):
+    """Parameters for the RobotDescriptionModule."""
 
     link_scales: Dict[str, PositiveFloat] = Field(default_factory=dict)
     """Optional per-link scale factors for visual geometry."""
 
 
-@REGISTRY.register("urdf")
-class URDFModule(TopicToComponentModule):
+@REGISTRY.register("robot_description")
+class RobotDescriptionModule(TopicToComponentModule):
     """Subscribe to /robot_description (std_msgs/String), parse URDF, log visuals, and expose kinematics.
 
     Module-specific extra configuration parameters:
       - link_scales: Optional per-link scale factors for visual geometry.
     """
 
-    PARAMS = URDFParams
-    params: URDFParams  # type hint for self.params
+    PARAMS = RobotDescriptionParams
+    params: RobotDescriptionParams  # type hint for self.params
 
     @classmethod
     def ros_msg_type(cls):  # noqa: D102
