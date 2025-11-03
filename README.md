@@ -11,6 +11,23 @@ A **config-driven, modular ROS 2 → Rerun** bridge. You describe what to subsc
 
 ---
 
+# Demos
+
+### Nav2 Demo
+
+This uses the [turtlebot3_nav2.config.yaml](example_configs/turtlebot3_nav2.config.yaml) config file and works directly with the [nav2 starter demo](https://docs.nav2.org/getting_started/index.html).
+
+[![ros_rerun_tb3_sim.mp4](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_tb3_sim.gif)](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_tb3_sim.mp4)
+
+### Moveit Demo
+
+This uses the [robot_joint_states.config.yaml](example_configs/robot_joint_states.config.yaml) config file and works with any robot that publishes robot description and joint states.
+
+[![ros_rerun_franka_moveit.mp4](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.gif)](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.mp4)
+
+
+---
+
 ## Highlights
 
 * **Modular by design:** add/remove per-topic handlers as plugins.
