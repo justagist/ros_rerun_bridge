@@ -6,7 +6,7 @@
 [![Rerun 0.40](https://img.shields.io/badge/Rerun-0.40-0B8CE9.svg)](https://rerun.io)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
-Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rviz. List the topics you want to see in a YAML config file: the bridge subscribes to them and sends each message to Rerun, drawn in its TF frame.
+Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rviz. List the topics you want to see in a YAML config file: the bridge subscribes to them and sends each message to Rerun, drawing spatial data in its TF frame.
 
 > **Status:** I created this repository mainly to get familiar with Rerun and to use it in my own ROS projects. It is under active development, so features, interfaces and behaviour may change. Tested with Rerun 0.40.0 and ROS 2 Jazzy.
 

@@ -1,6 +1,6 @@
 # Configuration
 
-A config is a YAML file listing the topics to show and how. The bridge checks it on start: an unknown key or invalid value stops it before a viewer opens. Each module's `params` are checked when the module is created, just after.
+A config is a YAML file listing the topics to show and how. The bridge checks it on start: an unknown key or invalid value stops it before a viewer opens. Each module's `params` are checked when the module is created, after the viewer has opened.
 
 ```yaml
 global_frame: map          # optional: the TF frame the 3D view is rendered in (default: map)
@@ -43,7 +43,7 @@ Data from stamped messages is placed in the TF frame named in the message header
 
 ## Timeline
 
-Data is logged on a `ros_time` timeline at each message's stamp, or at the time it was received if it has none, so the viewer can scrub back through what happened.
+Data is logged on a `ros_time` timeline at each message's stamp, or at the time it was received if it has no stamp or a zero one, so the viewer can scrub back through what happened.
 
 ## Viewer layout
 

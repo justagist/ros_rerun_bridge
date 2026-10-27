@@ -2,7 +2,7 @@
 
 Each module subscribes to one topic and logs its messages under the module's `entity_path`. Select one with `module: <name>` in the config ([CONFIGURATION.md](CONFIGURATION.md)); set its parameters under `params`. Unknown parameters are an error.
 
-For messages with a header, modules draw the data in the header's TF frame and log it at the header's stamp; see [Frames](CONFIGURATION.md#frames) and [Timeline](CONFIGURATION.md#timeline).
+For messages with a header, spatial modules draw the data in the header's TF frame (images in its image plane frame, see [`image`](#image)), and every module logs it at the header's stamp, or when received if the stamp is zero; see [Frames](CONFIGURATION.md#frames) and [Timeline](CONFIGURATION.md#timeline).
 
 | Module | Message | Shows |
 | --- | --- | --- |
@@ -144,7 +144,7 @@ Plots numeric fields of any message type as time series. Set the message type wi
 * An array is plotted as one series per element. When a message's array is shorter than earlier ones, the series for the missing elements have a gap.
 * Each series follows its element's position in the array. If elements change meaning between messages, as on `/joint_states` with several publishers covering different joints, a series mixes values from different joints.
 * Values are plotted as they are. Non-finite values, such as a `Range`'s `+inf` "no detection" readings, leave a gap.
-* Messages with a header are plotted at its stamp, others at the time they are received.
+* Messages are plotted at their header's stamp, or at the time they are received if they have no header or a zero stamp.
 * To both draw a topic and plot it, give it two modules, e.g. `range` for the cone and `scalars` for the plot. Each subscribes to the topic on its own.
 
 | Param | Default | |
