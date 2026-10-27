@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Dict
 
 import rclpy
 import yaml
-from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
 import rerun as rr
@@ -36,21 +36,11 @@ class BridgeNode(Node):
         """
         super().__init__("ros_rerun_bridge")
 
-        # Allow concurrent callbacks
-        self.callback_group = ReentrantCallbackGroup()
-
         # Optional shared context. Currently only holds TF helper.
         bridge_context = BridgeContext(tf=TFHelper(self))
 
         # Load config
         cfg = BridgeConfig.model_validate(load_yaml(config_path))
-
-        # TODO: Log the real map once https://github.com/rerun-io/rerun/issues/1531 is merged
-        rr.log(
-            f"{cfg.global_frame}/box",
-            rr.Boxes3D(half_sizes=[3, 3, 1], centers=[0, 0, 1], colors=[255, 255, 255, 255]),
-            static=True,
-        )
 
         # build modules
         builder = BridgeBuilder(self)
@@ -97,9 +87,14 @@ def run(argv: list[str] | None = None) -> None:
 
     try:
         rclpy.spin(node, executor=rclpy.executors.MultiThreadedExecutor())
+    except (KeyboardInterrupt, ExternalShutdownException):
+        # rclpy's signal handler shuts the context down from its own thread; shutting it down here as well races
+        # with that and can fail with "rcl_shutdown already called"
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        # Flushes pending data, e.g. for --save
+        rr.script_teardown(args)
 
 
 if __name__ == "__main__":

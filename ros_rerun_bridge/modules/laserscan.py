@@ -44,6 +44,11 @@ class LaserScanModule(TopicToComponentModule):
     PARAMS = LaserScanParams
     params: LaserScanParams  # type hint for self.params
 
+    def __init__(self, *a, **kw) -> None:
+        """Initialise the LaserScanModule with a reusable LaserProjection."""
+        super().__init__(*a, **kw)
+        self.projection = laser_geometry.laser_geometry.LaserProjection()
+
     @classmethod
     def ros_msg_type(cls):  # noqa: D102
         return LaserScan
@@ -52,15 +57,15 @@ class LaserScanModule(TopicToComponentModule):
         return Time.from_msg(msg.header.stamp)
 
     def handle(self, msg: LaserScan) -> None:  # noqa: D102
-        proj = laser_geometry.laser_geometry.LaserProjection()
-        cloud = proj.projectLaser(msg)
+        cloud = self.projection.projectLaser(msg)
         pts_iter = point_cloud2.read_points(cloud, field_names=["x", "y", "z"], skip_nans=True)
         pts = structured_to_unstructured(pts_iter)
 
         # Optional rendering mode via extra: lines | points
         if self.params.mode == "lines":
             origin = (pts / np.linalg.norm(pts, axis=1).reshape(-1, 1)) * self.params.origin_scale
-            segs = np.hstack([origin, pts]).reshape(pts.shape[0] * 2, 3)
+            # (N, 2, 3): one two-point strip per ray. A flat (2N, 3) array would be drawn as a single zigzag strip.
+            segs = np.hstack([origin, pts]).reshape(-1, 2, 3)
             rr.log(self.entity_path, rr.LineStrips3D(segs, radii=self.params.radius))
         else:
             rr.log(self.entity_path, rr.Points3D(pts))

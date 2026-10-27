@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from rclpy.time import Time
 from sensor_msgs.msg import JointState
 
 from ..base import TopicToComponentModule
@@ -13,6 +14,9 @@ class JointStatesModule(TopicToComponentModule):
     @classmethod
     def ros_msg_type(cls):  # noqa: D102
         return JointState
+
+    def _extract_time(self, msg: JointState) -> Time | None:
+        return Time.from_msg(msg.header.stamp)
 
     def handle(self, msg: JointState) -> None:  # noqa: D102
         if not self.context.urdf_kinematics:

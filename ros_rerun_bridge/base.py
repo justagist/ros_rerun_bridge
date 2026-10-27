@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import importlib
 from typing import TYPE_CHECKING, Any, Callable, Optional, Type
 
 from pydantic import BaseModel, Field, ValidationError
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 from .types import StrictParamsModel
 from .utils.utils import _import_module_by_path, make_qos, set_rr_time_from_ros
@@ -56,8 +56,8 @@ class TopicToComponentModule:
     otherwise it remains a plain dict.
 
     Subclasses MAY implement `_extract_time(msg) -> Optional[Time]` to extract
-    a ROS time stamp from the message. If implemented, the bridge will set
-    Rerun's global time to that stamp before calling `handle()`.
+    a ROS time stamp from the message. The bridge sets Rerun's time to that
+    stamp before calling `handle()`, or to the receive time if there is none.
     """
 
     PARAMS: Optional[BaseModel] = None  # subclasses can override
@@ -93,7 +93,10 @@ class TopicToComponentModule:
         qos_profile: QoSProfile = make_qos(**config.qos) if config.qos else make_qos()
 
         msg_type = self._resolve_msg_type()
-        self._sub = node.create_subscription(msg_type, config.topic, self._callback, qos_profile)
+        # One group per module: topics are handled in parallel, but each module sees its messages one at a time
+        self._sub = node.create_subscription(
+            msg_type, config.topic, self._callback, qos_profile, callback_group=MutuallyExclusiveCallbackGroup()
+        )
         node.get_logger().info(
             f"[{config.name}] subscribed to {config.topic} with {msg_type.__name__} → {config.entity_path}"
         )
@@ -110,18 +113,17 @@ class TopicToComponentModule:
 
     # ——— Internals ———
     def _callback(self, msg: Any) -> None:
+        # Rerun's time is per thread and executor threads are shared between modules, so it must be set for every
+        # message. Unstamped messages (or a zero stamp) fall back to receive time.
         stamp_getter: Optional[Callable[[Any], Optional["Time"]]] = getattr(self, "_extract_time", None)
-        if stamp_getter:
-            try:
-                stamp = stamp_getter(msg)
-                if stamp is not None:
-                    set_rr_time_from_ros(stamp)
-            except Exception as e:
-                self.node.get_logger().warn(f"[{self.name}] failed to set rr time: {e}")
+        stamp = stamp_getter(msg) if stamp_getter else None
+        if stamp is None or stamp.nanoseconds == 0:
+            stamp = self.node.get_clock().now()
+        set_rr_time_from_ros(stamp)
         try:
             self.handle(msg)
         except Exception as e:
-            self.node.get_logger().error(f"[{self.name}] handle() error: {e}")
+            self.node.get_logger().error(f"[{self.name}] handle() error: {e}", throttle_duration_sec=5.0)
 
     def _resolve_msg_type(self) -> Type:
         if self.msg_type:

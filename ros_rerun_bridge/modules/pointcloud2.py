@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Literal
 
+import numpy as np
 from numpy.lib.recfunctions import structured_to_unstructured
 from rclpy.time import Time
-from sensor_msgs.msg import PointCloud2, PointField
+from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 
 import rerun as rr
@@ -50,25 +51,22 @@ class PointCloud2Module(TopicToComponentModule):
         return Time.from_msg(msg.header.stamp)
 
     def handle(self, msg: PointCloud2) -> None:  # noqa: D102
-        # Configure color extraction (module extra supports multiple patterns)
-        field_names = ["x", "y", "z"]
-        pts_iter = point_cloud2.read_points(msg, field_names=field_names, skip_nans=True)
-        pts = structured_to_unstructured(pts_iter)
+        colour_fields = {"rgb_packed": ["rgb"], "fields": self.params.colour_fields, "none": []}[self.params.colour_mode]
+        # Read in one pass so colours stay aligned with points. NaNs are filtered on xyz only: a packed RGBA float
+        # with full alpha is itself a NaN bit pattern.
+        cloud = point_cloud2.read_points(msg, field_names=["x", "y", "z", *colour_fields])
+        pts = structured_to_unstructured(cloud[["x", "y", "z"]])
+        valid = np.isfinite(pts).all(axis=1)
+        pts = pts[valid]
 
         colors = None
         if self.params.colour_mode == "rgb_packed":
-            # Some drivers pack RGB into a float field named 'rgb'. We'll reinterpret offsets.
-            msg.fields = [
-                PointField(name="r", offset=16, datatype=PointField.UINT8, count=1),
-                PointField(name="g", offset=17, datatype=PointField.UINT8, count=1),
-                PointField(name="b", offset=18, datatype=PointField.UINT8, count=1),
-            ]
-            colors_iter = point_cloud2.read_points(msg, field_names=["r", "g", "b"], skip_nans=True)
-            colors = structured_to_unstructured(colors_iter)
+            # PCL packs colour as 0x00RRGGBB in the 4 bytes of the 'rgb' field
+            rgb = cloud["rgb"][valid]
+            packed = rgb.astype(rgb.dtype.newbyteorder("=")).view(np.uint32)
+            colors = np.stack([(packed >> 16) & 0xFF, (packed >> 8) & 0xFF, packed & 0xFF], axis=1).astype(np.uint8)
         elif self.params.colour_mode == "fields":
-            colors_iter = point_cloud2.read_points(msg, field_names=self.params.colour_fields, skip_nans=True)
-            colors = structured_to_unstructured(colors_iter)
-        # else: no colors
+            colors = structured_to_unstructured(cloud[self.params.colour_fields])[valid]
 
         rr.log(self.entity_path, rr.Points3D(pts, colors=colors))
 

@@ -17,8 +17,7 @@ def _import_module_by_path(path: str):
         return getattr(importlib.import_module(mod), attr)
     raise ValueError(
         f"Invalid module path '{path}'. Expected 'pkg.mod:Class' or 'pkg.mod.Class'. "
-        "If you intended a registry key (e.g. 'image'), ensure 'ros_rerun_bridge.modules' "
-        "is imported so the key is registered."
+        "If you intended a built-in module (e.g. 'image'), check its name."
     )
 
 

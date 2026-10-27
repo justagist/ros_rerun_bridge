@@ -137,7 +137,7 @@ class ParticleCloudModule(TopicToComponentModule):
             rr.log(self.entity_path, rr.Arrows3D(origins=pos, vectors=vectors, radii=self.params.radius, colors=colours))
         else:
             # POINTS MODE
-            rr.log(self.entity_path, rr.Points3D(pos, colours=colours, radii=self.params.radius))
+            rr.log(self.entity_path, rr.Points3D(pos, colors=colours, radii=self.params.radius))
 
         # Optional TF attachments (same pattern as other modules)
         stamp = self._extract_time(msg)
