@@ -1,15 +1,12 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from .utils.tf_utils import TFHelper
-from .utils.urdf_utils import UrdfKinematics
+import rerun as rr
 
 
 @dataclass
 class BridgeContext:
     """Shared context for all modules that run at a time."""
 
-    tf: TFHelper  # filled by BridgeNode
-    """TF helper for logging transforms."""
-    urdf_kinematics: Optional[UrdfKinematics] = None
-    """URDF kinematics helper, filled by URDF module if the module is loaded correctly."""
+    urdf_tree: Optional[rr.urdf.UrdfTree] = None
+    """Robot model, filled by the robot_description module once the URDF is received."""

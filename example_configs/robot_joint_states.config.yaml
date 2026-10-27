@@ -1,17 +1,22 @@
-# Example configuration for logging robot joint states and URDF. This should work with any robot publishing /robot_description and /joint_states.
+# Example configuration for logging a robot from its URDF and joint states. This should work with any robot publishing
+# /robot_description and /joint_states. For robots that publish TF (e.g. via robot_state_publisher), use the tf module
+# instead of joint_states, as in turtlebot3_nav2.config.yaml.
 
-global_frame: map
+# Without TF, nothing links the robot to a world frame: render the 3D view in the robot's root link
+# (e.g. panda_link0 for the Franka MoveIt demo)
+global_frame: base_link
 
 modules:
   # URDF logged once (latching /robot_description)
   - name: robot_description
     module: robot_description
     topic: /robot_description
-    entity_path: map/robot/robot_description
+    entity_path: robot
     qos: { depth: 1, durability: transient_local }
 
-  # Joint states updating the URDF kinematics (robot_description module must be loaded as well)
+  # Joint states moving the robot model (robot_description module must be loaded as well). Logged on `tf`, the entity
+  # a tf module would use, so adding one later (e.g. for a camera's frames) cannot conflict.
   - name: joints
     module: joint_states
     topic: /joint_states
-    entity_path: map/robot/robot_description # not used directly, but consistent root for clarity
+    entity_path: tf

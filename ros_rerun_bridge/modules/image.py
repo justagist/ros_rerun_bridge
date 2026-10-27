@@ -9,10 +9,11 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..types import BaseModelWithTFPaths
+from ..types import StrictParamsModel
+from ..utils.utils import IMAGE_PLANE_SUFFIX
 
 
-class ImageParams(BaseModelWithTFPaths):
+class ImageParams(StrictParamsModel):
     """Parameters for the ImageModule."""
 
     encoding_override: str | None = None
@@ -44,11 +45,6 @@ class ImageModule(TopicToComponentModule):
             if self.params.encoding_override
             else cvb.imgmsg_to_cv2(msg)
         )
-        rr.log(self.entity_path, rr.Image(img))
-
-        stamp = self._extract_time(msg)
-        for tfp in self.params.tf_paths:
-            self.context.tf.log_tf_path(
-                tf_path=tfp,
-                time=stamp,
-            )
+        # Shown in 3D through the camera's pinhole, logged by the camera_info module
+        frame = msg.header.frame_id
+        self.log(rr.Image(img), frame_id=f"{frame}{IMAGE_PLANE_SUFFIX}" if frame else "")

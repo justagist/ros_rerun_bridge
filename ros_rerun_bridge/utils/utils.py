@@ -6,6 +6,9 @@ from rclpy.time import Time
 
 import rerun as rr
 
+IMAGE_PLANE_SUFFIX = "_image_plane"
+"""Appended to a camera's frame_id to name the frame its images are in, linked to the camera frame by its pinhole."""
+
 
 def _import_module_by_path(path: str):
     # Utility: import a dotted path "a.b.c:Class" or "a.b.c.Class"

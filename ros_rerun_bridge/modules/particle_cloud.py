@@ -10,7 +10,7 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..types import BaseModelWithTFPaths
+from ..types import StrictParamsModel
 
 try:
     from nav2_msgs.msg import ParticleCloud
@@ -20,7 +20,7 @@ except ImportError:
     NAV2_MSGS_AVAILABLE = False
 
 
-class ParticleCloudParams(BaseModelWithTFPaths):
+class ParticleCloudParams(StrictParamsModel):
     """Parameters for the ParticleCloudModule."""
 
     mode: Literal["points", "arrows"] = "points"
@@ -134,15 +134,10 @@ class ParticleCloudModule(TopicToComponentModule):
             lengths = (self.params.arrow_len * (0.2 + 0.8 * w_norm)).reshape(-1, 1)  # keep a small floor
             vectors = dirs * lengths  # (N,3)
 
-            rr.log(self.entity_path, rr.Arrows3D(origins=pos, vectors=vectors, radii=self.params.radius, colors=colours))
+            self.log(
+                rr.Arrows3D(origins=pos, vectors=vectors, radii=self.params.radius, colors=colours),
+                frame_id=msg.header.frame_id,
+            )
         else:
             # POINTS MODE
-            rr.log(self.entity_path, rr.Points3D(pos, colors=colours, radii=self.params.radius))
-
-        # Optional TF attachments (same pattern as other modules)
-        stamp = self._extract_time(msg)
-        for tfp in self.params.tf_paths:
-            self.context.tf.log_tf_path(
-                tf_path=tfp,
-                time=stamp,
-            )
+            self.log(rr.Points3D(pos, colors=colours, radii=self.params.radius), frame_id=msg.header.frame_id)

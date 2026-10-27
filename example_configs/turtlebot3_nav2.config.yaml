@@ -1,51 +1,55 @@
 # this can be used with the example from nav2 starter doc: https://docs.nav2.org/getting_started/index.html
 # Run that example, and in another terminal run:
 # ros_rerun_bridge --config <path_to_ros_rerun_bridge>/example_configs/turtlebot3_nav2.config.yaml
+#
+# Every module places its data in the TF frame named in the message header, so the tf modules are needed for anything
+# to appear in the 3D view.
 
 global_frame: map
 
 modules:
-  # Camera intrinsics → Pinhole at map/robot/camera/img
+  # TF: /tf_static goes on `tf_static`, the entity Rerun's URDF importer also uses
+  - name: tf
+    module: tf
+    topic: /tf
+    entity_path: tf
+
+  - name: tf_static
+    module: tf
+    topic: /tf_static
+    entity_path: tf_static
+    qos: { depth: 10, durability: transient_local }
+    params:
+      static: true
+
+  # Camera intrinsics: a pinhole from the camera frame to its image plane
   - name: camera_info
     module: camera_info
     topic: /intel_realsense_r200_depth/camera_info
-    entity_path: map/robot/camera/img
+    entity_path: camera/info
 
-  # RGB image + transform for the camera rig
+  # RGB image, shown in 3D through the camera's pinhole
   - name: rgb_image
     module: image
     topic: /intel_realsense_r200_depth/image_raw
-    entity_path: map/robot/camera/img
+    entity_path: camera/image
     params:
       # optional: desired cv_bridge encoding
       encoding_override: null
-      tf_paths:
-        - path: map/robot/camera
-          child_frame: camera_rgb_optical_frame
-          parent_frame: base_footprint
 
-  # Depth point cloud: log once under camera-centric path and once under map
+  # Depth point cloud
   - name: depth_points
     module: pointcloud2
     topic: /intel_realsense_r200_depth/points
-    entity_path: map/robot/camera/points
+    entity_path: camera/points
     params:
       colour_mode: rgb_packed
-      tf_paths:
-        # Robot-centric (camera frame relative to camera optical frame)
-        - path: map/robot/camera/points
-          child_frame: camera_depth_frame
-          parent_frame: camera_rgb_optical_frame
-        # Map-centric (same child, placed under map)
-        - path: map/points
-          child_frame: camera_depth_frame
-          parent_frame: map
 
-  # Particle cloud → arrows + transform for the particle cloud
+  # Particle cloud → arrows
   - name: particles_arrows
     module: particle_cloud
     topic: /particle_cloud
-    entity_path: map/particlecloud_arrows
+    entity_path: particlecloud_arrows
     params:
       mode: arrows
       arrow_axis: x # use body X as heading
@@ -53,37 +57,25 @@ modules:
       radius: 0.002
       colour: [0, 255, 0, 255] # green
 
-  # Laser scan → line strips + transform for the scanner
+  # Laser scan → line strips
   - name: scan
     module: laserscan
     topic: /scan
-    entity_path: map/robot/scan
+    entity_path: scan
     params:
       mode: lines
       origin_scale: 0.3
       radius: 0.0025
-      tf_paths:
-        - path: map/robot/scan
-          child_frame: base_scan
-          parent_frame: base_footprint
 
-  # Odometry → scalar plots + robot pose under map
+  # Odometry → scalar plots
   - name: odom
     module: odometry
     topic: /odom
     entity_path: odometry
-    params:
-      tf_paths:
-        - path: map/robot
-          child_frame: base_footprint
-          parent_frame: map
 
   # URDF logged once (latching /robot_description)
   - name: robot_description
     module: robot_description
     topic: /robot_description
-    entity_path: map/robot/robot_description
+    entity_path: robot
     qos: { depth: 1, durability: transient_local }
-    params:
-      link_scales:
-        camera_link: 0.00254

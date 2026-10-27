@@ -9,13 +9,13 @@ description = "Config-driven, pluggable ROS2 → Rerun bridge"
 authors = [{ name = "Saif Sidhik", email = "mail@saifsidhik.page" }]
 requires-python = ">=3.10"
 dependencies = [
-    "rerun-sdk",
-    "numpy",
+    # Pinned: Rerun's API changes between minor versions
+    "rerun-sdk==0.40.0",
+    "numpy>=2",
     "pyyaml",
     # ROS2 deps are system-provided; python-only extras below
     "opencv-python", # for cv_bridge conversion runtime (cv_bridge still required from ROS)
-    "trimesh",
-    "yourdfpy",
+    "scipy",
     "pydantic>=2.0",
 ]
 

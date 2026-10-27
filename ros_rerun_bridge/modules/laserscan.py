@@ -13,10 +13,10 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..types import BaseModelWithTFPaths
+from ..types import StrictParamsModel
 
 
-class LaserScanParams(BaseModelWithTFPaths):
+class LaserScanParams(StrictParamsModel):
     """Parameters for the LaserScanModule."""
 
     mode: Literal["lines", "points"] = "lines"
@@ -66,13 +66,6 @@ class LaserScanModule(TopicToComponentModule):
             origin = (pts / np.linalg.norm(pts, axis=1).reshape(-1, 1)) * self.params.origin_scale
             # (N, 2, 3): one two-point strip per ray. A flat (2N, 3) array would be drawn as a single zigzag strip.
             segs = np.hstack([origin, pts]).reshape(-1, 2, 3)
-            rr.log(self.entity_path, rr.LineStrips3D(segs, radii=self.params.radius))
+            self.log(rr.LineStrips3D(segs, radii=self.params.radius), frame_id=msg.header.frame_id)
         else:
-            rr.log(self.entity_path, rr.Points3D(pts))
-
-        stamp = self._extract_time(msg)
-        for tfp in self.params.tf_paths:
-            self.context.tf.log_tf_path(
-                tf_path=tfp,
-                time=stamp,
-            )
+            self.log(rr.Points3D(pts), frame_id=msg.header.frame_id)

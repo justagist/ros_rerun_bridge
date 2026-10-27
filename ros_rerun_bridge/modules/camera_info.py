@@ -8,6 +8,7 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
+from ..utils.utils import IMAGE_PLANE_SUFFIX
 
 
 @REGISTRY.register("camera_info")
@@ -28,10 +29,14 @@ class CameraInfoModule(TopicToComponentModule):
 
     def handle(self, msg: CameraInfo) -> None:  # noqa: D102
         self.cam_model.from_camera_info(msg)
+        # The pinhole links the camera frame to its image plane frame, where the image modules place images
+        frame = msg.header.frame_id
         rr.log(
             self.entity_path,
             rr.Pinhole(
                 resolution=[self.cam_model.width, self.cam_model.height],
                 image_from_camera=self.cam_model.intrinsicMatrix(),
+                parent_frame=frame or None,
+                child_frame=f"{frame}{IMAGE_PLANE_SUFFIX}" if frame else None,
             ),
         )

@@ -12,10 +12,10 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..types import BaseModelWithTFPaths
+from ..types import StrictParamsModel
 
 
-class PointCloud2Params(BaseModelWithTFPaths):
+class PointCloud2Params(StrictParamsModel):
     """Parameters for the PointCloud2Module."""
 
     colour_mode: Literal["rgb_packed", "fields", "none"] = "rgb_packed"
@@ -68,11 +68,4 @@ class PointCloud2Module(TopicToComponentModule):
         elif self.params.colour_mode == "fields":
             colors = structured_to_unstructured(cloud[self.params.colour_fields])[valid]
 
-        rr.log(self.entity_path, rr.Points3D(pts, colors=colors))
-
-        stamp = self._extract_time(msg)
-        for tfp in self.params.tf_paths:
-            self.context.tf.log_tf_path(
-                tf_path=tfp,
-                time=stamp,
-            )
+        self.log(rr.Points3D(pts, colors=colors), frame_id=msg.header.frame_id)

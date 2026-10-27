@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Type
 from pydantic import BaseModel, Field, ValidationError
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
+import rerun as rr
+
 from .types import StrictParamsModel
 from .utils.utils import _import_module_by_path, make_qos, set_rr_time_from_ros
 
@@ -39,7 +41,7 @@ class BridgeConfig(StrictParamsModel):
     """Configuration for the ROS→Rerun bridge."""
 
     global_frame: str = "map"
-    """Global frame for TF logging."""
+    """TF frame that Rerun's default 3D view is rendered in."""
     modules: list[ModuleConfig]
     """List of bridge modules."""
 
@@ -49,7 +51,7 @@ class TopicToComponentModule:
 
     Subclasses should:
       * implement `ros_msg_type()` returning a ROS msg class (if msg_type not provided in config)
-      * implement `handle(msg)` to log to Rerun using `self.entity_path`
+      * implement `handle(msg)` to log to Rerun using `self.entity_path`, usually via `self.log(..., frame_id=...)`
 
     Subclasses MAY define `PARAMS` = <PydanticModelSubclass>.
     If present, `self.params` will be an instance of that type (validated),
@@ -110,6 +112,18 @@ class TopicToComponentModule:
     def handle(self, msg: Any) -> None:
         """Process & log to Rerun. This method is called when a new message is received. Subclasses must override."""
         raise NotImplementedError
+
+    # ——— Helpers ———
+    def log(self, *archetypes: Any, frame_id: str = "") -> None:
+        """Log archetypes to this module's entity, placed in the named TF frame `frame_id` if one is given.
+
+        Args:
+            archetypes: Rerun archetypes to log.
+            frame_id: TF frame the data is expressed in, usually the message's `header.frame_id`.
+        """
+        if frame_id:
+            archetypes = (*archetypes, rr.CoordinateFrame(frame=frame_id))
+        rr.log(self.entity_path, *archetypes)
 
     # ——— Internals ———
     def _callback(self, msg: Any) -> None:

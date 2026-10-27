@@ -20,15 +20,15 @@ from rclpy.time import Time
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..types import BaseModelWithTFPaths
+from ..types import StrictParamsModel
 
-class MyPoseParams(BaseModelWithTFPaths):
+class MyPoseParams(StrictParamsModel):
     # add your own strict, typed params here
-    scale: float = 1.0
+    radius: float = 0.02
 
 @REGISTRY.register("my_pose")
 class MyPoseModule(TopicToComponentModule):
-    """Log PoseStamped as a 3D transform."""
+    """Log a PoseStamped's position as a point."""
 
     PARAMS = MyPoseParams
     params: MyPoseParams  # for type checkers
@@ -42,17 +42,8 @@ class MyPoseModule(TopicToComponentModule):
 
     def handle(self, msg: PoseStamped) -> None:
         p = msg.pose.position
-        q = msg.pose.orientation
-        rr.log(self.entity_path, rr.Transform3D(
-            translation=[p.x, p.y, p.z],
-            rotation=rr.Quaternion(xyzw=[q.x, q.y, q.z, q.w]),
-            scale=[self.params.scale,]*3,
-        ))
-
-        # Optionally log TF paths configured in params
-        stamp = self._extract_time(msg)
-        for tfp in self.params.tf_paths:
-            self.context.tf.log_tf_path(tf_path=tfp, time=stamp)
+        # Placed in the message's TF frame, which the `tf` module links to the rest of the scene
+        self.log(rr.Points3D([[p.x, p.y, p.z]], radii=self.params.radius), frame_id=msg.header.frame_id)
 ```
 
 **Key conventions**
@@ -83,13 +74,9 @@ modules:
   - name: pose
     module: my_pose            # or package path
     topic: /pose
-    entity_path: map/robot
+    entity_path: pose
     params:
-      scale: 1.5
-      tf_paths:
-        - path: map/robot
-          child_frame: base_link
-          parent_frame: map
+      radius: 0.05
 ```
 
 ### 5) QoS & message types
@@ -106,8 +93,8 @@ modules:
 ### 7) Common utilities you can use
 
 * `set_rr_time_from_ros(stamp)` – align Rerun time with a ROS stamp.
-* `TFHelper.log_tf_path(tf_path, time)` – produce a transform chain under `tf_path.path` using `tf2` lookups.
-* `UrdfKinematics` – if your module needs to place things in the robot frame tree.
+* `self.log(*archetypes, frame_id=...)` – log to the module's entity, placed in a named TF frame.
+* `context.urdf_tree` – the robot model (Rerun's `UrdfTree`), once the `robot_description` module has received it.
 
 ---
 

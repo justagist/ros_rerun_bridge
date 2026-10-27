@@ -7,7 +7,7 @@ A **config-driven, modular ROS 2 → Rerun** bridge. You describe what to subsc
 > 
 > **Note:** This repository is created primarily so that I can get familiar with rerun and to try using it for some of my personal ROS projects. It is under active development; so features, interfaces, and behavior may change, and bugs or incomplete functionality could be present.
 
-**Tested with Rerun sdk v0.26.2 and ROS Jazzy.**
+**Tested with Rerun sdk v0.40.0 and ROS Jazzy.**
 
 ---
 
@@ -33,7 +33,7 @@ This uses the [robot_joint_states.config.yaml](example_configs/robot_joint_state
 * **Modular by design:** add/remove per-topic handlers as plugins.
 * **Config-first:** ship a single YAML that declares topics, QoS, entity paths, and per-module parameters.
 * **Zero-copy-ish visuals:** modules translate ROS messages to Rerun primitives directly.
-* **TF & URDF aware:** optional helpers to visualize frames and robot geometry; `joint_states` can animate URDF.
+* **TF & URDF aware:** data is placed in the TF frame named in each message's header, as in rviz; the robot model is loaded with Rerun's URDF importer and moves with TF (or `joint_states`).
 * **Module-specific params:** Each module can have module-specific params. Module params are validated with Pydantic (v2) for stricter typing.
 
 ---
@@ -48,7 +48,7 @@ pip install -e .
 #   source /opt/ros/humble/setup.bash
 ```
 
-> Python deps are declared in `pyproject.toml` (e.g. `pydantic`, `pyyaml`, `opencv-python`, `trimesh`, `yourdfpy`). ROS-supplied Python packages (e.g. message types) come from your sourced ROS environment.
+> Python deps are declared in `pyproject.toml` (e.g. `rerun-sdk`, `pydantic`, `pyyaml`, `opencv-python`, `scipy`). ROS-supplied Python packages (e.g. message types) come from your sourced ROS environment.
 
 ---
 
@@ -104,8 +104,8 @@ modules:            # list of module specs (loaded in order)
 
 ### Shared helpers available to modules
 
-* **TF helper** (`node.tf`): modules that include `tf_paths` in their params can log transforms per message timestamp.
-* **URDF kinematics** (`context.urdf_kinematics`): exposed once the `urdf` module loads; used by `joint_states` to animate links.
+* **Frame-aware logging** (`self.log(..., frame_id=...)`): logs to the module's entity, placed in the named TF frame. TF itself comes from the `tf` module.
+* **Robot model** (`context.urdf_tree`): Rerun's `UrdfTree`, exposed once the `robot_description` module loads; used by `joint_states` to move joints.
 
 > Internally, params inherit from a strict `BaseModel` so unknown fields error out instead of being ignored.
 
@@ -115,18 +115,26 @@ modules:            # list of module specs (loaded in order)
 
 Below is the current set of bundled modules and their notable params. See params in their corresponding src file for full details.
 
-> All modules accept `entity_path` and (unless otherwise stated) support optional `params.tf_paths: [ {path, child_frame, parent_frame}, … ]` to log transforms alongside the primary visualization.
+> All modules accept `entity_path`. Modules for stamped messages place their data in the message's `header.frame_id`, so configure the `tf` module for anything to appear in the 3D view. `global_frame` sets the frame the default 3D view is rendered in.
+
+### `tf`  -- `tf2_msgs/TFMessage`
+
+* Logs each transform as a `rr.Transform3D` between named frames (`header.frame_id` → `child_frame_id`).
+* Use one module for `/tf` and another for `/tf_static`. Rerun requires a frame relation to always be logged on the same entity, so give them different entities, and log `/tf_static` on `tf_static`, the entity Rerun's URDF importer also logs the robot's joints on.
+* **Params**
+
+  * `static: bool` -- log transforms as static, valid at all times (default `false`). Set for `/tf_static`, with `durability: transient_local` QoS.
 
 ### `image`  -- `sensor_msgs/Image`
 
-* Converts via `cv_bridge` and logs `rr.Image`.
+* Converts via `cv_bridge` and logs `rr.Image` in the frame `<frame_id>_image_plane`, where the `camera_info` pinhole shows it in 3D.
 * **Params**
 
   * `encoding_override: <string>` -- force a cv_bridge target encoding.
 
 ### `camera_info`  -- `sensor_msgs/CameraInfo`
 
-* Uses `image_geometry.PinholeCameraModel` to log intrinsics to Rerun (`rr.Pinhole`), aligned with your `entity_path`.
+* Uses `image_geometry.PinholeCameraModel` to log intrinsics to Rerun (`rr.Pinhole`) from the camera frame to its image plane frame, `<frame_id>_image_plane`.
 
 ### `laserscan`  -- `sensor_msgs/LaserScan`
 
@@ -160,18 +168,20 @@ Below is the current set of bundled modules and their notable params. See params
 
 ### `odometry`  -- `nav_msgs/Odometry` (optional dep)
 
-* Logs scalar time‑series for linear/angular velocities and supports TF path logging via `tf_paths`.
+* Logs scalar time‑series for linear/angular velocities. The robot's pose comes from TF.
 
 ### `robot_description`  -- `std_msgs/String` (XML from `/robot_description`)
 
-* Parses the URDF from the /robot_description topic, logs link visuals, and exposes kinematics in `context.urdf_kinematics` (which can be used by other modules).
-* **Params**
-
-  * `link_scales: { <link_name>: <scale> }` -- per‑link scale factors for visuals.
+* Loads the URDF from the /robot_description topic with Rerun's URDF importer and logs each link's visual geometry in the link's frame. `package://` mesh paths are resolved through the sourced ROS environment. Collision geometry is not logged.
+* Scales Collada (`.dae`) visual meshes by the unit they declare (`<unit meter="...">`), as rviz does: Rerun's importer ignores it, so e.g. a mesh authored in inches would otherwise render ~40x too large.
+* Logs the joints at zero as static defaults on `tf_static`, so the robot is assembled before TF or joint states arrive.
+* Exposes the model in `context.urdf_tree` for other modules.
 
 ### `joint_states`  -- `sensor_msgs/JointState`
 
-* Updates joint positions in the URDF scene (requires `robot_description` module to be loaded first) based on the published /joint_states topic.
+* Moves the robot model's joints from the published /joint_states topic (requires the `robot_description` module).
+* Not needed where `robot_state_publisher` already puts the joints on `/tf`.
+* Log it on the `tf` module's entity (`entity_path: tf`). Rerun requires a frame relation to always be logged on the same entity, so this lets the same joint arrive on both `/tf` and `/joint_states` (the latest transform wins, as in tf2), and lets `joint_states` move the arm while `/tf` carries other frames, e.g. a camera.
 
 ---
 

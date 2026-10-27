@@ -19,7 +19,6 @@ from . import __version__
 from .base import BridgeConfig
 from .context import BridgeContext
 from .loader import BridgeBuilder
-from .utils.tf_utils import TFHelper
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -36,11 +35,14 @@ class BridgeNode(Node):
         """
         super().__init__("ros_rerun_bridge")
 
-        # Optional shared context. Currently only holds TF helper.
-        bridge_context = BridgeContext(tf=TFHelper(self))
+        # Shared context. Currently only holds the robot model.
+        bridge_context = BridgeContext()
 
         # Load config
         cfg = BridgeConfig.model_validate(load_yaml(config_path))
+
+        # The root entity's frame is the one Rerun's default 3D view renders in. ROS frames are right-handed, Z up.
+        rr.log("/", rr.ViewCoordinates.RIGHT_HAND_Z_UP, rr.CoordinateFrame(frame=cfg.global_frame), static=True)
 
         # build modules
         builder = BridgeBuilder(self)
