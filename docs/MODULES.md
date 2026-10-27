@@ -2,7 +2,7 @@
 
 Each module subscribes to one topic and logs its messages under the module's `entity_path`. Select one with `module: <name>` in the config ([CONFIGURATION.md](CONFIGURATION.md)); set its parameters under `params`. Unknown parameters are an error.
 
-Modules for stamped messages log at the message's stamp (or the receive time if it has none) and place their data in the TF frame named in its header, as rviz does. Configure the [`tf`](#tf) module for those frames to be linked into one scene.
+Modules for stamped messages place their data in the TF frame named in its header and log it at its stamp; see [Frames](CONFIGURATION.md#frames) and [Timeline](CONFIGURATION.md#timeline).
 
 | Module | Message | Shows |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ Modules for stamped messages log at the message's stamp (or the receive time if 
 
 Logs each transform as a link between named frames (`header.frame_id` to `child_frame_id`).
 
-Use one module for `/tf` and another for `/tf_static`, on different entities: Rerun requires a link between two frames to always be logged on the same entity. Log `/tf_static` on `tf_static`, the entity the `robot_description` module also logs the robot's fixed joints on.
+Use one module for `/tf` and another for `/tf_static`, on different entities: Rerun requires a link between two frames to change over time on one entity only (a static value on another entity is allowed, as a default). Log `/tf_static` on `tf_static`, the entity the `robot_description` module also logs the robot's joint defaults on.
 
 ```yaml
 - { name: tf, module: tf, topic: /tf, entity_path: tf }
@@ -52,7 +52,7 @@ Loads the URDF from `/robot_description` with Rerun's URDF importer and logs eac
 
 ## `joint_states`
 
-Moves the robot model's joints from `/joint_states`. Needs the [`robot_description`](#robot_description) module. Joint positions are shown as reported, even outside the URDF's limits.
+Moves the robot model's joints from `/joint_states`. Needs the [`robot_description`](#robot_description) module. Joint positions are shown as reported, even outside the URDF's limits. Mimic joints follow the joint they mimic, as with `robot_state_publisher`, unless the message gives their position.
 
 Not needed where `robot_state_publisher` already puts the joints on `/tf`. Log it on the `tf` module's entity (`entity_path: tf`): the same joint can then arrive on both `/tf` and `/joint_states` (the latest wins, as in tf2), and `/tf` can carry other frames, such as a camera's.
 
@@ -68,7 +68,7 @@ Logs JPEG and PNG images as they are, for the viewer to decode, in the frame `<f
 
 ## `camera_info`
 
-Logs the camera's intrinsics (`K`) as a pinhole linking the camera frame to its image plane frame, `<frame_id>_image_plane`.
+Logs the camera's intrinsics (`K`) as a pinhole linking the camera frame to its image plane frame, `<frame_id>_image_plane`. As in rviz, `frame_id` should be the camera's optical frame (`x` right, `y` down, `z` forward); another frame shows the image plane rotated.
 
 ## `pointcloud2`
 
@@ -76,7 +76,7 @@ Logs points with their colours. Points with a NaN coordinate are dropped.
 
 | Param | Default | |
 | --- | --- | --- |
-| `colour_mode` | `rgb_packed` | `rgb_packed`: colour packed in a field named `rgb`, as PCL does. `fields`: separate channels. `none`: no colour. |
+| `colour_mode` | `auto` | `auto`: the `rgb` field if the cloud has one, otherwise no colour. `rgb_packed`: colour packed in a field named `rgb`, as PCL does. `fields`: separate channels. `none`: no colour. |
 | `colour_fields` | `[r, g, b]` | Channel fields, for `colour_mode: fields`. |
 
 ## `laserscan`

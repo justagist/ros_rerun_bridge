@@ -24,7 +24,7 @@ Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rv
 
 * **Config-driven:** one YAML file lists the topics, their QoS, where they appear in Rerun, and per-module parameters, validated on start.
 * **TF and URDF aware:** data appears in its TF frame, and the robot model, loaded from its URDF, moves with TF or joint states.
-* **rviz's common displays:** robot model, images, point clouds, laser scans, range sensors, markers, maps and costmaps, and more (see [modules](#modules)).
+* **rviz's common displays:** robot model, images, point clouds, laser scans, range sensors, markers, maps and costmaps, and more (see [Modules](#modules)).
 * **Remote viewing:** any number of native or browser viewers can connect to a bridge running on a robot.
 * **Extensible:** a new message type is a small module class, built in or loaded from your own package.
 
@@ -40,13 +40,7 @@ uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml
 
 This opens the Rerun viewer and shows any robot publishing `/robot_description` and `/joint_states`, such as the MoveIt demo above.
 
-To have the `ros-rerun-bridge` command available everywhere:
-
-```bash
-uv tool install --python-preference only-system -e .
-```
-
-See [INSTALLATION.md](docs/INSTALLATION.md) for other ways to install, and why the bridge needs its own environment.
+See [INSTALLATION.md](docs/INSTALLATION.md) to make the `ros-rerun-bridge` command available everywhere, for other ways to install, and for why the bridge needs its own environment.
 
 ## Usage
 
@@ -88,22 +82,7 @@ See [CONFIGURATION.md](docs/CONFIGURATION.md) for every field, frames, QoS and s
 
 ## Modules
 
-| Module | Message | Shows |
-| --- | --- | --- |
-| `tf` | `tf2_msgs/TFMessage` | Links between TF frames |
-| `robot_description` | `std_msgs/String` | The robot model from its URDF |
-| `joint_states` | `sensor_msgs/JointState` | Robot joints, without TF |
-| `image`, `compressed_image` | `sensor_msgs/Image`, `CompressedImage` | Camera images |
-| `camera_info` | `sensor_msgs/CameraInfo` | Camera intrinsics, to show images in 3D |
-| `pointcloud2` | `sensor_msgs/PointCloud2` | Point clouds |
-| `laserscan` | `sensor_msgs/LaserScan` | Laser scans |
-| `range` | `sensor_msgs/Range` | Range sensor readings |
-| `marker_array` | `visualization_msgs/MarkerArray`, `Marker` | rviz markers |
-| `occupancy_grid` | `nav_msgs/OccupancyGrid` | Maps and costmaps |
-| `odometry` | `nav_msgs/Odometry` | Velocities as plots |
-| `particle_cloud` | `nav2_msgs/ParticleCloud` | Localisation particles |
-
-See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
+Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `occupancy_grid`, `odometry` and `particle_cloud`. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
 
 ## Development
 

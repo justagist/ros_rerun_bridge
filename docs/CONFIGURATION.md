@@ -1,6 +1,6 @@
 # Configuration
 
-A config is a YAML file listing the topics to show and how. The bridge validates it on start: unknown keys and parameters are an error.
+A config is a YAML file listing the topics to show and how. The bridge validates it on start, before opening a viewer: unknown keys, invalid values and unknown parameters are an error.
 
 ```yaml
 global_frame: map          # optional: the TF frame the 3D view is rendered in (default: map)
@@ -28,11 +28,18 @@ The [example configs](../example_configs) are a good starting point.
 
 `msg_type` overrides a module's message type by its Python path, e.g. `visualization_msgs.msg.Marker` to use `marker_array` on a single-marker topic.
 
+## QoS
+
+A subscription only receives from publishers with compatible QoS (DDS middlewares enforce this; rmw_zenoh is lenient about reliability). Check a topic's publishers with `ros2 topic info -v <topic>`:
+
+* **Reliability:** a `reliable` subscription (the default) receives nothing from `best_effort` publishers, which many sensor drivers use (`SensorDataQoS`). `best_effort` receives from both, so it is a safe choice for sensor topics.
+* **Durability:** latched topics (`/map`, `/robot_description`, `/tf_static`, Nav2 costmaps) are published `transient_local`. Subscribe `transient_local` too, to get their last message when the bridge starts after the publisher. A `transient_local` subscription receives nothing from a `volatile` publisher.
+
 ## Frames
 
 Data from stamped messages is placed in the TF frame named in the message header, as in rviz. The [`tf`](MODULES.md#tf) module links those frames into one scene; without it, data in different frames is drawn on top of each other at the origin.
 
-`global_frame` is the frame the default 3D view is rendered in, like rviz's fixed frame: `map` for navigation, or e.g. `world` or the robot's root link for an arm.
+`global_frame` is the frame the default 3D view is rendered in, like rviz's fixed frame: `map` for navigation, or e.g. `world` or the robot's root link for an arm. It must be linked to the data's frames, through TF or the robot's URDF, or the 3D view stays empty.
 
 ## Timeline
 

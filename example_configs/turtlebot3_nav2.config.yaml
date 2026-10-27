@@ -1,9 +1,9 @@
 # this can be used with the example from nav2 starter doc: https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/
 # Run that example, and in another terminal run:
-# ros_rerun_bridge --config <path_to_ros_rerun_bridge>/example_configs/turtlebot3_nav2.config.yaml
+# ros-rerun-bridge --config <path_to_ros_rerun_bridge>/example_configs/turtlebot3_nav2.config.yaml
 #
-# Every module places its data in the TF frame named in the message header, so the tf modules are needed for anything
-# to appear in the 3D view.
+# Every module places its data in the TF frame named in the message header; the tf modules link those frames into one
+# scene. Sensor topics are subscribed best effort, which also matches reliable publishers.
 
 global_frame: map
 
@@ -27,26 +27,29 @@ modules:
     module: camera_info
     topic: /intel_realsense_r200_depth/camera_info
     entity_path: camera/info
+    qos: { reliability: best_effort }
 
   # RGB image, shown in 3D through the camera's pinhole
   - name: rgb_image
     module: image
     topic: /intel_realsense_r200_depth/image_raw
     entity_path: camera/image
+    qos: { reliability: best_effort }
 
   # Depth point cloud
   - name: depth_points
     module: pointcloud2
     topic: /intel_realsense_r200_depth/points
     entity_path: camera/points
-    params:
-      colour_mode: rgb_packed
+    qos: { reliability: best_effort }
 
   # Particle cloud -> arrows
   - name: particles_arrows
     module: particle_cloud
     topic: /particle_cloud
     entity_path: particlecloud_arrows
+    # AMCL publishes it best effort
+    qos: { reliability: best_effort }
     params:
       mode: arrows
       arrow_axis: x # use body X as heading
@@ -59,6 +62,7 @@ modules:
     module: laserscan
     topic: /scan
     entity_path: scan
+    qos: { reliability: best_effort }
     params:
       mode: lines
       origin_scale: 0.3
@@ -75,6 +79,7 @@ modules:
     module: occupancy_grid
     topic: /global_costmap/costmap
     entity_path: global_costmap
+    qos: { depth: 1, durability: transient_local }
     params:
       colormap: RvizCostmap
       opacity: 0.6
