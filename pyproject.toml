@@ -4,27 +4,57 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ros-rerun-bridge"
-version = "0.0.1"
-description = "Config-driven, pluggable ROS2 → Rerun bridge"
+version = "0.1.0"
+description = "Config-driven, pluggable ROS2 -> Rerun bridge"
 authors = [{ name = "Saif Sidhik", email = "mail@saifsidhik.page" }]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
-    "rerun-sdk",
-    "numpy",
+    # Pinned: Rerun's API changes between minor versions
+    "rerun-sdk==0.40.0",
+    "numpy>=2",
     "pyyaml",
     # ROS2 deps are system-provided; python-only extras below
-    "opencv-python", # for cv_bridge conversion runtime (cv_bridge still required from ROS)
-    "trimesh",
-    "yourdfpy",
+    "scipy",
     "pydantic>=2.0",
 ]
 
 [project.scripts]
 ros-rerun-bridge = "ros_rerun_bridge:run"
 
+[dependency-groups]
+dev = [
+    "pytest",
+    # Pinned: ruff's default rules and formatting change between versions
+    "ruff==0.17.3",
+]
+
 [tool.setuptools]
 packages = [
     "ros_rerun_bridge",
     "ros_rerun_bridge.modules",
     "ros_rerun_bridge.utils",
+]
+
+[tool.uv]
+# rclpy is compiled for the distro's Python: never use a uv-managed one
+python-preference = "only-system"
+
+[tool.ruff]
+line-length = 120
+include = ["ros_rerun_bridge/**/*.py", "tests/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# A sourced ROS environment registers its own pytest plugins, whose dependencies are not in this environment
+addopts = [
+    "-p", "no:launch_testing",
+    "-p", "no:launch_ros",
+    "-p", "no:ament_copyright",
+    "-p", "no:ament_flake8",
+    "-p", "no:ament_lint",
+    "-p", "no:ament_pep257",
+    "-p", "no:ament_xmllint",
 ]

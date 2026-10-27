@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List, Literal, Tuple
 
 import numpy as np
+from nav2_msgs.msg import ParticleCloud
 from rclpy.time import Time
 from scipy.spatial.transform import Rotation
 
@@ -10,23 +11,16 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..types import BaseModelWithTFPaths
-
-try:
-    from nav2_msgs.msg import ParticleCloud
-
-    NAV2_MSGS_AVAILABLE = True
-except ImportError:
-    NAV2_MSGS_AVAILABLE = False
+from ..types import StrictParamsModel
 
 
-class ParticleCloudParams(BaseModelWithTFPaths):
+class ParticleCloudParams(StrictParamsModel):
     """Parameters for the ParticleCloudModule."""
 
     mode: Literal["points", "arrows"] = "points"
-    """Visualization mode. 'points' for Points3D, 'arrows' for LineStrips3D."""
+    """Visualisation mode: "points" for rr.Points3D, "arrows" for rr.Arrows3D."""
     radius: float = 0.0015
-    """Base radius for Points3D or LineStrips3D."""
+    """Base radius for points or arrows."""
     colour: tuple[int, int, int, int] = (255, 255, 255, 255)
     """Base RGBA colour as 4-tuple of uint8."""
     colour_by_weight: bool = True
@@ -43,44 +37,19 @@ class ParticleCloudParams(BaseModelWithTFPaths):
 
 @REGISTRY.register("particle_cloud")
 class ParticleCloudModule(TopicToComponentModule):
-    """
-    Visualize nav2_msgs/ParticleCloud as:
-        - mode: "points"  -> rr.Points3D coloured by weight
-        - mode: "arrows"  -> rr.LineStrips3D short arrows oriented by pose and scaled by weight
-    Module-specific extra configuration parameters:
-        - mode: "points" | "arrows"  (default: "points")
-                - points: render as points
-                - arrows: render as arrows oriented by pose
-        - radius: float (default: 0.0015)
-                - base radius for points or arrows
-        - colour: tuple[int, int, int, int] (default: (255, 255, 255, 255))
-                - base RGBA colour as 4-tuple of uint8
-        - colour_by_weight: bool (default: True)
-                - whether to modulate colour alpha by weight
-        - w_min: float | None (default: None)
-                - minimum weight for normalization (auto from current msg if None)
-        - w_max: float | None (default: None)
-                - maximum weight for normalization (auto from current msg if None)
-        - arrow_len: float (default: 0.05)
-                - base arrow length in meters (before weight scaling)
-        - arrow_axis: "x" | "y" | "z" (default: "x")
-                - which body axis defines heading for arrows
-    """
+    """Module for logging nav2_msgs/ParticleCloud to Rerun as points, or as arrows along each particle's heading."""
 
     PARAMS = ParticleCloudParams
     params: ParticleCloudParams  # type hint for self.params
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
-        if not NAV2_MSGS_AVAILABLE:
-            raise RuntimeError("nav2_msgs package is not installed.")
-
+    def ros_msg_type(cls):
         return ParticleCloud
 
-    def _extract_time(self, msg: ParticleCloud) -> Time | None:  # type: ignore[override]
+    def _extract_time(self, msg: ParticleCloud) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: ParticleCloud) -> None:  # noqa: D102
+    def handle(self, msg: ParticleCloud) -> None:
         particles = msg.particles or []
         if not particles:
             return
@@ -127,22 +96,19 @@ class ParticleCloudModule(TopicToComponentModule):
             q_xyzw = np.asarray(quats_xyzw, dtype=np.float32)
             rot = Rotation.from_quat(q_xyzw)  # SciPy expects xyzw
 
-            basis = {"x": np.array([1, 0, 0]), "y": np.array([0, 1, 0]), "z": np.array([0, 0, 1])}[self.params.arrow_axis]
+            basis = {"x": np.array([1, 0, 0]), "y": np.array([0, 1, 0]), "z": np.array([0, 0, 1])}[
+                self.params.arrow_axis
+            ]
 
             dirs = rot.apply(np.tile(basis, (len(particles), 1)))
 
             lengths = (self.params.arrow_len * (0.2 + 0.8 * w_norm)).reshape(-1, 1)  # keep a small floor
             vectors = dirs * lengths  # (N,3)
 
-            rr.log(self.entity_path, rr.Arrows3D(origins=pos, vectors=vectors, radii=self.params.radius, colors=colours))
+            self.log(
+                rr.Arrows3D(origins=pos, vectors=vectors, radii=self.params.radius, colors=colours),
+                frame_id=msg.header.frame_id,
+            )
         else:
             # POINTS MODE
-            rr.log(self.entity_path, rr.Points3D(pos, colours=colours, radii=self.params.radius))
-
-        # Optional TF attachments (same pattern as other modules)
-        stamp = self._extract_time(msg)
-        for tfp in self.params.tf_paths:
-            self.context.tf.log_tf_path(
-                tf_path=tfp,
-                time=stamp,
-            )
+            self.log(rr.Points3D(pos, colors=colours, radii=self.params.radius), frame_id=msg.header.frame_id)

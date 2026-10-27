@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: Lint
+        run: uv run --only-group dev ruff check
+      - name: Check formatting
+        run: uv run --only-group dev ruff format --check
+
+  test:
+    runs-on: ubuntu-24.04
+    container: ros:jazzy-ros-base
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ROS packages the modules use
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ros-jazzy-laser-geometry ros-jazzy-sensor-msgs-py ros-jazzy-nav2-msgs
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: Test
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          uv run pytest

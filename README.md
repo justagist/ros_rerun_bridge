@@ -1,191 +1,101 @@
-
 # ros-rerun-bridge
 
-A **config-driven, modular ROS 2 → Rerun** bridge. You describe what to subscribe to and how to visualize it in a YAML file; the bridge loads a set of lightweight **modules** (one topic → one Rerun component) and streams everything into the Rerun viewer.
+[![CI](https://github.com/justagist/ros_rerun_bridge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/justagist/ros_rerun_bridge/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202-Jazzy-22314E.svg)](https://docs.ros.org/en/jazzy/)
+[![Rerun 0.40](https://img.shields.io/badge/Rerun-0.40-0B8CE9.svg)](https://rerun.io)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
-> 🚧 In Active Development
-> 
-> **Note:** This repository is created primarily so that I can get familiar with rerun and to try using it for some of my personal ROS projects. It is under active development; so features, interfaces, and behavior may change, and bugs or incomplete functionality could be present.
+Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rviz. You list the topics to show in a YAML config; the bridge subscribes to them and logs each message to Rerun, placed in its TF frame.
 
-**Tested with Rerun sdk v0.26.2 and ROS Jazzy.**
+> **Status:** I created this repository mainly to get familiar with Rerun and to use it in my own ROS projects. It is under active development, so features, interfaces and behaviour may change. Tested with Rerun 0.40.0 and ROS 2 Jazzy.
 
----
+## Demos
 
-# Demos
-
-### Nav2 Demo
-
-This uses the [turtlebot3_nav2.config.yaml](example_configs/turtlebot3_nav2.config.yaml) config file and works directly with the [nav2 starter demo](https://docs.nav2.org/getting_started/index.html).
+**Nav2:** the [Nav2 getting started demo](https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/) with [turtlebot3_nav2.config.yaml](example_configs/turtlebot3_nav2.config.yaml).
 
 [![ros_rerun_tb3_sim.mp4](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_tb3_sim.gif)](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_tb3_sim.mp4)
 
-### Moveit Demo
-
-This uses the [robot_joint_states.config.yaml](example_configs/robot_joint_states.config.yaml) config file and works with any robot that publishes robot description and joint states.
+**MoveIt:** `ros2 launch moveit_resources_panda_moveit_config demo.launch.py` with [robot_joint_states.config.yaml](example_configs/robot_joint_states.config.yaml).
 
 [![ros_rerun_franka_moveit.mp4](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.gif)](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.mp4)
 
+## Features
 
----
+* **Config-driven:** one YAML file lists the topics, their QoS, where they appear in Rerun, and per-module parameters, validated on start.
+* **TF and URDF aware:** data appears in its TF frame, and the robot model, loaded from its URDF, moves with TF or joint states.
+* **rviz's common displays:** robot model, images, point clouds, laser scans, range sensors, markers, maps and costmaps, and more (see [Modules](#modules)).
+* **Remote viewing:** any number of native or browser viewers can connect to a bridge running on a robot.
+* **Extensible:** a new message type is a small module class, built in or loaded from your own package.
 
-## Highlights
+## Quick start
 
-* **Modular by design:** add/remove per-topic handlers as plugins.
-* **Config-first:** ship a single YAML that declares topics, QoS, entity paths, and per-module parameters.
-* **Zero-copy-ish visuals:** modules translate ROS messages to Rerun primitives directly.
-* **TF & URDF aware:** optional helpers to visualize frames and robot geometry; `joint_states` can animate URDF.
-* **Module-specific params:** Each module can have module-specific params. Module params are validated with Pydantic (v2) for stricter typing.
-
----
-
-## Installation (dev)
+Needs a ROS 2 installation and [uv](https://docs.astral.sh/uv/). The bridge runs in its own Python environment, as Rerun needs NumPy 2 while ROS ships NumPy 1; uv sets that up.
 
 ```bash
-# From the repo root
-pip install -e .
-
-# Make sure your ROS 2 distro is installed & sourced (e.g. Humble):
-#   source /opt/ros/humble/setup.bash
+git clone https://github.com/justagist/ros_rerun_bridge.git && cd ros_rerun_bridge
+source /opt/ros/jazzy/setup.bash
+uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml
 ```
 
-> Python deps are declared in `pyproject.toml` (e.g. `pydantic`, `pyyaml`, `opencv-python`, `trimesh`, `yourdfpy`). ROS-supplied Python packages (e.g. message types) come from your sourced ROS environment.
+This opens the Rerun viewer and shows any robot publishing `/robot_description` and `/joint_states`, such as the MoveIt demo above.
 
----
+See [INSTALLATION.md](docs/INSTALLATION.md) to make the `ros-rerun-bridge` command available everywhere, for other ways to install, and for why the bridge needs its own environment.
 
-## Running
-
-The package exposes a console script:
+## Usage
 
 ```bash
-ros-rerun-bridge --config path/to/config.yaml [RERUN_ARGS …] -- [RCLPY_ARGS …]
+ros-rerun-bridge --config <config.yaml> [options] [-- <ROS arguments>]
 ```
 
-* `--config` points to your YAML (schema below).
-* **RERUN_ARGS** are forwarded to `rerun.script_setup(...)` (e.g. `--spawn`, `--connect`, `--save` etc.).
-* After a literal `--`, any **RCLPY_ARGS** are passed through to rclpy/ROS 2.
-* `--version` prints the package version and exits.
+| Option | |
+| --- | --- |
+| *(none)* | Open a Rerun viewer. |
+| `--connect [--url <url>]` | Send to a Rerun viewer that is already running. |
+| `--serve [--allow-origin <pattern>]` | Host servers for viewers on other machines ([REMOTE_VIEWING.md](docs/REMOTE_VIEWING.md)). |
+| `--save <file.rrd>` | Record to a file, to open later with `rerun <file.rrd>`. |
+| `--stdout` | Stream to standard output, to pipe into `rerun -`. |
+| `--headless` | Run without a viewer. |
+| `--version` | Print the version. |
 
-Example:
+Arguments after `--` are passed to ROS, e.g. `-- --ros-args -p use_sim_time:=true`.
 
-```bash
-# Spawn a Rerun viewer and start the bridge.
-ros-rerun-bridge --config example_configs/turtlebot3_nav2.config.yaml --spawn
+## Configuration
 
-# Or connect to an already-running viewer
-ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml --connect 127.0.0.1:9876
-```
-
----
-
-## Configuration schema
-
-At the top level:
+A config lists the topics to show, each handled by a module:
 
 ```yaml
-global_frame: map   # (optional) default TF global frame for helpers
-modules:            # list of module specs (loaded in order)
-  - name: <string>          # required, human-friendly
-    module: <id-or-path>    # required, registry key OR python path (see below)
-    topic: <ros-topic>      # required, ROS topic to subscribe
-    entity_path: <rerun/entity>  # required, where to log in Rerun
-    msg_type: <pkg/msg>     # optional override; module has a default
-    qos:                    # optional QoS (all fields optional)
-      depth: 10
-      reliability: best_effort | reliable
-      durability: volatile | transient_local
-      history: keep_last | keep_all
-    params: {}              # optional, module-specific settings
+global_frame: map            # the TF frame the 3D view is rendered in
+modules:
+  - { name: tf, module: tf, topic: /tf, entity_path: tf }
+  - name: scan
+    module: laserscan
+    topic: /scan
+    entity_path: scan
+    qos: { reliability: best_effort }   # as most sensor drivers publish
+    params: { mode: points }
 ```
 
-### Module resolution
+See [CONFIGURATION.md](docs/CONFIGURATION.md) for every field, frames, QoS and saving a viewer layout. Two example configs are in [example_configs](example_configs):
 
-* Use a **registry key** (e.g. `image`, `pointcloud2`) to load a built‑in module, **or**
-* Provide a **Python path** to a class (`package.module:ClassName` or `package.module.ClassName`).
+* [robot_joint_states.config.yaml](example_configs/robot_joint_states.config.yaml): a robot from its URDF and joint states. Works as is with the MoveIt demos.
+* [turtlebot3_nav2.config.yaml](example_configs/turtlebot3_nav2.config.yaml): TF, robot, camera, point cloud, laser scan, map, costmap, particles and odometry from the Nav2 demo.
 
-### Shared helpers available to modules
+## Modules
 
-* **TF helper** (`node.tf`): modules that include `tf_paths` in their params can log transforms per message timestamp.
-* **URDF kinematics** (`context.urdf_kinematics`): exposed once the `urdf` module loads; used by `joint_states` to animate links.
+Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `occupancy_grid`, `odometry` and `particle_cloud`. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
 
-> Internally, params inherit from a strict `BaseModel` so unknown fields error out instead of being ignored.
-
----
-
-## Built‑in modules
-
-Below is the current set of bundled modules and their notable params. See params in their corresponding src file for full details.
-
-> All modules accept `entity_path` and (unless otherwise stated) support optional `params.tf_paths: [ {path, child_frame, parent_frame}, … ]` to log transforms alongside the primary visualization.
-
-### `image`  -- `sensor_msgs/Image`
-
-* Converts via `cv_bridge` and logs `rr.Image`.
-* **Params**
-
-  * `encoding_override: <string>` -- force a cv_bridge target encoding.
-
-### `camera_info`  -- `sensor_msgs/CameraInfo`
-
-* Uses `image_geometry.PinholeCameraModel` to log intrinsics to Rerun (`rr.Pinhole`), aligned with your `entity_path`.
-
-### `laserscan`  -- `sensor_msgs/LaserScan`
-
-* Converts a scan to points or lines using `laser_geometry`/`sensor_msgs_py.point_cloud2`.
-* **Params**
-
-  * `mode: points | lines` (default `points`)
-  * `origin_scale`  -- Scale factor for the laser origin when rendering lines (default: 0.3 m) 
-  * `radius: float` -- line radius when `render_mode=lines`
-
-### `pointcloud2`  -- `sensor_msgs/PointCloud2`
-
-* Logs `rr.Points3D` with optional RGB extraction.
-* **Params**
-
-  * `colour_mode: rgb_packed | fields | none` (default `rgb_packed`)
-  * `colour_fields: [r, g, b]` -- when `colour_mode=fields`
-
-### `particle_cloud`  -- `nav2_msgs/ParticleCloud`
-
-* Visualizes a particle cloud as either points or arrows, depending on configuration.
-* **Params**
-
-  * `mode: "points" | "arrows"` -- Visualization mode. `'points'` uses `rr.Points3D`, `'arrows'` uses `rr.Arrows3D`.
-  * `radius: float` -- Base radius for points or arrows (default: 0.0015).
-  * `colour: [r, g, b, a]` -- Base RGBA colour (default: `[255, 255, 255, 255]`).
-  * `colour_by_weight: bool` -- Whether to modulate colour alpha by particle weight.
-  * `w_min` / `w_max`: Optional normalization bounds for weights.
-  * `arrow_len: float` -- Base arrow length (default: 0.05).
-  * `arrow_axis: "x" | "y" | "z"` -- Which body axis defines heading for arrows (default: x).
-
-### `odometry`  -- `nav_msgs/Odometry` (optional dep)
-
-* Logs scalar time‑series for linear/angular velocities and supports TF path logging via `tf_paths`.
-
-### `robot_description`  -- `std_msgs/String` (XML from `/robot_description`)
-
-* Parses the URDF from the /robot_description topic, logs link visuals, and exposes kinematics in `context.urdf_kinematics` (which can be used by other modules).
-* **Params**
-
-  * `link_scales: { <link_name>: <scale> }` -- per‑link scale factors for visuals.
-
-### `joint_states`  -- `sensor_msgs/JointState`
-
-* Updates joint positions in the URDF scene (requires `robot_description` module to be loaded first) based on the published /joint_states topic.
-
----
-
-## Examples
-
-The repo includes two sample configs in `example_configs/`:
-
-* `robot_joint_states.config.yaml` -- load URDF once, then animate with `/joint_states`. This should work with any robot publishing /robot_description and /joint_states. 
-* `turtlebot3_nav2.config.yaml` -- camera, laser scan, odometry, point clouds, etc. This can be used with the example from nav2 starter doc: https://docs.nav2.org/getting_started/index.html.
-
-Run either as:
+## Development
 
 ```bash
-ros-rerun-bridge --config example_configs/turtlebot3_nav2.config.yaml --spawn
+source /opt/ros/jazzy/setup.bash
+uv run pytest            # tests: no running ROS graph needed
+uv run ruff check        # lint
+uv run ruff format       # format
 ```
 
----
+Tests drive each module with real ROS messages and check what it logs to an in-memory Rerun recording. CI runs them in the `ros:jazzy-ros-base` image.
+
+## License
+
+[MIT](LICENSE)

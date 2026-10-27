@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from image_geometry import PinholeCameraModel
+from typing import Literal
+
+import numpy as np
 from rclpy.time import Time
 from sensor_msgs.msg import CameraInfo
 
@@ -8,30 +10,55 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
+from ..types import StrictParamsModel
+from ..utils.utils import IMAGE_PLANE_SUFFIX
+
+
+class CameraInfoParams(StrictParamsModel):
+    """Parameters for the CameraInfoModule."""
+
+    intrinsics: Literal["k", "p"] = "k"
+    """Which intrinsics match the images shown: "k" for raw images, "p" (its left 3x3) for rectified ones."""
 
 
 @REGISTRY.register("camera_info")
 class CameraInfoModule(TopicToComponentModule):
     """Module for handling CameraInfo messages and logging camera intrinsics to Rerun."""
 
-    def __init__(self, *a, **kw) -> None:
-        """Initialize the CameraInfoModule with a PinholeCameraModel."""
-        super().__init__(*a, **kw)
-        self.cam_model = PinholeCameraModel()
+    PARAMS = CameraInfoParams
+    params: CameraInfoParams  # type hint for self.params
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
+    def ros_msg_type(cls):
         return CameraInfo
 
-    def _extract_time(self, msg: CameraInfo) -> Time | None:  # type: ignore[override]
+    def _extract_time(self, msg: CameraInfo) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: CameraInfo) -> None:  # noqa: D102
-        self.cam_model.from_camera_info(msg)
+    def handle(self, msg: CameraInfo) -> None:
+        # The intrinsics are for the full sensor resolution: adjust them, and the resolution, to the published image's
+        # binning and region of interest, as image_geometry does
+        binning_x, binning_y = max(1, msg.binning_x), max(1, msg.binning_y)
+        roi = msg.roi
+        full_frame = roi.x_offset == roi.y_offset == roi.width == roi.height == 0
+        width, height = (msg.width, msg.height) if full_frame else (roi.width, roi.height)
+        if self.params.intrinsics == "k":
+            k = np.reshape(msg.k, (3, 3)).astype(np.float64)
+        else:
+            k = np.reshape(msg.p, (3, 4))[:, :3].astype(np.float64)
+        k[0, 0] /= binning_x
+        k[1, 1] /= binning_y
+        k[0, 2] = (k[0, 2] - roi.x_offset) / binning_x
+        k[1, 2] = (k[1, 2] - roi.y_offset) / binning_y
+
+        # The pinhole links the camera frame to its image plane frame, where the image modules place images
+        frame = msg.header.frame_id
         rr.log(
             self.entity_path,
             rr.Pinhole(
-                resolution=[self.cam_model.width, self.cam_model.height],
-                image_from_camera=self.cam_model.intrinsicMatrix(),
+                resolution=[width // binning_x, height // binning_y],
+                image_from_camera=k,
+                parent_frame=frame or None,
+                child_frame=f"{frame}{IMAGE_PLANE_SUFFIX}" if frame else None,
             ),
         )
