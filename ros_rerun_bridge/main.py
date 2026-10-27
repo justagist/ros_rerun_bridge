@@ -148,8 +148,8 @@ def run(argv: list[str] | None = None) -> None:
         pass
     finally:
         node.destroy_node()
-        # Flushes pending data, e.g. for --save
-        rr.script_teardown(args)
+        # Not rr.script_teardown: with --serve it only waits forever, keeping the servers up after ROS has stopped
+        rr.get_global_data_recording().flush()
 
 
 if __name__ == "__main__":

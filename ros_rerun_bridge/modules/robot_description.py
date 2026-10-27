@@ -13,7 +13,7 @@ import rerun as rr
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
 
-_COLLADA_UNIT = re.compile(rb'<unit\b[^>]*\bmeter="([^"]+)"')
+_COLLADA_UNIT = re.compile(rb"""<unit\b[^>]*\bmeter\s*=\s*(?:"([^"]+)"|'([^']+)')""")
 
 
 @REGISTRY.register("robot_description")
@@ -87,4 +87,4 @@ def _collada_unit(filename: str) -> float:
     # <unit> is in the <asset> block at the top of the file
     with path.open("rb") as f:
         match = _COLLADA_UNIT.search(f.read(16384))
-    return float(match.group(1)) if match else 1.0
+    return float(match.group(1) or match.group(2)) if match else 1.0

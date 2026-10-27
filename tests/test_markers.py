@@ -188,15 +188,58 @@ def test_single_marker_topics(node, build, recording):
     assert recording.rows("/single/ns/7")[0].get("Cylinders3D:lengths") is not None
 
 
-def test_markers_without_a_namespace_are_logged_under_an_underscore(node, build, recording):
-    build("marker_array", entity_path="markers")
-    node.publish(MarkerArray(markers=[marker(ns="", marker_id=4)]))
-    assert recording.rows("/markers/_/4")[0].get("Boxes3D:half_sizes") is not None
-
-
 def test_an_all_zero_orientation_is_treated_as_identity(node, build, recording):
     build("marker_array", entity_path="markers")
     m = marker()
     m.pose.orientation.w = 0.0
     node.publish(MarkerArray(markers=[m]))
     assert recording.rows("/markers/ns/0")[0]["Transform3D:quaternion"] == [[0.0, 0.0, 0.0, 1.0]]
+
+
+def received_late(node, build):
+    """A marker with a 1 s lifetime, stamped at 5 s but received at 9 s."""
+    build("marker_array", entity_path="markers")
+    old = marker(marker_id=1, lifetime=DurationMsg(sec=1))
+    old.header.stamp = TimeMsg(sec=5)
+    node.now_ns = 9_000_000_000
+    node.publish(MarkerArray(markers=[old]))
+
+
+def test_marker_lifetime_runs_from_when_it_is_received(node, build, recording):
+    received_late(node, build)
+    # Past its stamp plus lifetime, but within a second of being received
+    node.now_ns = 9_500_000_000
+    node.timers[0]()
+    assert not is_cleared(recording, "/markers/ns/1")
+
+
+def test_expired_markers_are_cleared_a_lifetime_after_their_stamp(node, build, recording):
+    received_late(node, build)
+    node.now_ns = 10_000_000_000
+    node.timers[0]()
+    cleared = [row for row in recording.rows("/markers/ns/1") if row.get("Clear:is_recursive") is not None]
+    assert [row["ros_time"] for row in cleared] == [6_000_000_000]
+
+
+def test_empty_and_underscore_namespaces_are_distinct(node, build, recording):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(ns="", marker_id=4), marker(Marker.SPHERE, ns="_", marker_id=4)]))
+    node.publish(MarkerArray(markers=[Marker(action=Marker.DELETE, ns="_", id=4)]))
+    assert not is_cleared(recording, "/markers/_/4")
+    assert recording.rows("/markers/_/4")[0].get("Boxes3D:half_sizes") is not None
+    assert is_cleared(recording, "/markers/__/4")
+
+
+def test_triangle_lists_are_scaled(node, build, recording):
+    triangles = archetype_from_marker(marker(Marker.TRIANGLE_LIST, points=POINTS[1:4]))
+    # scale (0.2, 0.4, 0.6) applied to each vertex
+    np.testing.assert_allclose(component(triangles, "vertex_positions"), [[0.2, 0, 0], [0.2, 0.4, 0], [0, 0.4, 0]])
+
+
+def test_triangle_lists_switching_to_one_colour_drop_their_vertex_colours(node, build, recording):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.TRIANGLE_LIST, points=POINTS[:3], colors=PER_POINT[:3])]))
+    node.publish(MarkerArray(markers=[marker(Marker.TRIANGLE_LIST, points=POINTS[:3])]))
+    last = recording.rows("/markers/ns/0")[-1]
+    assert not last["Mesh3D:vertex_colors"]
+    assert last["Mesh3D:albedo_factor"] == [0xFF8000FF]

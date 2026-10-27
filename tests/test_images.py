@@ -50,12 +50,15 @@ def test_images_keep_their_exact_pixels_and_colour_model(encoding, pixels, colou
 
 
 @pytest.mark.parametrize(
-    ("encoding", "pixel_format", "step"),
+    ("encoding", "pixel_format", "row_bytes"),
     [("bayer_rggb8", rr.PixelFormat.BayerRGGB8, 6), ("yuv422_yuy2", rr.PixelFormat.YUY2, 12)],
 )
-def test_packed_encodings_are_passed_to_rerun_to_decode(encoding, pixel_format, step):
-    raw = RNG.integers(0, 255, (4, step), dtype=np.uint8)
-    image = image_from_msg(Image(height=4, width=6, encoding=encoding, step=step, data=raw.tobytes()))
+@pytest.mark.parametrize("padding", [0, 2], ids=["plain", "padded"])
+def test_packed_encodings_are_passed_to_rerun_to_decode_without_row_padding(encoding, pixel_format, row_bytes, padding):
+    raw = RNG.integers(0, 255, (4, row_bytes), dtype=np.uint8)
+    padded = np.hstack([raw, np.full((4, padding), 0xEE, np.uint8)])
+    msg = Image(height=4, width=6, encoding=encoding, step=row_bytes + padding, data=padded.tobytes())
+    image = image_from_msg(msg)
     assert image.format.as_arrow_array().to_pylist()[0]["pixel_format"] == pixel_format.value
     assert bytes(image.buffer.as_arrow_array().to_pylist()[0]) == raw.tobytes()
 
@@ -113,3 +116,17 @@ def test_camera_info_links_the_camera_frame_to_its_image_plane(node, build, reco
     np.testing.assert_allclose(
         np.reshape(row["Pinhole:image_from_camera"][0], (3, 3), order="F"), np.reshape(msg.k, (3, 3))
     )
+
+
+def test_camera_info_is_adjusted_for_binning_and_region_of_interest(node, build, recording):
+    build("camera_info", entity_path="camera/info")
+    msg = CameraInfo(width=640, height=480, k=[500.0, 0.0, 320.0, 0.0, 510.0, 240.0, 0.0, 0.0, 1.0])
+    msg.binning_x, msg.binning_y = 2, 2
+    msg.roi.x_offset, msg.roi.y_offset, msg.roi.width, msg.roi.height = 100, 40, 400, 300
+    node.publish(msg)
+
+    row = recording.rows("/camera/info")[0]
+    # The published image is the 400x300 region, binned 2x2
+    assert row["Pinhole:resolution"] == [[200.0, 150.0]]
+    k = np.reshape(row["Pinhole:image_from_camera"][0], (3, 3), order="F")
+    np.testing.assert_allclose(k, [[250.0, 0.0, 110.0], [0.0, 255.0, 100.0], [0.0, 0.0, 1.0]])

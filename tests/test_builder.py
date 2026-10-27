@@ -57,6 +57,11 @@ def test_qos_values_are_validated(build):
         build("tf", qos={"reliability": "best-effort"})
 
 
+def test_qos_depth_must_be_positive(build):
+    with pytest.raises(ValidationError, match="depth"):
+        build("tf", qos={"depth": 0})
+
+
 def test_unknown_qos_keys_are_an_error(build):
     with pytest.raises(ValidationError, match="deph"):
         build("tf", qos={"deph": 5})

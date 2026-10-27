@@ -67,10 +67,17 @@ def archetype_from_marker(marker: Marker):
         return rr.Points3D([[0, 0, 0]], radii=0.0, colors=_rgba(marker.color), labels=[marker.text], show_labels=True)
     if marker.type == Marker.TRIANGLE_LIST:
         n = 3 * (len(points) // 3)
+        vertices = points[:n] * [s.x, s.y, s.z]
+        # clear_unset: a marker switching between per-vertex colours and one colour must not keep the other
         if colours.ndim == 2:
-            return rr.Mesh3D(vertex_positions=points[:n], vertex_colors=colours[:n])
-        return rr.Mesh3D(vertex_positions=points[:n], albedo_factor=colours)
+            return rr.Mesh3D.from_fields(clear_unset=True, vertex_positions=vertices, vertex_colors=colours[:n])
+        return rr.Mesh3D.from_fields(clear_unset=True, vertex_positions=vertices, albedo_factor=colours)
     return None
+
+
+def _ns_part(ns: str) -> str:
+    """Return the entity path part for a marker namespace: distinct for every namespace, including "" and "_"."""
+    return rr.escape_entity_path_part(f"_{ns}" if not ns or ns.startswith("_") else ns)
 
 
 @REGISTRY.register("marker_array")
@@ -87,8 +94,8 @@ class MarkerArrayModule(TopicToComponentModule):
         super().__init__(*a, **kw)
         self._types: dict[tuple[str, int], int] = {}
         """Type last logged per marker (ns, id), to clear the old shape when a marker changes type."""
-        self._expiries: dict[tuple[str, int], int] = {}
-        """Expiry time in ns per marker with a lifetime."""
+        self._expiries: dict[tuple[str, int], tuple[int, int]] = {}
+        """Per marker with a lifetime: when to clear it (node time, ns), and the time to log the clear at (ns)."""
         self.node.create_timer(0.1, self._expire, callback_group=self.callback_group)
 
     @classmethod
@@ -106,16 +113,14 @@ class MarkerArrayModule(TopicToComponentModule):
                 self._clear([key])
             elif marker.action == Marker.DELETEALL:
                 # As rviz: only the message's namespace, or every marker if it has none
-                ns_path = (
-                    f"{self.entity_path}/{rr.escape_entity_path_part(marker.ns)}" if marker.ns else self.entity_path
-                )
+                ns_path = f"{self.entity_path}/{_ns_part(marker.ns)}" if marker.ns else self.entity_path
                 rr.log(ns_path, rr.Clear(recursive=True))
                 for k in [k for k in {*self._types, *self._expiries} if not marker.ns or k[0] == marker.ns]:
                     self._types.pop(k, None)
                     self._expiries.pop(k, None)
 
     def _path(self, key: tuple[str, int]) -> str:
-        return f"{self.entity_path}/{rr.escape_entity_path_part(key[0] or '_')}/{key[1]}"
+        return f"{self.entity_path}/{_ns_part(key[0])}/{key[1]}"
 
     def _add(self, key: tuple[str, int], marker: Marker, stamp: Time) -> None:
         archetype = archetype_from_marker(marker)
@@ -146,7 +151,8 @@ class MarkerArrayModule(TopicToComponentModule):
         )
         lifetime = Duration.from_msg(marker.lifetime).nanoseconds
         if lifetime > 0:
-            self._expiries[key] = stamp.nanoseconds + lifetime
+            # As rviz, the lifetime runs from when the marker is received; the clear is logged relative to its stamp
+            self._expiries[key] = (self.node.get_clock().now().nanoseconds + lifetime, stamp.nanoseconds + lifetime)
         else:
             self._expiries.pop(key, None)
 
@@ -157,8 +163,8 @@ class MarkerArrayModule(TopicToComponentModule):
             self._expiries.pop(key, None)
 
     def _expire(self) -> None:
-        """Clear markers whose lifetime has run out, at their expiry time."""
+        """Clear markers whose lifetime has run out, logged at their stamp plus lifetime."""
         now = self.node.get_clock().now().nanoseconds
-        for key, expiry in [(k, e) for k, e in self._expiries.items() if e <= now]:
-            set_rr_time_from_ros(Time(nanoseconds=expiry))
+        for key, (deadline, log_time) in [(k, e) for k, e in self._expiries.items() if e[0] <= now]:
+            set_rr_time_from_ros(Time(nanoseconds=log_time))
             self._clear([key])

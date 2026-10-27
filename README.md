@@ -72,6 +72,7 @@ modules:
     module: laserscan
     topic: /scan
     entity_path: scan
+    qos: { reliability: best_effort }   # as most sensor drivers publish
     params: { mode: points }
 ```
 

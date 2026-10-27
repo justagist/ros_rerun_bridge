@@ -23,6 +23,14 @@ URDF = f"""<robot name="tester">
     <visual><geometry><mesh filename="file://{DATA_DIR / "triangle_inches.dae"}" scale="2 2 2"/></geometry></visual>
   </link>
   <link name="finger"/>
+  <link name="tip"/>
+  <!-- Mimics a mimic joint, and comes first so a single pass would miss it -->
+  <joint name="tip_joint" type="revolute">
+    <parent link="finger"/><child link="tip"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3" upper="3" effort="1" velocity="1"/>
+    <mimic joint="finger_joint" multiplier="2"/>
+  </joint>
   <joint name="shoulder" type="revolute">
     <parent link="base"/><child link="arm"/>
     <origin xyz="0 0 0.5"/><axis xyz="0 0 1"/>
@@ -61,7 +69,7 @@ def test_collision_geometry_is_not_logged(robot, recording):
 def test_joints_at_zero_are_logged_as_static_defaults(robot, recording):
     rows = recording.rows("/tf_static")
     assert all(row["static"] for row in rows)
-    assert sorted(row["Transform3D:child_frame"][0] for row in rows) == ["arm", "finger"]
+    assert sorted(row["Transform3D:child_frame"][0] for row in rows) == ["arm", "finger", "tip"]
 
 
 def test_collada_meshes_are_scaled_by_their_unit_and_urdf_scale(robot, recording):
@@ -81,6 +89,13 @@ def test_other_geometry_is_not_rescaled(robot, recording):
 )
 def test_collada_meshes_that_cannot_be_found_are_not_rescaled(filename):
     assert _collada_unit(filename) == 1.0
+
+
+@pytest.mark.parametrize("declaration", ["<unit meter='0.0254'/>", '<unit meter = "0.0254" name="inch"/>'])
+def test_collada_units_are_read_with_either_quotes_and_spacing(tmp_path, declaration):
+    mesh = tmp_path / "part.dae"
+    mesh.write_text(f"<COLLADA><asset>{declaration}</asset></COLLADA>")
+    assert _collada_unit(str(mesh)) == pytest.approx(0.0254)
 
 
 def test_collada_units_are_read_from_package_paths(tmp_path, monkeypatch):
@@ -116,10 +131,12 @@ def test_joint_states_move_joints_beyond_their_limits(robot, node, build, record
     assert arm["Transform3D:quaternion"] == z_rotation(2.0)
 
 
-def test_mimic_joints_follow_the_joint_they_mimic(robot, node, build, recording):
+def test_mimic_joints_follow_the_joint_they_mimic_including_chains(robot, node, build, recording):
     build("joint_states", entity_path="tf")
     node.publish(JointState(name=["shoulder"], position=[1.0]))
-    assert joints_by_child(recording)["finger"]["Transform3D:quaternion"] == z_rotation(-0.5 * 1.0 + 0.1)
+    joints = joints_by_child(recording)
+    assert joints["finger"]["Transform3D:quaternion"] == z_rotation(-0.5 * 1.0 + 0.1)
+    assert joints["tip"]["Transform3D:quaternion"] == z_rotation(2 * (-0.5 * 1.0 + 0.1))
 
 
 def test_mimic_joints_given_in_the_message_keep_their_own_position(robot, node, build, recording):

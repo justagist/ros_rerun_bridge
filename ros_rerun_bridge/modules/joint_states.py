@@ -34,10 +34,13 @@ class JointStatesModule(TopicToComponentModule):
             )
             return
         positions = dict(zip(msg.name, msg.position))
-        # Mimic joints follow the joint they mimic, as robot_state_publisher does, unless the message gives them
-        for joint in tree.joints():
-            if joint.mimic is not None and joint.name not in positions and joint.mimic.joint in positions:
+        # Mimic joints follow the joint they mimic, as robot_state_publisher does, unless the message gives them.
+        # Repeat until no more can be derived, for joints mimicking a mimic joint.
+        pending = [joint for joint in tree.joints() if joint.mimic is not None and joint.name not in positions]
+        while derived := [joint for joint in pending if joint.mimic.joint in positions]:
+            for joint in derived:
                 positions[joint.name] = joint.mimic.multiplier * positions[joint.mimic.joint] + joint.mimic.offset
+            pending = [joint for joint in pending if joint not in derived]
         for name, position in positions.items():
             joint = tree.get_joint_by_name(name)
             if joint is not None:

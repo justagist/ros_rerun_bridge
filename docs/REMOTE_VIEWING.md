@@ -32,11 +32,15 @@ ros-rerun-bridge --config <config.yaml> --serve --allow-origin 'http://192.168.1
 
 ## Security
 
-Neither connection is authenticated or encrypted: anyone who can reach the ports, or whose origin is allowed, can read the stream. Off a trusted network, use an SSH tunnel and `localhost` instead, which needs no `--allow-origin`:
+Neither connection is authenticated or encrypted: anyone who can reach the ports can read the stream. `--allow-origin` only controls which web pages a browser lets connect; it does not stop a native viewer or any other client.
+
+Off a trusted network, block ports 9876 and 9090 from other hosts with a firewall on the bridge's machine, and connect through an SSH tunnel to `localhost`, which needs no `--allow-origin`:
 
 ```bash
 ssh -L 9876:localhost:9876 -L 9090:localhost:9090 <host>
 ```
+
+The tunnel only protects your own connection: without the firewall, other hosts can still reach the ports directly.
 
 ## In Docker
 

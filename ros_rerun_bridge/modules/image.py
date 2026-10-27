@@ -27,13 +27,13 @@ _PIXEL_ENCODINGS = {
     "32FC1": (np.float32, 1, "L"),
 }
 
-# ROS encodings Rerun decodes itself from the raw bytes
+# ROS encodings Rerun decodes itself from the raw bytes -> (pixel format, bytes per pixel)
 _PACKED_ENCODINGS = {
-    "bayer_rggb8": rr.PixelFormat.BayerRGGB8,
-    "bayer_bggr8": rr.PixelFormat.BayerBGGR8,
-    "bayer_gbrg8": rr.PixelFormat.BayerGBRG8,
-    "bayer_grbg8": rr.PixelFormat.BayerGRBG8,
-    "yuv422_yuy2": rr.PixelFormat.YUY2,
+    "bayer_rggb8": (rr.PixelFormat.BayerRGGB8, 1),
+    "bayer_bggr8": (rr.PixelFormat.BayerBGGR8, 1),
+    "bayer_gbrg8": (rr.PixelFormat.BayerGBRG8, 1),
+    "bayer_grbg8": (rr.PixelFormat.BayerGRBG8, 1),
+    "yuv422_yuy2": (rr.PixelFormat.YUY2, 2),
 }
 
 
@@ -49,16 +49,16 @@ def image_from_msg(msg: Image) -> rr.Image:
     Raises:
         ValueError: If the encoding is not supported.
     """
+    # Rows can be padded: step is the row length in bytes
+    rows = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step)
     if msg.encoding in _PACKED_ENCODINGS:
-        return rr.Image(
-            bytes=bytes(msg.data), width=msg.width, height=msg.height, pixel_format=_PACKED_ENCODINGS[msg.encoding]
-        )
+        pixel_format, pixel_bytes = _PACKED_ENCODINGS[msg.encoding]
+        packed = rows[:, : msg.width * pixel_bytes].tobytes()
+        return rr.Image(bytes=packed, width=msg.width, height=msg.height, pixel_format=pixel_format)
     if msg.encoding not in _PIXEL_ENCODINGS:
         raise ValueError(f"unsupported image encoding '{msg.encoding}'")
     dtype, channels, colour_model = _PIXEL_ENCODINGS[msg.encoding]
     dtype = np.dtype(dtype).newbyteorder(">" if msg.is_bigendian else "<")
-    # Rows can be padded: step is the row length in bytes
-    rows = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step)
     pixels = rows[:, : msg.width * channels * dtype.itemsize].view(dtype).astype(dtype.newbyteorder("="), copy=False)
     shape = (msg.height, msg.width) if channels == 1 else (msg.height, msg.width, channels)
     return rr.Image(pixels.reshape(shape), color_model=colour_model)

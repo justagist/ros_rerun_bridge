@@ -3,7 +3,7 @@ from __future__ import annotations
 import traceback
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, PositiveInt, ValidationError
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 import rerun as rr
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 class QoSConfig(StrictParamsModel):
     """Subscription QoS for a module. The publisher's QoS must be compatible, e.g. `best_effort` for sensor data."""
 
-    depth: int = 10
+    depth: PositiveInt = 10
     reliability: Literal["reliable", "best_effort"] = "reliable"
     durability: Literal["volatile", "transient_local"] = "volatile"
     history: Literal["keep_last", "keep_all"] = "keep_last"

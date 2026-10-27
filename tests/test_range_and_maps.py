@@ -35,6 +35,18 @@ def test_range_outside_its_limits_clears_the_cone(node, build, recording, value)
     assert recording.rows("/range")[0].get("Clear:is_recursive") is not None
 
 
+def test_fixed_distance_sensor_detections_are_drawn_at_their_range(node, build, recording):
+    build("range", entity_path="range")
+    msg = Range(field_of_view=0.5, min_range=0.3, max_range=0.3, range=-math.inf)
+    node.publish(msg)
+    msg.range = math.inf
+    node.publish(msg)
+
+    detected, cleared = recording.rows("/range")
+    np.testing.assert_allclose(np.array(detected["LineStrips3D:strips"][0])[:, 0], 0.3)
+    assert cleared.get("Clear:is_recursive") is not None
+
+
 def grid() -> OccupancyGrid:
     msg = OccupancyGrid()
     msg.header.frame_id = "map"

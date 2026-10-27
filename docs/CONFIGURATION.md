@@ -13,7 +13,7 @@ modules:
     msg_type: pkg.msg.Type # optional: message type, for modules that accept several
     qos:                   # optional: subscription QoS, every field optional
       depth: 10
-      reliability: reliable      # or best_effort
+      reliability: best_effort   # or reliable (the default); see QoS below
       durability: volatile       # or transient_local, for latched topics
       history: keep_last         # or keep_all
     params:                # optional: the module's parameters

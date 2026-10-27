@@ -91,7 +91,7 @@ Logs a scan as rays from the scanner, or as points.
 
 ## `range`
 
-Draws a reading as rviz does: a cone along the sensor frame's x axis, with the measured range as its length and the field of view as its angle. Readings outside `[min_range, max_range]`, including `±inf` "no detection" readings, clear it.
+Draws a reading as rviz does: a cone along the sensor frame's x axis, with the measured range as its length and the field of view as its angle. Readings outside `[min_range, max_range]`, such as `+inf` "no detection" readings, clear it. For a fixed-distance sensor (`min_range == max_range`), a `-inf` reading is a detection, drawn at its fixed range.
 
 | Param | Default | |
 | --- | --- | --- |
