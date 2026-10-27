@@ -2,7 +2,7 @@
 
 Each module subscribes to one topic and logs its messages under the module's `entity_path`. Select one with `module: <name>` in the config ([CONFIGURATION.md](CONFIGURATION.md)); set its parameters under `params`. Unknown parameters are an error.
 
-Modules for stamped messages place their data in the TF frame named in its header and log it at its stamp; see [Frames](CONFIGURATION.md#frames) and [Timeline](CONFIGURATION.md#timeline).
+For messages with a header, modules draw the data in the header's TF frame and log it at the header's stamp; see [Frames](CONFIGURATION.md#frames) and [Timeline](CONFIGURATION.md#timeline).
 
 | Module | Message | Shows |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ Modules for stamped messages place their data in the TF frame named in its heade
 
 Logs each transform as a link between named frames (`header.frame_id` to `child_frame_id`).
 
-Use one module for `/tf` and another for `/tf_static`, on different entities: Rerun requires a link between two frames to change over time on one entity only (a static value on another entity is allowed, as a default). Log `/tf_static` on `tf_static`, the entity the `robot_description` module also logs the robot's joint defaults on.
+Use two `tf` modules, one for `/tf` and one for `/tf_static`, each with its own `entity_path`: Rerun only lets the transform between two frames change over time on one entity, though a static transform on another entity can act as its default. Use `entity_path: tf_static` for `/tf_static`, where the `robot_description` module also logs the robot's default joint positions.
 
 ```yaml
 - { name: tf, module: tf, topic: /tf, entity_path: tf }
@@ -47,14 +47,14 @@ Loads the URDF from `/robot_description` with Rerun's URDF importer and logs eac
 * `package://` mesh paths are resolved through the sourced ROS environment.
 * Collision geometry is not logged.
 * Collada (`.dae`) meshes are scaled by the unit they declare (`<unit meter="...">`), as rviz does. Rerun's importer ignores it, so a mesh authored in inches would otherwise render about 40 times too large.
-* The joints at zero are logged as static defaults on `tf_static`, so the robot is assembled before TF or joint states arrive.
+* Each joint's zero position is logged on `tf_static` as a default, so the robot is drawn assembled before TF or joint states arrive.
 * The model is shared with other modules as `context.urdf_tree`.
 
 ## `joint_states`
 
 Moves the robot model's joints from `/joint_states`. Needs the [`robot_description`](#robot_description) module. Joint positions are shown as reported, even outside the URDF's limits. Mimic joints follow the joint they mimic, as with `robot_state_publisher`, unless the message gives their position.
 
-Not needed where `robot_state_publisher` already puts the joints on `/tf`. Log it on the `tf` module's entity (`entity_path: tf`): the same joint can then arrive on both `/tf` and `/joint_states` (the latest wins, as in tf2), and `/tf` can carry other frames, such as a camera's.
+Not needed if `robot_state_publisher` already publishes the joints on `/tf`. Give it the `tf` module's `entity_path` (`tf`). A joint can then arrive on both `/tf` and `/joint_states` without conflict (the latest value wins, as in tf2), and `/tf` can still carry other frames, such as a camera's.
 
 ## `image`
 
@@ -68,7 +68,7 @@ Logs JPEG and PNG images as they are, for the viewer to decode, in the frame `<f
 
 ## `camera_info`
 
-Logs the camera's intrinsics as a pinhole linking the camera frame to its image plane frame, `<frame_id>_image_plane`, adjusted for binning and region of interest. As in rviz, `frame_id` should be the camera's optical frame (`x` right, `y` down, `z` forward); another frame shows the image plane rotated.
+Logs the camera's intrinsics as a pinhole projection from the camera frame to the image plane frame, `<frame_id>_image_plane`, where [`image`](#image) and [`compressed_image`](#compressed_image) draw the images. The intrinsics are adjusted for binning and region of interest. As in rviz, `frame_id` should be the camera's optical frame (`x` right, `y` down, `z` forward); another frame shows the image plane rotated.
 
 | Param | Default | |
 | --- | --- | --- |
@@ -138,20 +138,25 @@ Logs a Nav2 particle cloud as points or as arrows along each particle's heading.
 
 ## `scalars`
 
-Plots numeric fields of any message type as time series, each on `<entity_path>/<field>` with the field's dots as slashes. The config must set the message type with `msg_type`. Fields are checked against it on start: one that does not exist, or is not a number or an array of numbers, is an error. An array is plotted as one series per element, with a gap in a series while an array is too short to have it. Each series follows its element's index, so arrays whose elements change meaning between messages, such as `/joint_states` from several publishers, mix them.
+Plots numeric fields of any message type as time series. Set the message type with `msg_type`. Each field is plotted on `<entity_path>/<field>`, with the field's dots replaced by slashes: `twist.twist.linear.x` is plotted on `<entity_path>/twist/twist/linear/x`.
 
-Values are logged as they are: non-finite ones, such as a `Range`'s `+inf` "no detection" readings, break the line. Messages with a header are logged at its stamp, others when received. A topic can be plotted alongside another module's display of it, e.g. the `range` cone.
+* Fields are checked against the message type on start. A field that does not exist, or is not a number or an array of numbers, is an error.
+* An array is plotted as one series per element. When a message's array is shorter than earlier ones, the series for the missing elements have a gap.
+* Each series follows its element's position in the array. If elements change meaning between messages, as on `/joint_states` with several publishers covering different joints, a series mixes values from different joints.
+* Values are plotted as they are. Non-finite values, such as a `Range`'s `+inf` "no detection" readings, leave a gap.
+* Messages with a header are plotted at its stamp, others at the time they are received.
+* To both draw a topic and plot it, give it two modules, e.g. `range` for the cone and `scalars` for the plot. Each subscribes to the topic on its own.
 
 | Param | Default | |
 | --- | --- | --- |
 | `fields` | required | Dotted paths to the fields to plot, e.g. `range` or `twist.twist.linear.x`. |
 
 ```yaml
-- name: inlet_sensor_plot
+- name: velocity_plot
   module: scalars
-  topic: /distance_readings/inlet_transfer
-  msg_type: sensor_msgs.msg.Range
-  entity_path: plots/inlet_transfer
+  topic: /odom
+  msg_type: nav_msgs.msg.Odometry
+  entity_path: plots/odom
   params:
-    fields: [range]
+    fields: [twist.twist.linear.x, twist.twist.angular.z]
 ```

@@ -1,6 +1,6 @@
 # Configuration
 
-A config is a YAML file listing the topics to show and how. The bridge validates it on start, before opening a viewer: unknown keys, invalid values and unknown parameters are an error.
+A config is a YAML file listing the topics to show and how. The bridge checks it on start: an unknown key or invalid value stops it before a viewer opens. Each module's `params` are checked when the module is created, just after.
 
 ```yaml
 global_frame: map          # optional: the TF frame the 3D view is rendered in (default: map)
@@ -30,7 +30,7 @@ The [example configs](../example_configs) are a good starting point.
 
 ## QoS
 
-A subscription only receives from publishers with compatible QoS (DDS middlewares enforce this; rmw_zenoh is lenient about reliability). Check a topic's publishers with `ros2 topic info -v <topic>`:
+A subscription only receives messages from publishers with compatible QoS. Check a topic's publishers with `ros2 topic info -v <topic>`:
 
 * **Reliability:** a `reliable` subscription (the default) receives nothing from `best_effort` publishers, which many sensor drivers use (`SensorDataQoS`). `best_effort` receives from both, so it is a safe choice for sensor topics.
 * **Durability:** latched topics (`/map`, `/robot_description`, `/tf_static`, Nav2 costmaps) are published `transient_local`. Subscribe `transient_local` too, to get their last message when the bridge starts after the publisher. A `transient_local` subscription receives nothing from a `volatile` publisher.
@@ -47,4 +47,4 @@ Data is logged on a `ros_time` timeline at each message's stamp, or at the time 
 
 ## Viewer layout
 
-Without a `blueprint`, Rerun picks a layout from the data. To keep one, arrange the viewer, save it with **Save blueprint…** in the viewer's file menu, and point `blueprint` at the `.rbl` file. A layout saved from any recording applies. Layouts can also be [written in Python](https://rerun.io/docs/howto/visualization/build-a-blueprint-programmatically) and saved with `Blueprint.save()`.
+Without a `blueprint`, Rerun picks a layout from the data. To keep one, arrange the viewer, save it with **Save blueprint…** in the viewer's file menu, and point `blueprint` at the `.rbl` file. The layout applies even if it was saved while viewing a different recording. Layouts can also be [written in Python](https://rerun.io/docs/howto/visualization/build-a-blueprint-programmatically) and saved with `Blueprint.save()`.
