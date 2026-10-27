@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from image_geometry import PinholeCameraModel
+import numpy as np
 from rclpy.time import Time
 from sensor_msgs.msg import CameraInfo
 
@@ -15,11 +15,6 @@ from ..utils.utils import IMAGE_PLANE_SUFFIX
 class CameraInfoModule(TopicToComponentModule):
     """Module for handling CameraInfo messages and logging camera intrinsics to Rerun."""
 
-    def __init__(self, *a, **kw) -> None:
-        """Initialize the CameraInfoModule with a PinholeCameraModel."""
-        super().__init__(*a, **kw)
-        self.cam_model = PinholeCameraModel()
-
     @classmethod
     def ros_msg_type(cls):  # noqa: D102
         return CameraInfo
@@ -28,14 +23,13 @@ class CameraInfoModule(TopicToComponentModule):
         return Time.from_msg(msg.header.stamp)
 
     def handle(self, msg: CameraInfo) -> None:  # noqa: D102
-        self.cam_model.from_camera_info(msg)
         # The pinhole links the camera frame to its image plane frame, where the image modules place images
         frame = msg.header.frame_id
         rr.log(
             self.entity_path,
             rr.Pinhole(
-                resolution=[self.cam_model.width, self.cam_model.height],
-                image_from_camera=self.cam_model.intrinsicMatrix(),
+                resolution=[msg.width, msg.height],
+                image_from_camera=np.reshape(msg.k, (3, 3)),
                 parent_frame=frame or None,
                 child_frame=f"{frame}{IMAGE_PLANE_SUFFIX}" if frame else None,
             ),

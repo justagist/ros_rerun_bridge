@@ -48,7 +48,7 @@ pip install -e .
 #   source /opt/ros/humble/setup.bash
 ```
 
-> Python deps are declared in `pyproject.toml` (e.g. `rerun-sdk`, `pydantic`, `pyyaml`, `opencv-python`, `scipy`). ROS-supplied Python packages (e.g. message types) come from your sourced ROS environment.
+> Python deps are declared in `pyproject.toml` (e.g. `rerun-sdk`, `pydantic`, `pyyaml`, `scipy`). ROS-supplied Python packages (e.g. message types) come from your sourced ROS environment.
 
 ---
 
@@ -127,14 +127,17 @@ Below is the current set of bundled modules and their notable params. See params
 
 ### `image`  -- `sensor_msgs/Image`
 
-* Converts via `cv_bridge` and logs `rr.Image` in the frame `<frame_id>_image_plane`, where the `camera_info` pinhole shows it in 3D.
-* **Params**
+* Logs `rr.Image` in the frame `<frame_id>_image_plane`, where the `camera_info` pinhole shows it in 3D.
+* Supports the RGB(A), BGR(A) and mono encodings at 8 and 16 bits, `8UC1`, `16UC1` and `32FC1`, Bayer 8-bit and `yuv422_yuy2`. Rerun displays them natively, so no conversion is needed.
 
-  * `encoding_override: <string>` -- force a cv_bridge target encoding.
+### `compressed_image`  -- `sensor_msgs/CompressedImage`
+
+* Logs JPEG and PNG images as `rr.EncodedImage`, for the viewer to decode, in the frame `<frame_id>_image_plane` like `image`.
+* `compressedDepth` images are not supported.
 
 ### `camera_info`  -- `sensor_msgs/CameraInfo`
 
-* Uses `image_geometry.PinholeCameraModel` to log intrinsics to Rerun (`rr.Pinhole`) from the camera frame to its image plane frame, `<frame_id>_image_plane`.
+* Logs the intrinsics (`K`) as `rr.Pinhole` from the camera frame to its image plane frame, `<frame_id>_image_plane`.
 
 ### `laserscan`  -- `sensor_msgs/LaserScan`
 

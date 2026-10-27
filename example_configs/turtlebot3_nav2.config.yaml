@@ -33,9 +33,6 @@ modules:
     module: image
     topic: /intel_realsense_r200_depth/image_raw
     entity_path: camera/image
-    params:
-      # optional: desired cv_bridge encoding
-      encoding_override: null
 
   # Depth point cloud
   - name: depth_points
