@@ -64,6 +64,22 @@ modules:
       origin_scale: 0.3
       radius: 0.0025
 
+  # Map (latched) and the global costmap drawn over it
+  - name: map
+    module: occupancy_grid
+    topic: /map
+    entity_path: map
+    qos: { depth: 1, durability: transient_local }
+
+  - name: global_costmap
+    module: occupancy_grid
+    topic: /global_costmap/costmap
+    entity_path: global_costmap
+    params:
+      colormap: RvizCostmap
+      opacity: 0.6
+      draw_order: 1.0
+
   # Odometry → scalar plots
   - name: odom
     module: odometry

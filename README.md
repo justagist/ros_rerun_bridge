@@ -205,6 +205,14 @@ Below is the current set of bundled modules and their notable params. See params
 
 * Logs scalar time‑series for linear/angular velocities. The robot's pose comes from TF.
 
+### `occupancy_grid`  -- `nav_msgs/OccupancyGrid`
+
+* Logs maps and costmaps as `rr.GridMap` in the message's frame, coloured as in rviz. `/map` is latched, so give it `durability: transient_local` QoS.
+* **Params**
+
+  * `colormap: RvizMap | RvizCostmap | Costmap | Grayscale` (default `RvizMap`).
+  * `opacity: float` (default `1.0`) and `draw_order: float` -- e.g. to draw a semi-transparent costmap over the map.
+
 ### `robot_description`  -- `std_msgs/String` (XML from `/robot_description`)
 
 * Loads the URDF from the /robot_description topic with Rerun's URDF importer and logs each link's visual geometry in the link's frame. `package://` mesh paths are resolved through the sourced ROS environment. Collision geometry is not logged.
@@ -225,7 +233,7 @@ Below is the current set of bundled modules and their notable params. See params
 The repo includes two sample configs in `example_configs/`:
 
 * `robot_joint_states.config.yaml` -- load URDF once, then animate with `/joint_states`. Works as is with the MoveIt demos, and with any robot publishing /robot_description and /joint_states (set `global_frame` to its root link if nothing publishes a `world` frame). 
-* `turtlebot3_nav2.config.yaml` -- camera, laser scan, odometry, point clouds, etc. This can be used with the example from nav2 starter doc: https://docs.nav2.org/getting_started/index.html.
+* `turtlebot3_nav2.config.yaml` -- camera, laser scan, odometry, point clouds, etc. This can be used with the example from nav2 starter doc: https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/#quickstart.
 
 Run either as:
 
