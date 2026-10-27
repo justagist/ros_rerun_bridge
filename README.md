@@ -83,7 +83,7 @@ See [CONFIGURATION.md](docs/CONFIGURATION.md) for every field, frames, QoS and s
 
 ## Modules
 
-Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `occupancy_grid`, `odometry` and `particle_cloud`; `scalars` plots numeric fields of any message. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
+Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `occupancy_grid` and `particle_cloud`; `scalars` plots numeric fields of any message. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
 
 ## Development
 

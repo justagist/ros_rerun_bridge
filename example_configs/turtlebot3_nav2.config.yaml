@@ -85,11 +85,14 @@ modules:
       opacity: 0.6
       draw_order: 1.0
 
-  # Odometry -> scalar plots
+  # Odometry velocities -> plots
   - name: odom
-    module: odometry
+    module: scalars
     topic: /odom
+    msg_type: nav_msgs.msg.Odometry
     entity_path: odometry
+    params:
+      fields: [twist.twist.linear.x, twist.twist.angular.z]
 
   # URDF logged once (latching /robot_description)
   - name: robot_description

@@ -17,7 +17,6 @@ Modules for stamped messages place their data in the TF frame named in its heade
 | [`range`](#range) | `sensor_msgs/Range` | Range sensor readings as cones |
 | [`marker_array`](#marker_array) | `visualization_msgs/MarkerArray` or `Marker` | rviz markers |
 | [`occupancy_grid`](#occupancy_grid) | `nav_msgs/OccupancyGrid` | Maps and costmaps |
-| [`odometry`](#odometry) | `nav_msgs/Odometry` | Velocities as plots |
 | [`particle_cloud`](#particle_cloud) | `nav2_msgs/ParticleCloud` | Localisation particles |
 | [`scalars`](#scalars) | Any, set with `msg_type` | Numeric fields as plots |
 
@@ -122,10 +121,6 @@ Logs maps and costmaps in the message's frame, coloured as in rviz. `/map` is la
 | `colormap` | `RvizMap` | `RvizMap`, `RvizCostmap`, `Costmap` or `Grayscale`. |
 | `opacity` | `1.0` | E.g. below 1 for a costmap drawn over the map. |
 | `draw_order` | none | Grids with a higher draw order are drawn on top. |
-
-## `odometry`
-
-Logs the linear x and angular z velocities as plots, on `<entity_path>/vel` and `<entity_path>/ang_vel`. The robot's pose comes from TF.
 
 ## `particle_cloud`
 
