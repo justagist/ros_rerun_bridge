@@ -7,3 +7,5 @@ except PackageNotFoundError:  # during dev
 
 # Re-exports
 from .main import run
+
+__all__ = ["__version__", "run"]

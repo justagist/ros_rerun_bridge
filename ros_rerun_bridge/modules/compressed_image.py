@@ -22,11 +22,11 @@ def media_type_from_format(image_format: str) -> str:
     Raises:
         ValueError: If the format is not plain JPEG or PNG, e.g. compressedDepth, which adds its own header.
     """
-    image_format = image_format.lower()
-    if "compresseddepth" not in image_format:
-        if "jpeg" in image_format or "jpg" in image_format:
+    lowered = image_format.lower()
+    if "compresseddepth" not in lowered:
+        if "jpeg" in lowered or "jpg" in lowered:
             return "image/jpeg"
-        if "png" in image_format:
+        if "png" in lowered:
             return "image/png"
     raise ValueError(f"unsupported compressed image format '{image_format}'")
 

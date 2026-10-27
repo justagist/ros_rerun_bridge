@@ -51,7 +51,9 @@ class PointCloud2Module(TopicToComponentModule):
         return Time.from_msg(msg.header.stamp)
 
     def handle(self, msg: PointCloud2) -> None:  # noqa: D102
-        colour_fields = {"rgb_packed": ["rgb"], "fields": self.params.colour_fields, "none": []}[self.params.colour_mode]
+        colour_fields = {"rgb_packed": ["rgb"], "fields": self.params.colour_fields, "none": []}[
+            self.params.colour_mode
+        ]
         # Read in one pass so colours stay aligned with points. NaNs are filtered on xyz only: a packed RGBA float
         # with full alpha is itself a NaN bit pattern.
         cloud = point_cloud2.read_points(msg, field_names=["x", "y", "z", *colour_fields])

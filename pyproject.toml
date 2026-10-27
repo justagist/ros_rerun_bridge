@@ -21,6 +21,13 @@ dependencies = [
 [project.scripts]
 ros-rerun-bridge = "ros_rerun_bridge:run"
 
+[dependency-groups]
+dev = [
+    "pytest",
+    # Pinned: ruff's default rules and formatting change between versions
+    "ruff==0.17.3",
+]
+
 [tool.setuptools]
 packages = [
     "ros_rerun_bridge",
@@ -31,3 +38,23 @@ packages = [
 [tool.uv]
 # rclpy is compiled for the distro's Python: never use a uv-managed one
 python-preference = "only-system"
+
+[tool.ruff]
+line-length = 120
+include = ["ros_rerun_bridge/**/*.py", "tests/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# A sourced ROS environment registers its own pytest plugins, whose dependencies are not in this environment
+addopts = [
+    "-p", "no:launch_testing",
+    "-p", "no:launch_ros",
+    "-p", "no:ament_copyright",
+    "-p", "no:ament_flake8",
+    "-p", "no:ament_lint",
+    "-p", "no:ament_pep257",
+    "-p", "no:ament_xmllint",
+]

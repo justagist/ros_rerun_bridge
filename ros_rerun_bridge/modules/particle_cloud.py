@@ -127,7 +127,9 @@ class ParticleCloudModule(TopicToComponentModule):
             q_xyzw = np.asarray(quats_xyzw, dtype=np.float32)
             rot = Rotation.from_quat(q_xyzw)  # SciPy expects xyzw
 
-            basis = {"x": np.array([1, 0, 0]), "y": np.array([0, 1, 0]), "z": np.array([0, 0, 1])}[self.params.arrow_axis]
+            basis = {"x": np.array([1, 0, 0]), "y": np.array([0, 1, 0]), "z": np.array([0, 0, 1])}[
+                self.params.arrow_axis
+            ]
 
             dirs = rot.apply(np.tile(basis, (len(particles), 1)))
 
