@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [0.3.0] - 2026-10-27
+
+### Removed
+
+- `odometry` module: `scalars` plots the same velocities, and any other field. Replace `module: odometry` with `module: scalars`, `msg_type: nav_msgs.msg.Odometry` and `params: { fields: [twist.twist.linear.x, twist.twist.angular.z] }`. The plots move from `<entity_path>/vel` and `<entity_path>/ang_vel` to `<entity_path>/twist/twist/linear/x` and `<entity_path>/twist/twist/angular/z`.
+
 ## [0.2.0] - 2026-10-27
 
 ### Added
@@ -65,6 +71,7 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 
 First version: a config-driven bridge with `image`, `camera_info`, `laserscan`, `pointcloud2`, `particle_cloud`, `odometry`, `robot_description` and `joint_states` modules.
 
+[0.3.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/justagist/ros_rerun_bridge/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/justagist/ros_rerun_bridge/compare/c6298dd...v0.1.0

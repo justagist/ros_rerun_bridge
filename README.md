@@ -6,7 +6,7 @@
 [![Rerun 0.40](https://img.shields.io/badge/Rerun-0.40-0B8CE9.svg)](https://rerun.io)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
-Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rviz. You list the topics to show in a YAML config; the bridge subscribes to them and logs each message to Rerun, placed in its TF frame.
+Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rviz. List the topics you want to see in a YAML config file: the bridge subscribes to them and sends each message to Rerun, drawing spatial data in its TF frame.
 
 > **Status:** I created this repository mainly to get familiar with Rerun and to use it in my own ROS projects. It is under active development, so features, interfaces and behaviour may change. Tested with Rerun 0.40.0 and ROS 2 Jazzy.
 
@@ -22,15 +22,15 @@ Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rv
 
 ## Features
 
-* **Config-driven:** one YAML file lists the topics, their QoS, where they appear in Rerun, and per-module parameters, validated on start.
-* **TF and URDF aware:** data appears in its TF frame, and the robot model, loaded from its URDF, moves with TF or joint states.
+* **Config-driven:** one YAML file says which topics to show and how, and is checked when the bridge starts.
+* **TF and URDF aware:** data is drawn in its TF frame. The robot model is loaded from its URDF and moves with TF or joint states.
 * **rviz's common displays:** robot model, images, point clouds, laser scans, range sensors, markers, maps and costmaps, and more (see [Modules](#modules)).
 * **Remote viewing:** any number of native or browser viewers can connect to a bridge running on a robot.
-* **Extensible:** a new message type is a small module class, built in or loaded from your own package.
+* **Extensible:** support a new message type with a small module class, in this package or in your own.
 
 ## Quick start
 
-Needs a ROS 2 installation and [uv](https://docs.astral.sh/uv/). The bridge runs in its own Python environment, as Rerun needs NumPy 2 while ROS ships NumPy 1; uv sets that up.
+You need ROS 2 and [uv](https://docs.astral.sh/uv/). The bridge runs in its own Python environment, because Rerun needs NumPy 2 and ROS ships NumPy 1. uv creates that environment for you.
 
 ```bash
 git clone https://github.com/justagist/ros_rerun_bridge.git && cd ros_rerun_bridge
@@ -50,9 +50,9 @@ ros-rerun-bridge --config <config.yaml> [options] [-- <ROS arguments>]
 
 | Option | |
 | --- | --- |
-| *(none)* | Open a Rerun viewer. |
+| *(no option)* | Open a Rerun viewer. |
 | `--connect [--url <url>]` | Send to a Rerun viewer that is already running. |
-| `--serve [--allow-origin <pattern>]` | Host servers for viewers on other machines ([REMOTE_VIEWING.md](docs/REMOTE_VIEWING.md)). |
+| `--serve [--allow-origin <pattern>]` | Let viewers on other machines connect ([REMOTE_VIEWING.md](docs/REMOTE_VIEWING.md)). |
 | `--save <file.rrd>` | Record to a file, to open later with `rerun <file.rrd>`. |
 | `--stdout` | Stream to standard output, to pipe into `rerun -`. |
 | `--headless` | Run without a viewer. |
@@ -62,7 +62,7 @@ Arguments after `--` are passed to ROS, e.g. `-- --ros-args -p use_sim_time:=tru
 
 ## Configuration
 
-A config lists the topics to show, each handled by a module:
+A config lists the topics to show. Each topic is handled by a module, which decides how it is drawn:
 
 ```yaml
 global_frame: map            # the TF frame the 3D view is rendered in
@@ -72,24 +72,24 @@ modules:
     module: laserscan
     topic: /scan
     entity_path: scan
-    qos: { reliability: best_effort }   # as most sensor drivers publish
+    qos: { reliability: best_effort }   # most sensor drivers publish best effort
     params: { mode: points }
 ```
 
-See [CONFIGURATION.md](docs/CONFIGURATION.md) for every field, frames, QoS and saving a viewer layout. Two example configs are in [example_configs](example_configs):
+[CONFIGURATION.md](docs/CONFIGURATION.md) describes every field, and covers frames, QoS and saving a viewer layout. Two example configs are in [example_configs](example_configs):
 
 * [robot_joint_states.config.yaml](example_configs/robot_joint_states.config.yaml): a robot from its URDF and joint states. Works as is with the MoveIt demos.
 * [turtlebot3_nav2.config.yaml](example_configs/turtlebot3_nav2.config.yaml): TF, robot, camera, point cloud, laser scan, map, costmap, particles and odometry from the Nav2 demo.
 
 ## Modules
 
-Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `occupancy_grid`, `odometry` and `particle_cloud`; `scalars` plots numeric fields of any message. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
+Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
 
 ## Development
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-uv run pytest            # tests: no running ROS graph needed
+uv run pytest            # tests (no running ROS nodes needed)
 uv run ruff check        # lint
 uv run ruff format       # format
 ```

@@ -12,7 +12,7 @@ import rerun as rr
 
 def reading(value: float) -> Range:
     msg = Range(field_of_view=0.5, min_range=0.02, max_range=2.0, range=value)
-    msg.header.frame_id = "inlet_sensor"
+    msg.header.frame_id = "front_sensor"
     return msg
 
 

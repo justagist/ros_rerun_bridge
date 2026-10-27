@@ -4,13 +4,13 @@ The bridge needs a sourced ROS 2 environment (tested with Jazzy) and its own Pyt
 
 ## Why its own environment
 
-Rerun needs NumPy 2, while ROS distros ship NumPy 1. The bridge therefore runs in its own virtual environment and takes ROS's Python packages (`rclpy`, message types) from the sourced ROS environment through `PYTHONPATH`. That environment:
+Rerun needs NumPy 2, while ROS distros ship NumPy 1. The bridge therefore runs in its own virtual environment and takes ROS's Python packages (`rclpy`, message types) from the sourced ROS environment through `PYTHONPATH`. The bridge's environment:
 
 * must not be the system Python: upgrading NumPy there breaks other ROS nodes (e.g. OpenCV, `cv_bridge`);
 * must not include system site-packages: the distro's NumPy 1 builds of packages such as pandas then break Rerun;
 * must use the Python your ROS distro is built for (3.12 on Jazzy), as `rclpy` is compiled for it.
 
-[uv](https://docs.astral.sh/uv/) handles all of this. The repo configures it to use only system Pythons, never one uv downloads.
+[uv](https://docs.astral.sh/uv/) handles all of this. The repo tells uv to use a Python installed on the system, never one it downloads.
 
 ## From a clone, with `uv run`
 
@@ -22,7 +22,7 @@ uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml
 
 ## As a command available everywhere
 
-Install it as a uv tool: it gets its own environment and the command goes in `~/.local/bin` (run `uv tool update-shell` if that is not on your `PATH`). `uv tool` does not read the repo's settings, so ask for a system Python explicitly:
+Install it as a uv tool. It gets its own environment, and the command goes in `~/.local/bin` (run `uv tool update-shell` if that is not on your `PATH`). `uv tool` does not read the repo's settings, so ask for a system Python explicitly:
 
 ```bash
 # From a clone, editable: code changes apply without reinstalling (add --reinstall after dependency changes)

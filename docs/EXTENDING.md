@@ -56,7 +56,7 @@ modules:
 **Conventions**
 
 * Inherit from `TopicToComponentModule`.
-* Implement `ros_msg_type()`, unless users must set `msg_type` in the config. Users can override it with `msg_type` anyway, by its Python path (e.g. `visualization_msgs.msg.Marker`), for a module that handles several message types.
+* Implement `ros_msg_type()` to return the message type. Skip it only if users must always set `msg_type` in the config, as for `scalars`. Users can also override it with `msg_type` (e.g. `visualization_msgs.msg.Marker`), for a module that handles several message types.
 * Implement `handle(msg)`, called for every message.
 * Implement `_extract_time(msg)` to log at the message's stamp. Without it, or for a zero stamp, data is logged at the time it was received.
 * Set `PARAMS` to a `StrictParamsModel` subclass for the config's `params` to be validated into `self.params`.

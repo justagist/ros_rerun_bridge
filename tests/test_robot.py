@@ -1,11 +1,10 @@
-"""Robot model, joint states and odometry."""
+"""Robot model and joint states."""
 
 import math
 from pathlib import Path
 
 import pytest
 from builtin_interfaces.msg import Time as TimeMsg
-from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 
@@ -150,12 +149,3 @@ def test_joint_states_wait_for_the_robot_model(node, build, recording):
     node.publish(JointState(name=["shoulder"], position=[0.5]))
     assert "/tf" not in recording.entities()
     assert node.log_messages[-1][0] == "warn"
-
-
-def test_odometry_logs_velocities_as_scalars(node, build, recording):
-    build("odometry", entity_path="odometry")
-    msg = Odometry()
-    msg.twist.twist.linear.x, msg.twist.twist.angular.z = 0.5, -0.2
-    node.publish(msg)
-    assert recording.rows("/odometry/vel")[0]["Scalars:scalars"] == pytest.approx([0.5])
-    assert recording.rows("/odometry/ang_vel")[0]["Scalars:scalars"] == pytest.approx([-0.2])
