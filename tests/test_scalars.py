@@ -66,6 +66,7 @@ def test_values_are_logged_at_their_stamp_or_receive_time(node, build, recording
         ("sensor_msgs.msg.Range", ["distance"], "Range has no field 'distance'"),
         ("sensor_msgs.msg.Range", ["header"], "is std_msgs/Header, not a number"),
         ("sensor_msgs.msg.JointState", ["name"], "is sequence<string>, not a number"),
+        ("std_msgs.msg.Byte", ["data"], "is octet, not a number"),
         ("sensor_msgs.msg.Range", ["range.x"], "'range' is not a message"),
         ("visualization_msgs.msg.MarkerArray", ["markers.id"], "'markers' is not a message"),
     ],

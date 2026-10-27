@@ -16,9 +16,9 @@ from ..context import BridgeContext
 from ..registry import REGISTRY
 from ..types import StrictParamsModel
 
+# Not octet (`byte`): its values are `bytes` objects, and numeric bytes are uint8 by convention
 _NUMERIC = {
     "boolean",
-    "octet",
     "float",
     "double",
     "int8",
