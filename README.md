@@ -93,7 +93,8 @@ ros-rerun-bridge --config path/to/config.yaml [RERUN_ARGS …] -- [RCLPY_ARGS �
 ```
 
 * `--config` points to your YAML (schema below).
-* **RERUN_ARGS** are forwarded to `rerun.script_setup(...)`. Without any, the bridge spawns a native Rerun viewer. Others: `--connect` (to a running viewer, default address, or `--url`), `--serve` (web viewer), `--save <file.rrd>`, `--headless`.
+* **RERUN_ARGS** are forwarded to `rerun.script_setup(...)`. Without any, the bridge spawns a native Rerun viewer. Others: `--connect` (to a running viewer, default address, or `--url`), `--serve` (servers for remote viewers, see below), `--save <file.rrd>`, `--stdout`, `--headless`.
+* `--allow-origin <pattern>` (repeatable) lets web viewers served from other origins connect with `--serve`.
 * After a literal `--`, any **RCLPY_ARGS** are passed through to rclpy/ROS 2.
 * `--version` prints the package version and exits.
 
@@ -107,6 +108,15 @@ uv run ros-rerun-bridge --config example_configs/turtlebot3_nav2.config.yaml
 uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml --connect
 ```
 
+### Viewing from other machines
+
+With `--serve`, the bridge hosts a gRPC server (port 9876) and a web viewer (port 9090), both on all interfaces, and prints how to connect. Any number of viewers can connect and disconnect at any time; one joining late gets the recent history (up to 1 GiB).
+
+* **Native viewer:** `rerun rerun+http://<host>:9876/proxy`, using Rerun 0.40.0 to match the bridge (e.g. `uvx --from rerun-sdk==0.40.0 rerun ...`). On the bridge's own machine add `--port auto`, as the bridge already uses 9876.
+* **Browser:** `http://<host>:9090/?url=rerun%2Bhttp%3A%2F%2F<host>%3A9876%2Fproxy`. The page only connects when given the server in `url`. The server only accepts web viewers served from `localhost` or rerun.io, so a browser reaching the bridge by any other address needs that origin allowed, e.g. `--allow-origin 'http://192.168.1.10:*'`.
+
+Neither connection is authenticated or encrypted: anyone who can reach the ports, or whose origin is allowed, can read the stream. Off a trusted network, use an SSH tunnel (`ssh -L 9876:localhost:9876 -L 9090:localhost:9090 <host>`) and `localhost` instead. In Docker, publish both ports.
+
 ---
 
 ## Configuration schema
@@ -114,7 +124,8 @@ uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml 
 At the top level:
 
 ```yaml
-global_frame: map   # (optional) default TF global frame for helpers
+global_frame: map   # (optional) TF frame the default 3D view is rendered in
+blueprint: layout.rbl  # (optional) viewer layout to open with, relative to this file (see below)
 modules:            # list of module specs (loaded in order)
   - name: <string>          # required, human-friendly
     module: <id-or-path>    # required, registry key OR python path (see below)
@@ -128,6 +139,10 @@ modules:            # list of module specs (loaded in order)
       history: keep_last | keep_all
     params: {}              # optional, module-specific settings
 ```
+
+### Viewer layout
+
+Without a `blueprint`, Rerun picks a layout from the data. To keep one, arrange the viewer, save it with **Save blueprint…** in the viewer's file menu and point `blueprint` at the `.rbl` file. It applies whichever application it was saved from. Layouts can also be [written in Python](https://rerun.io/docs/howto/visualization/build-a-blueprint-programmatically) and saved with `Blueprint.save()`.
 
 ### Module resolution
 

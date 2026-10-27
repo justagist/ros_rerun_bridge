@@ -42,6 +42,8 @@ class BridgeConfig(StrictParamsModel):
 
     global_frame: str = "map"
     """TF frame that Rerun's default 3D view is rendered in."""
+    blueprint: str | None = None
+    """Viewer layout to open with: a .rbl file, e.g. saved from the viewer. Relative paths are to the config file."""
     modules: list[ModuleConfig]
     """List of bridge modules."""
 

@@ -1,1 +1,1 @@
-"""Built-in modules. Each is imported on demand by the loader, keyed by its file name."""
+"""Built-in modules. Each is imported on demand by the builder, keyed by its file name."""

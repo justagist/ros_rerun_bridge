@@ -56,7 +56,7 @@ class MyPoseModule(TopicToComponentModule):
 
 ### 3) Add it to the package (optional for local use)
 
-If you’re contributing to the package, the registry name must match the file name (`my_pose` in `ros_rerun_bridge/modules/my_pose.py`). The loader imports a built-in module only when a config uses it.
+If you’re contributing to the package, the registry name must match the file name (`my_pose` in `ros_rerun_bridge/modules/my_pose.py`). The builder imports a built-in module only when a config uses it.
 
 For **local/private** modules, you can skip the registry and load via Python path in your YAML:
 

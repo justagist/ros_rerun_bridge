@@ -7,7 +7,9 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import TYPE_CHECKING, Any, Dict
+from pathlib import Path
+from typing import Any, Dict
+from urllib.parse import quote
 
 import rclpy
 import yaml
@@ -18,11 +20,8 @@ import rerun as rr
 
 from . import __version__
 from .base import BridgeConfig
+from .builder import BridgeBuilder
 from .context import BridgeContext
-from .loader import BridgeBuilder
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class BridgeNode(Node):
@@ -45,6 +44,13 @@ class BridgeNode(Node):
         # The root entity's frame is the one Rerun's default 3D view renders in. ROS frames are right-handed, Z up.
         rr.log("/", rr.ViewCoordinates.RIGHT_HAND_Z_UP, rr.CoordinateFrame(frame=cfg.global_frame), static=True)
 
+        if cfg.blueprint:
+            blueprint = Path(config_path).parent / cfg.blueprint
+            if not blueprint.is_file():
+                raise FileNotFoundError(f"blueprint '{blueprint}' not found")
+            # Rerun applies it to this recording's application, whichever it was saved from
+            rr.log_file_from_path(blueprint)
+
         # build modules
         builder = BridgeBuilder(self)
         self.modules = builder.build_modules(cfg, bridge_context)
@@ -54,6 +60,25 @@ def load_yaml(path: str | Path) -> Dict[str, Any]:
     """Load a YAML file from the given path."""
     with open(path, "r") as f:
         return yaml.safe_load(f)
+
+
+def serve(allowed_origins: list[str] | None) -> None:
+    """Host a gRPC server and a web viewer, as `rr.script_setup` does for --serve, and print how to connect.
+
+    Args:
+        allowed_origins: Extra origins whose web viewers may connect to the gRPC server.
+    """
+    rr.init(application_id="ros_rerun_bridge", default_enabled=True, strict=True)
+    grpc_url = rr.get_global_data_recording().serve_grpc(cors_allow_origin=allowed_origins)
+    rr.serve_web_viewer(open_browser=True, connect_to=grpc_url)
+    # The web viewer only connects when given the server in its `url` parameter
+    print(
+        "Connect Rerun viewers with (from another machine, replace 127.0.0.1/localhost with this machine's address):\n"
+        f"  native:  rerun {grpc_url}   (add --port auto on this machine)\n"
+        f"  browser: http://localhost:9090/?url={quote(grpc_url, safe='')}\n"
+        "           (a browser reaching this machine by another address needs --allow-origin)",
+        flush=True,
+    )
 
 
 def run(argv: list[str] | None = None) -> None:
@@ -75,6 +100,13 @@ def run(argv: list[str] | None = None) -> None:
     bridge_grp = parser.add_argument_group()
     bridge_grp.add_argument("-v", "--version", action="store_true", help="Show version and exit")
     bridge_grp.add_argument("--config", required=True, help="Path to YAML config")
+    bridge_grp.add_argument(
+        "--allow-origin",
+        action="append",
+        metavar="PATTERN",
+        help="With --serve: also let web viewers served from these origins connect, e.g. 'http://192.168.1.10:*' "
+        "(by default only localhost and rerun.io). Repeatable.",
+    )
 
     # Group: Rerun SDK options (show separately)
     rerun_grp = parser.add_argument_group("Rerun options (directly passed to Rerun SDK)")
@@ -86,7 +118,10 @@ def run(argv: list[str] | None = None) -> None:
     # Spawning the viewer looks `rerun` up on PATH. Use the one installed with this package, which matches the SDK
     # version, also when its environment is not on PATH (e.g. after `uv tool install`).
     os.environ["PATH"] = os.pathsep.join([os.path.dirname(sys.executable), os.environ.get("PATH", "")])
-    rr.script_setup(args, "ros_rerun_bridge")
+    if args.serve and not args.stdout:
+        serve(args.allow_origin)
+    else:
+        rr.script_setup(args, "ros_rerun_bridge")
 
     rclpy.init(args=unknownargs)
     node = BridgeNode(args.config)
