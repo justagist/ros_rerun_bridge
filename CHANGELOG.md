@@ -14,6 +14,7 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 - `--allow-origin` option, so web viewers on other machines can connect with `--serve`. With `--serve`, the bridge prints how to connect.
 - `auto` point cloud colour mode, the new default: the `rgb` field if the cloud has one, otherwise no colour.
 - Mimic joints follow the joint they mimic in `joint_states`.
+- `intrinsics` parameter of `camera_info`, to show rectified images with the projection matrix `P`.
 - `uv run` and `uv tool install` support, with the Rerun viewer found in the bridge's own environment.
 - Test suite, CI, MIT licence, and documentation in `docs/`.
 

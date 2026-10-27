@@ -130,3 +130,15 @@ def test_camera_info_is_adjusted_for_binning_and_region_of_interest(node, build,
     assert row["Pinhole:resolution"] == [[200.0, 150.0]]
     k = np.reshape(row["Pinhole:image_from_camera"][0], (3, 3), order="F")
     np.testing.assert_allclose(k, [[250.0, 0.0, 110.0], [0.0, 255.0, 100.0], [0.0, 0.0, 1.0]])
+
+
+def test_camera_info_can_use_the_rectified_intrinsics(node, build, recording):
+    build("camera_info", entity_path="camera/info", params={"intrinsics": "p"})
+    msg = CameraInfo(width=640, height=480, k=[500.0, 0.0, 320.0, 0.0, 510.0, 240.0, 0.0, 0.0, 1.0])
+    msg.p = [480.0, 0.0, 310.0, -24.0, 0.0, 490.0, 235.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    msg.binning_x = msg.binning_y = 2
+    node.publish(msg)
+
+    k = np.reshape(recording.rows("/camera/info")[0]["Pinhole:image_from_camera"][0], (3, 3), order="F")
+    # The left 3x3 of P, adjusted for binning; the stereo baseline column is not part of the intrinsics
+    np.testing.assert_allclose(k, [[240.0, 0.0, 155.0], [0.0, 245.0, 117.5], [0.0, 0.0, 1.0]])

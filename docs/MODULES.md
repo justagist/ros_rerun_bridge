@@ -68,7 +68,11 @@ Logs JPEG and PNG images as they are, for the viewer to decode, in the frame `<f
 
 ## `camera_info`
 
-Logs the camera's intrinsics (`K`) as a pinhole linking the camera frame to its image plane frame, `<frame_id>_image_plane`. As in rviz, `frame_id` should be the camera's optical frame (`x` right, `y` down, `z` forward); another frame shows the image plane rotated.
+Logs the camera's intrinsics as a pinhole linking the camera frame to its image plane frame, `<frame_id>_image_plane`, adjusted for binning and region of interest. As in rviz, `frame_id` should be the camera's optical frame (`x` right, `y` down, `z` forward); another frame shows the image plane rotated.
+
+| Param | Default | |
+| --- | --- | --- |
+| `intrinsics` | `k` | Which intrinsics match the images shown: `k` for raw images (e.g. `image_raw`), `p` (its left 3x3) for rectified ones (e.g. `image_rect`). |
 
 ## `pointcloud2`
 
