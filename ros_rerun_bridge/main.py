@@ -5,6 +5,7 @@ The main entry point for the ROS2 → Rerun bridge node.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from typing import TYPE_CHECKING, Any, Dict
 
@@ -82,6 +83,9 @@ def run(argv: list[str] | None = None) -> None:
     # Parse known so leftover go to rclpy
     args, unknownargs = parser.parse_known_args(argv)
 
+    # Spawning the viewer looks `rerun` up on PATH. Use the one installed with this package, which matches the SDK
+    # version, also when its environment is not on PATH (e.g. after `uv tool install`).
+    os.environ["PATH"] = os.pathsep.join([os.path.dirname(sys.executable), os.environ.get("PATH", "")])
     rr.script_setup(args, "ros_rerun_bridge")
 
     rclpy.init(args=unknownargs)

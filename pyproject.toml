@@ -7,7 +7,7 @@ name = "ros-rerun-bridge"
 version = "0.0.1"
 description = "Config-driven, pluggable ROS2 → Rerun bridge"
 authors = [{ name = "Saif Sidhik", email = "mail@saifsidhik.page" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     # Pinned: Rerun's API changes between minor versions
     "rerun-sdk==0.40.0",
@@ -27,3 +27,7 @@ packages = [
     "ros_rerun_bridge.modules",
     "ros_rerun_bridge.utils",
 ]
+
+[tool.uv]
+# rclpy is compiled for the distro's Python: never use a uv-managed one
+python-preference = "only-system"

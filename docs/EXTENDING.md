@@ -88,7 +88,7 @@ modules:
 
 * Validate your Pydantic params by constructing the model in isolation.
 * Use `ros2 topic pub` or bag playback to drive the module.
-* Try both `--spawn` and `--connect` flows.
+* Try both the default (spawned viewer) and `--connect` flows.
 
 ### 7) Common utilities you can use
 

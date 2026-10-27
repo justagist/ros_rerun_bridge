@@ -1,12 +1,21 @@
-# Example configuration for logging a robot from its URDF and joint states. This should work with any robot publishing
-# /robot_description and /joint_states. For robots that publish TF (e.g. via robot_state_publisher), use the tf module
-# instead of joint_states, as in turtlebot3_nav2.config.yaml.
+# Example configuration for logging a robot from its URDF and joint states. Works as is with the MoveIt demos
+# (e.g. `ros2 launch moveit_resources_panda_moveit_config demo.launch.py`), and with any robot publishing
+# /robot_description and /joint_states. For robots that publish TF (e.g. via robot_state_publisher), the tf module can
+# replace joint_states, as in turtlebot3_nav2.config.yaml.
 
-# Without TF, nothing links the robot to a world frame: render the 3D view in the robot's root link
-# (e.g. panda_link0 for the Franka MoveIt demo)
-global_frame: base_link
+# MoveIt demos publish a static world -> <robot root link> transform. Without one, set this to the robot's root link.
+global_frame: world
 
 modules:
+  # Static frames, e.g. world -> panda_link0 in the MoveIt demos
+  - name: tf_static
+    module: tf
+    topic: /tf_static
+    entity_path: tf_static
+    qos: { depth: 10, durability: transient_local }
+    params:
+      static: true
+
   # URDF logged once (latching /robot_description)
   - name: robot_description
     module: robot_description

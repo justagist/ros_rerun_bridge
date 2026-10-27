@@ -21,7 +21,7 @@ This uses the [turtlebot3_nav2.config.yaml](example_configs/turtlebot3_nav2.conf
 
 ### Moveit Demo
 
-This uses the [robot_joint_states.config.yaml](example_configs/robot_joint_states.config.yaml) config file and works with any robot that publishes robot description and joint states.
+This uses the [robot_joint_states.config.yaml](example_configs/robot_joint_states.config.yaml) config file with `ros2 launch moveit_resources_panda_moveit_config demo.launch.py`, and works with any robot that publishes robot description and joint states (set `global_frame` to its root link if nothing publishes a `world` frame).
 
 [![ros_rerun_franka_moveit.mp4](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.gif)](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.mp4)
 
@@ -38,17 +38,49 @@ This uses the [robot_joint_states.config.yaml](example_configs/robot_joint_state
 
 ---
 
-## Installation (dev)
+## Installation
+
+Rerun needs NumPy 2, while ROS distros ship NumPy 1, so the bridge runs in its own virtual environment. ROS-supplied Python packages (`rclpy`, message types) come from your sourced ROS environment through `PYTHONPATH`.
+
+* Do not install it into the system Python: upgrading NumPy there breaks other ROS nodes (e.g. OpenCV, `cv_bridge`).
+* Do not create the environment with system site-packages: the distro's NumPy 1 builds of packages such as pandas then break Rerun.
+* The environment must use the Python your ROS distro is built for (Python 3.12 on Jazzy), as `rclpy` is compiled for it.
+
+[uv](https://docs.astral.sh/uv/) handles all of this. The repo configures it to use only system Pythons, never a uv-managed one:
 
 ```bash
-# From the repo root
-pip install -e .
-
-# Make sure your ROS 2 distro is installed & sourced (e.g. Humble):
-#   source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
+# From the repo root: creates .venv on first run, then runs the console script
+uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml
 ```
 
-> Python deps are declared in `pyproject.toml` (e.g. `rerun-sdk`, `pydantic`, `pyyaml`, `scipy`). ROS-supplied Python packages (e.g. message types) come from your sourced ROS environment.
+Without cloning, `uvx` does not read the repo's uv settings, so ask for a system Python explicitly:
+
+```bash
+uvx --python-preference only-system --from git+https://github.com/justagist/ros_rerun_bridge ros-rerun-bridge --config <config.yaml>
+```
+
+To make `ros-rerun-bridge` available everywhere, install it as a uv tool. It gets its own environment and the command goes in `~/.local/bin` (run `uv tool update-shell` if that is not on your `PATH`). Like `uvx`, this does not read the repo's uv settings:
+
+```bash
+# From a clone, editable: code changes apply without reinstalling (add --reinstall after dependency changes)
+uv tool install --python-preference only-system -e .
+# Or straight from GitHub
+uv tool install --python-preference only-system git+https://github.com/justagist/ros_rerun_bridge
+
+source /opt/ros/jazzy/setup.bash
+ros-rerun-bridge --config <config.yaml>
+
+# To remove it
+uv tool uninstall ros-rerun-bridge
+```
+
+Or with pip, in a plain venv created from the distro's Python (on Ubuntu this needs the `python3-venv` package):
+
+```bash
+/usr/bin/python3 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/ros-rerun-bridge --config <config.yaml>
+```
 
 ---
 
@@ -61,7 +93,7 @@ ros-rerun-bridge --config path/to/config.yaml [RERUN_ARGS â€¦] -- [RCLPY_ARGS â€
 ```
 
 * `--config` points to your YAML (schema below).
-* **RERUN_ARGS** are forwarded to `rerun.script_setup(...)` (e.g. `--spawn`, `--connect`, `--save` etc.).
+* **RERUN_ARGS** are forwarded to `rerun.script_setup(...)`. Without any, the bridge spawns a native Rerun viewer. Others: `--connect` (to a running viewer, default address, or `--url`), `--serve` (web viewer), `--save <file.rrd>`, `--headless`.
 * After a literal `--`, any **RCLPY_ARGS** are passed through to rclpy/ROS 2.
 * `--version` prints the package version and exits.
 
@@ -69,10 +101,10 @@ Example:
 
 ```bash
 # Spawn a Rerun viewer and start the bridge.
-ros-rerun-bridge --config example_configs/turtlebot3_nav2.config.yaml --spawn
+uv run ros-rerun-bridge --config example_configs/turtlebot3_nav2.config.yaml
 
 # Or connect to an already-running viewer
-ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml --connect 127.0.0.1:9876
+uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml --connect
 ```
 
 ---
@@ -192,13 +224,13 @@ Below is the current set of bundled modules and their notable params. See params
 
 The repo includes two sample configs in `example_configs/`:
 
-* `robot_joint_states.config.yaml` -- load URDF once, then animate with `/joint_states`. This should work with any robot publishing /robot_description and /joint_states. 
+* `robot_joint_states.config.yaml` -- load URDF once, then animate with `/joint_states`. Works as is with the MoveIt demos, and with any robot publishing /robot_description and /joint_states (set `global_frame` to its root link if nothing publishes a `world` frame). 
 * `turtlebot3_nav2.config.yaml` -- camera, laser scan, odometry, point clouds, etc. This can be used with the example from nav2 starter doc: https://docs.nav2.org/getting_started/index.html.
 
 Run either as:
 
 ```bash
-ros-rerun-bridge --config example_configs/turtlebot3_nav2.config.yaml --spawn
+uv run ros-rerun-bridge --config example_configs/turtlebot3_nav2.config.yaml
 ```
 
 ---
