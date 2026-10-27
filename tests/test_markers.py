@@ -33,27 +33,39 @@ def component(archetype, name: str):
 
 
 @pytest.mark.parametrize(
-    ("marker_type", "archetype"),
+    ("marker_type", "archetype", "instances", "count"),
     [
-        (Marker.ARROW, rr.Arrows3D),
-        (Marker.CUBE, rr.Boxes3D),
-        (Marker.SPHERE, rr.Ellipsoids3D),
-        (Marker.CYLINDER, rr.Cylinders3D),
-        (Marker.LINE_STRIP, rr.LineStrips3D),
-        (Marker.LINE_LIST, rr.LineStrips3D),
-        (Marker.CUBE_LIST, rr.Boxes3D),
-        (Marker.SPHERE_LIST, rr.Ellipsoids3D),
-        (Marker.POINTS, rr.Points3D),
-        (Marker.TEXT_VIEW_FACING, rr.Points3D),
-        (Marker.TRIANGLE_LIST, rr.Mesh3D),
+        (Marker.ARROW, rr.Arrows3D, "vectors", 1),
+        (Marker.CUBE, rr.Boxes3D, "half_sizes", 1),
+        (Marker.SPHERE, rr.Ellipsoids3D, "half_sizes", 1),
+        (Marker.CYLINDER, rr.Cylinders3D, "lengths", 1),
+        (Marker.LINE_STRIP, rr.LineStrips3D, "strips", 1),
+        (Marker.LINE_LIST, rr.LineStrips3D, "strips", 2),
+        (Marker.CUBE_LIST, rr.Boxes3D, "half_sizes", 4),
+        (Marker.SPHERE_LIST, rr.Ellipsoids3D, "half_sizes", 4),
+        (Marker.POINTS, rr.Points3D, "positions", 4),
+        (Marker.TEXT_VIEW_FACING, rr.Points3D, "positions", 1),
+        (Marker.TRIANGLE_LIST, rr.Mesh3D, "vertex_positions", 3),
     ],
 )
-def test_every_marker_type_but_mesh_resource_converts(marker_type, archetype):
-    assert isinstance(archetype_from_marker(marker(marker_type, points=POINTS[:3], text="t")), archetype)
+def test_every_marker_type_but_mesh_resource_converts_to_its_instances(marker_type, archetype, instances, count):
+    # Four points: list markers draw one instance per point (or per segment, or per whole triangle)
+    converted = archetype_from_marker(marker(marker_type, points=POINTS, text="t"))
+    assert isinstance(converted, archetype)
+    assert len(component(converted, instances)) == count
 
 
-def test_mesh_resource_markers_are_not_supported():
-    assert archetype_from_marker(marker(Marker.MESH_RESOURCE)) is None
+def test_list_shapes_are_centred_on_their_points():
+    boxes = archetype_from_marker(marker(Marker.CUBE_LIST, points=POINTS))
+    np.testing.assert_allclose(component(boxes, "centers"), [[p.x, p.y, p.z] for p in POINTS])
+    np.testing.assert_allclose(component(boxes, "half_sizes"), [[0.1, 0.2, 0.3]] * 4)
+
+
+def test_triangle_lists_use_per_vertex_colours_or_the_marker_colour():
+    coloured = archetype_from_marker(marker(Marker.TRIANGLE_LIST, points=POINTS[:3], colors=PER_POINT[:3]))
+    assert component(coloured, "vertex_colors") == [0xFF0000FF, 0x00FF00FF, 0x0000FFFF]
+    plain = archetype_from_marker(marker(Marker.TRIANGLE_LIST, points=POINTS[:3]))
+    assert component(plain, "albedo_factor") == [0xFF8000FF]
 
 
 def test_shapes_use_scale_as_size_and_the_marker_colour():
@@ -174,3 +186,17 @@ def test_single_marker_topics(node, build, recording):
     build("marker_array", entity_path="single", msg_type="visualization_msgs.msg.Marker")
     node.publish(marker(Marker.CYLINDER, marker_id=7))
     assert recording.rows("/single/ns/7")[0].get("Cylinders3D:lengths") is not None
+
+
+def test_markers_without_a_namespace_are_logged_under_an_underscore(node, build, recording):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(ns="", marker_id=4)]))
+    assert recording.rows("/markers/_/4")[0].get("Boxes3D:half_sizes") is not None
+
+
+def test_an_all_zero_orientation_is_treated_as_identity(node, build, recording):
+    build("marker_array", entity_path="markers")
+    m = marker()
+    m.pose.orientation.w = 0.0
+    node.publish(MarkerArray(markers=[m]))
+    assert recording.rows("/markers/ns/0")[0]["Transform3D:quaternion"] == [[0.0, 0.0, 0.0, 1.0]]

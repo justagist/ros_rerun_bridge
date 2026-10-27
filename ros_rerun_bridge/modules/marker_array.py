@@ -9,7 +9,7 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..utils.utils import set_rr_time_from_ros
+from ..utils.utils import set_rr_time_from_ros, stamp_or_now
 
 
 def _rgba(colour) -> np.ndarray:
@@ -54,12 +54,12 @@ def archetype_from_marker(marker: Marker):
         return rr.LineStrips3D(
             points[: 2 * (len(points) // 2)].reshape(-1, 2, 3), radii=s.x / 2, colors=segment_colours
         )
+    # A shape batch has as many instances as half sizes: one each, or every centre after the first is dropped
+    list_half_sizes = np.tile([s.x / 2, s.y / 2, s.z / 2], (len(points), 1))
     if marker.type == Marker.CUBE_LIST:
-        return rr.Boxes3D(centers=points, half_sizes=[[s.x / 2, s.y / 2, s.z / 2]], colors=colours, fill_mode=solid)
+        return rr.Boxes3D(centers=points, half_sizes=list_half_sizes, colors=colours, fill_mode=solid)
     if marker.type == Marker.SPHERE_LIST:
-        return rr.Ellipsoids3D(
-            centers=points, half_sizes=[[s.x / 2, s.y / 2, s.z / 2]], colors=colours, fill_mode=solid
-        )
+        return rr.Ellipsoids3D(centers=points, half_sizes=list_half_sizes, colors=colours, fill_mode=solid)
     if marker.type == Marker.POINTS:
         return rr.Points3D(points, radii=s.x / 2, colors=colours)
     if marker.type == Marker.TEXT_VIEW_FACING:
@@ -92,15 +92,12 @@ class MarkerArrayModule(TopicToComponentModule):
         self.node.create_timer(0.1, self._expire, callback_group=self.callback_group)
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
+    def ros_msg_type(cls):
         return MarkerArray
 
-    def handle(self, msg: MarkerArray | Marker) -> None:  # noqa: D102
-        received = self.node.get_clock().now()
+    def handle(self, msg: MarkerArray | Marker) -> None:
         for marker in msg.markers if isinstance(msg, MarkerArray) else [msg]:
-            stamp = Time.from_msg(marker.header.stamp)
-            if stamp.nanoseconds == 0:
-                stamp = received
+            stamp = stamp_or_now(Time.from_msg(marker.header.stamp), self.node)
             set_rr_time_from_ros(stamp)
             key = (marker.ns, marker.id)
             if marker.action == Marker.ADD:
@@ -133,12 +130,14 @@ class MarkerArrayModule(TopicToComponentModule):
         self._types[key] = marker.type
         # The marker's pose places its own frame in the header frame
         p, q = marker.pose.position, marker.pose.orientation
+        # rviz treats an all-zero orientation, common in hand-written publishers, as identity
+        quaternion = [q.x, q.y, q.z, q.w] if (q.x, q.y, q.z, q.w) != (0.0, 0.0, 0.0, 0.0) else [0.0, 0.0, 0.0, 1.0]
         marker_frame = f"marker:{path}"
         rr.log(
             path,
             rr.Transform3D(
                 translation=[p.x, p.y, p.z],
-                quaternion=[q.x, q.y, q.z, q.w],
+                quaternion=quaternion,
                 parent_frame=marker.header.frame_id or None,
                 child_frame=marker_frame,
             ),

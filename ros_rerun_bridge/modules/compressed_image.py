@@ -36,13 +36,13 @@ class CompressedImageModule(TopicToComponentModule):
     """Module for logging JPEG and PNG CompressedImage messages to Rerun as is, for the viewer to decode."""
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
+    def ros_msg_type(cls):
         return CompressedImage
 
     def _extract_time(self, msg: CompressedImage) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: CompressedImage) -> None:  # noqa: D102
+    def handle(self, msg: CompressedImage) -> None:
         image = rr.EncodedImage(contents=bytes(msg.data), media_type=media_type_from_format(msg.format))
         # Shown in 3D through the camera's pinhole, logged by the camera_info module
         frame = msg.header.frame_id

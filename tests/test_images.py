@@ -28,6 +28,9 @@ ENCODINGS = [
     ("rgb8", RNG.integers(0, 255, (3, 5, 3), dtype=np.uint8), "RGB"),
     ("bgr8", RNG.integers(0, 255, (3, 5, 3), dtype=np.uint8), "BGR"),
     ("bgra8", RNG.integers(0, 255, (3, 5, 4), dtype=np.uint8), "BGRA"),
+    ("rgba8", RNG.integers(0, 255, (3, 5, 4), dtype=np.uint8), "RGBA"),
+    ("8UC1", RNG.integers(0, 255, (3, 5), dtype=np.uint8), "L"),
+    ("16UC1", RNG.integers(0, 65535, (3, 5), dtype=np.uint16), "L"),
     ("mono8", RNG.integers(0, 255, (3, 5), dtype=np.uint8), "L"),
     ("mono16", RNG.integers(0, 65535, (3, 5), dtype=np.uint16), "L"),
     ("rgb16", RNG.integers(0, 65535, (3, 5, 3), dtype=np.uint16), "RGB"),
@@ -46,10 +49,14 @@ def test_images_keep_their_exact_pixels_and_colour_model(encoding, pixels, colou
     np.testing.assert_array_equal(buffer.reshape(pixels.shape), pixels)
 
 
-def test_bayer_images_are_passed_to_rerun_to_decode():
-    raw = RNG.integers(0, 255, (4, 6), dtype=np.uint8)
-    image = image_from_msg(Image(height=4, width=6, encoding="bayer_rggb8", step=6, data=raw.tobytes()))
-    assert image.format.as_arrow_array().to_pylist()[0]["pixel_format"] == rr.PixelFormat.BayerRGGB8.value
+@pytest.mark.parametrize(
+    ("encoding", "pixel_format", "step"),
+    [("bayer_rggb8", rr.PixelFormat.BayerRGGB8, 6), ("yuv422_yuy2", rr.PixelFormat.YUY2, 12)],
+)
+def test_packed_encodings_are_passed_to_rerun_to_decode(encoding, pixel_format, step):
+    raw = RNG.integers(0, 255, (4, step), dtype=np.uint8)
+    image = image_from_msg(Image(height=4, width=6, encoding=encoding, step=step, data=raw.tobytes()))
+    assert image.format.as_arrow_array().to_pylist()[0]["pixel_format"] == pixel_format.value
     assert bytes(image.buffer.as_arrow_array().to_pylist()[0]) == raw.tobytes()
 
 

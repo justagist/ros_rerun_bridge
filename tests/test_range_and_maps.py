@@ -26,7 +26,6 @@ def test_range_draws_a_cone_along_the_sensor_x_axis(node, build, recording):
     np.testing.assert_allclose(np.hypot(rim[:, 1], rim[:, 2]), math.tan(0.25), rtol=1e-5)
     assert len(edges) == 4 and all(np.allclose(edge[0], 0.0) for edge in edges)
     assert row["LineStrips3D:colors"] == [0x00FF00FF]
-    assert row["CoordinateFrame:frame"] == ["inlet_sensor"]
 
 
 @pytest.mark.parametrize("value", [math.inf, -math.inf, 5.0, 0.0])

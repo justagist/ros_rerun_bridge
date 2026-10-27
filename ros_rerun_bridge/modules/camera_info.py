@@ -16,13 +16,13 @@ class CameraInfoModule(TopicToComponentModule):
     """Module for handling CameraInfo messages and logging camera intrinsics to Rerun."""
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
+    def ros_msg_type(cls):
         return CameraInfo
 
-    def _extract_time(self, msg: CameraInfo) -> Time | None:  # type: ignore[override]
+    def _extract_time(self, msg: CameraInfo) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: CameraInfo) -> None:  # noqa: D102
+    def handle(self, msg: CameraInfo) -> None:
         # The pinhole links the camera frame to its image plane frame, where the image modules place images
         frame = msg.header.frame_id
         rr.log(

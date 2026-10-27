@@ -28,23 +28,19 @@ class RangeModule(TopicToComponentModule):
 
     The cone's apex is the sensor, its length the measured range and its angle the field of view. Readings outside
     [min_range, max_range] (including +/-inf "no detection" readings) clear the cone.
-
-    Module-specific extra configuration parameters:
-      - colour: RGBA colour (default white).
-      - radius: Line radius in metres (default 0.001).
     """
 
     PARAMS = RangeParams
     params: RangeParams  # type hint for self.params
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
+    def ros_msg_type(cls):
         return Range
 
     def _extract_time(self, msg: Range) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: Range) -> None:  # noqa: D102
+    def handle(self, msg: Range) -> None:
         if not (math.isfinite(msg.range) and msg.min_range <= msg.range <= msg.max_range):
             rr.log(self.entity_path, rr.Clear(recursive=False))
             return

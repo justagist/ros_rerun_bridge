@@ -3,9 +3,11 @@ import subprocess
 import sys
 
 import pytest
+from pydantic import ValidationError
 from rclpy.qos import DurabilityPolicy
 from visualization_msgs.msg import Marker
 
+from ros_rerun_bridge.main import load_config
 from ros_rerun_bridge.modules.tf import TFModule
 
 
@@ -48,3 +50,42 @@ def test_subscribes_with_the_configured_topic_qos_and_message_type(node, build):
     assert subscription.topic == "/marker"
     assert subscription.msg_type is Marker
     assert subscription.qos.durability == DurabilityPolicy.TRANSIENT_LOCAL
+
+
+def test_qos_values_are_validated(build):
+    with pytest.raises(ValidationError, match="reliability"):
+        build("tf", qos={"reliability": "best-effort"})
+
+
+def test_unknown_qos_keys_are_an_error(build):
+    with pytest.raises(ValidationError, match="deph"):
+        build("tf", qos={"deph": 5})
+
+
+def write_config(directory, text: str):
+    path = directory / "bridge.yaml"
+    path.write_text(text)
+    return path
+
+
+def test_config_blueprint_is_resolved_relative_to_the_config(tmp_path):
+    (tmp_path / "layout.rbl").write_bytes(b"")
+    cfg = load_config(write_config(tmp_path, "blueprint: layout.rbl\nmodules: []\n"))
+    assert cfg.blueprint == str(tmp_path / "layout.rbl")
+
+
+def test_config_with_a_missing_blueprint_is_an_error(tmp_path):
+    with pytest.raises(FileNotFoundError, match="missing.rbl"):
+        load_config(write_config(tmp_path, "blueprint: missing.rbl\nmodules: []\n"))
+
+
+def test_invalid_config_is_an_error(tmp_path):
+    with pytest.raises(ValidationError, match="modules"):
+        load_config(write_config(tmp_path, "global_frame: map\n"))
+
+
+def test_version_flag_prints_the_version_without_a_config():
+    result = subprocess.run(
+        [sys.executable, "-m", "ros_rerun_bridge.main", "--version"], capture_output=True, text=True
+    )
+    assert result.returncode == 0 and result.stdout.startswith("ros-rerun-bridge version ")

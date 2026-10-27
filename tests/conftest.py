@@ -117,8 +117,11 @@ class Recording:
 
     def close(self) -> None:
         """Fail if data was logged after the recording was read, which the test would not have seen."""
-        if self._chunks is not None:
-            self._stream.flush()
+        self._stream.flush()
+        if self._chunks is None:
+            # Unread data would otherwise be reported as dropped when the recording is freed
+            self._memory.drain_as_bytes()
+        else:
             assert self._memory.num_msgs() == 0, "data was logged after the recording was read"
 
     def entities(self) -> set[str]:

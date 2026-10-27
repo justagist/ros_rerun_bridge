@@ -3,16 +3,19 @@
 import math
 
 import numpy as np
-import pytest
+from geometry_msgs.msg import Pose
+from nav2_msgs.msg import Particle, ParticleCloud
 from sensor_msgs.msg import LaserScan, PointCloud2, PointField
 
+XYZ = [("x", "<f4"), ("y", "<f4"), ("z", "<f4")]
 
-def cloud(points: list[tuple], fields: list[str], dtype: list[tuple]) -> PointCloud2:
+
+def cloud(points: list[tuple], fields: list[str], dtype: list[tuple], big_endian: bool = False) -> PointCloud2:
     raw = np.array(points, dtype=dtype)
     msg = PointCloud2(
         height=1,
         width=len(points),
-        is_bigendian=False,
+        is_bigendian=big_endian,
         point_step=raw.itemsize,
         row_step=raw.nbytes,
         data=raw.tobytes(),
@@ -54,9 +57,26 @@ def test_colour_fields_mode_reads_separate_channels(node, build, recording):
     assert recording.rows("/points")[0]["Points3D:colors"] == [0xFF8000FF]
 
 
+def test_clouds_without_colour_get_no_colour_by_default(node, build, recording):
+    build("pointcloud2", entity_path="points")
+    node.publish(cloud([(1.0, 2.0, 3.0)], ["x", "y", "z"], XYZ))
+    row = recording.rows("/points")[0]
+    assert row["Points3D:positions"] == [[1.0, 2.0, 3.0]]
+    assert row.get("Points3D:colors") is None
+
+
+def test_big_endian_clouds_are_read_in_their_byte_order(node, build, recording):
+    build("pointcloud2", entity_path="points")
+    dtype = [("x", ">f4"), ("y", ">f4"), ("z", ">f4"), ("rgb", ">u4")]
+    node.publish(cloud([(1.0, 2.0, 3.0, 0x00112233)], ["x", "y", "z", "rgb"], dtype, big_endian=True))
+    row = recording.rows("/points")[0]
+    assert row["Points3D:positions"] == [[1.0, 2.0, 3.0]]
+    assert row["Points3D:colors"] == [0x112233FF]
+
+
 def test_no_colour_mode_logs_positions_only(node, build, recording):
     build("pointcloud2", entity_path="points", params={"colour_mode": "none"})
-    node.publish(cloud([(1.0, 1.0, 1.0)], ["x", "y", "z"], [("x", "<f4"), ("y", "<f4"), ("z", "<f4")]))
+    node.publish(cloud([(1.0, 1.0, 1.0)], ["x", "y", "z"], XYZ))
     row = recording.rows("/points")[0]
     assert row["Points3D:positions"] == [[1.0, 1.0, 1.0]]
     assert row.get("Points3D:colors") is None
@@ -81,28 +101,62 @@ def test_laser_scan_lines_draw_one_segment_per_ray(node, build, recording):
     assert row["CoordinateFrame:frame"] == ["base_scan"]
 
 
+def test_laser_scan_rays_start_at_returns_nearer_than_origin_scale(node, build, recording):
+    build("laserscan", entity_path="scan", params={"origin_scale": 0.3})
+    msg = scan()
+    msg.ranges = [0.2, 2.0, 0.15]
+    node.publish(msg)
+    strips = np.array(recording.rows("/scan")[0]["LineStrips3D:strips"])
+    np.testing.assert_allclose(np.linalg.norm(strips[:, 0], axis=1), [0.2, 0.3, 0.15], rtol=1e-5)
+
+
+def test_laser_scan_without_returns_logs_no_rays(node, build, recording):
+    build("laserscan", entity_path="scan")
+    msg = scan()
+    msg.ranges = [float("inf"), 20.0, 0.0]
+    node.publish(msg)
+    assert recording.rows("/scan")[0]["LineStrips3D:strips"] == []
+    assert not [m for m in node.log_messages if m[0] == "error"]
+
+
 def test_laser_scan_points_mode(node, build, recording):
     build("laserscan", entity_path="scan", params={"mode": "points"})
     node.publish(scan())
-    assert len(recording.rows("/scan")[0]["Points3D:positions"]) == 3
+    positions = np.array(recording.rows("/scan")[0]["Points3D:positions"])
+    angles = [-0.1, 0.0, 0.1]
+    expected = [[r * np.cos(a), r * np.sin(a), 0.0] for r, a in zip([1.0, 2.0, 3.0], angles)]
+    np.testing.assert_allclose(positions, expected, rtol=1e-5, atol=1e-6)
 
 
-def test_particle_clouds_as_points_and_arrows(node, build, recording):
-    nav2_msgs = pytest.importorskip("nav2_msgs.msg")
-    from geometry_msgs.msg import Pose
-
-    particles = [nav2_msgs.Particle(pose=Pose(), weight=w) for w in (0.2, 1.0)]
-    for p in particles:
-        p.pose.orientation.w = 1.0
-    msg = nav2_msgs.ParticleCloud(particles=particles)
+def particle_cloud():
+    particles = [Particle(pose=Pose(), weight=w) for w in (0.2, 1.0)]
+    for i, p in enumerate(particles):
+        p.pose.position.x, p.pose.orientation.w = float(i), 1.0
+    msg = ParticleCloud(particles=particles)
     msg.header.frame_id = "map"
+    return msg
 
-    build("particle_cloud", entity_path="particles/points")
-    node.publish(msg)
-    build("particle_cloud", entity_path="particles/arrows", params={"mode": "arrows", "arrow_len": 0.1})
-    node.publish(msg)
 
-    assert len(recording.rows("/particles/points")[0]["Points3D:positions"]) == 2
-    # Arrow length scales with weight, with a floor
-    vectors = np.array(recording.rows("/particles/arrows")[0]["Arrows3D:vectors"])
-    np.testing.assert_allclose(vectors[:, 0], [0.1 * 0.2, 0.1], rtol=1e-5)
+def test_particles_as_points_fade_with_weight(node, build, recording):
+    build("particle_cloud", entity_path="particles")
+    node.publish(particle_cloud())
+    row = recording.rows("/particles")[0]
+    assert row["Points3D:positions"] == [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]
+    # The lightest particle keeps 15% alpha, the heaviest is opaque
+    assert row["Points3D:colors"] == [0xFFFFFF26, 0xFFFFFFFF]
+
+
+def test_particle_arrows_scale_with_weight(node, build, recording):
+    build("particle_cloud", entity_path="particles", params={"mode": "arrows", "arrow_len": 0.1})
+    node.publish(particle_cloud())
+    # Weights normalised over the message (0.2 to 1.0), lengths from 20% to 100% of arrow_len
+    vectors = np.array(recording.rows("/particles")[0]["Arrows3D:vectors"])
+    np.testing.assert_allclose(vectors[:, 0], [0.02, 0.1], rtol=1e-5)
+
+
+def test_particle_weights_can_be_normalised_over_a_fixed_range(node, build, recording):
+    params = {"mode": "arrows", "arrow_len": 0.1, "w_min": 0.0, "w_max": 2.0}
+    build("particle_cloud", entity_path="particles", params=params)
+    node.publish(particle_cloud())
+    vectors = np.array(recording.rows("/particles")[0]["Arrows3D:vectors"])
+    np.testing.assert_allclose(vectors[:, 0], [0.1 * (0.2 + 0.8 * 0.1), 0.1 * (0.2 + 0.8 * 0.5)], rtol=1e-5)

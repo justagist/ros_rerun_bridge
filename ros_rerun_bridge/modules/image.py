@@ -73,13 +73,13 @@ class ImageModule(TopicToComponentModule):
     """
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
+    def ros_msg_type(cls):
         return Image
 
     def _extract_time(self, msg: Image) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: Image) -> None:  # noqa: D102
+    def handle(self, msg: Image) -> None:
         # Shown in 3D through the camera's pinhole, logged by the camera_info module
         frame = msg.header.frame_id
         self.log(image_from_msg(msg), frame_id=f"{frame}{IMAGE_PLANE_SUFFIX}" if frame else "")

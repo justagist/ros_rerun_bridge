@@ -31,3 +31,10 @@ def test_static_transforms_are_logged_as_static(node, build, recording):
     rows = recording.rows("/tf_static")
     assert len(rows) == 1 and rows[0]["static"]
     assert rows[0]["Transform3D:child_frame"] == ["camera"]
+
+
+def test_unstamped_transforms_are_logged_at_receive_time(node, build, recording):
+    build("tf", entity_path="tf")
+    node.now_ns = 42_000_000_000
+    node.publish(TFMessage(transforms=[transform("map", "odom", 1.0, sec=0)]))
+    assert recording.rows("/tf")[0]["ros_time"] == 42_000_000_000

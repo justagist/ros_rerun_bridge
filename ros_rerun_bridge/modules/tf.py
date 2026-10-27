@@ -8,7 +8,7 @@ import rerun as rr
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
 from ..types import StrictParamsModel
-from ..utils.utils import set_rr_time_from_ros
+from ..utils.utils import set_rr_time_from_ros, stamp_or_now
 
 
 class TFParams(StrictParamsModel):
@@ -24,25 +24,23 @@ class TFModule(TopicToComponentModule):
 
     Other modules then only name the frame their data is in (`header.frame_id`), as in rviz.
 
-    Rerun requires a frame relation to always be logged on the same entity, so use one entity for /tf and another for
-    /tf_static. Log /tf_static on `tf_static`, the entity Rerun's URDF importer also logs the robot's joints on.
-
-    Module-specific extra configuration parameters:
-      - static: Log transforms as static (default: False). Set for /tf_static.
+    Rerun requires a frame relation's changes over time to be logged on one entity; a static value on another entity
+    is allowed, and acts as a default. Use one module for /tf and another, with `static`, for /tf_static, the latter
+    on `tf_static`: the entity Rerun's URDF importer logs the robot's joint defaults on.
     """
 
     PARAMS = TFParams
     params: TFParams  # type hint for self.params
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
+    def ros_msg_type(cls):
         return TFMessage
 
-    def handle(self, msg: TFMessage) -> None:  # noqa: D102
+    def handle(self, msg: TFMessage) -> None:
         # One row per transform: each has its own stamp
         for tf in msg.transforms:
             if not self.params.static:
-                set_rr_time_from_ros(Time.from_msg(tf.header.stamp))
+                set_rr_time_from_ros(stamp_or_now(Time.from_msg(tf.header.stamp), self.node))
             t = tf.transform.translation
             q = tf.transform.rotation
             rr.log(

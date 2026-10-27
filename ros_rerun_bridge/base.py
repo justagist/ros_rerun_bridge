@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Optional, Type
+import traceback
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
@@ -8,14 +9,21 @@ from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 import rerun as rr
 
 from .types import StrictParamsModel
-from .utils.utils import _import_module_by_path, make_qos, set_rr_time_from_ros
+from .utils.utils import _import_module_by_path, make_qos, set_rr_time_from_ros, stamp_or_now
 
 if TYPE_CHECKING:
     from rclpy.node import Node
-    from rclpy.qos import QoSProfile
-    from rclpy.time import Time
 
     from .context import BridgeContext
+
+
+class QoSConfig(StrictParamsModel):
+    """Subscription QoS for a module. The publisher's QoS must be compatible, e.g. `best_effort` for sensor data."""
+
+    depth: int = 10
+    reliability: Literal["reliable", "best_effort"] = "reliable"
+    durability: Literal["volatile", "transient_local"] = "volatile"
+    history: Literal["keep_last", "keep_all"] = "keep_last"
 
 
 class ModuleConfig(StrictParamsModel):
@@ -31,8 +39,8 @@ class ModuleConfig(StrictParamsModel):
     """Rerun entity path for logging."""
     msg_type: str | None = None
     """Python path to ROS msg class (overrides module default if provided)."""
-    qos: dict = Field(default_factory=dict)
-    """Quality of Service settings (depth, reliability, durability, history)."""
+    qos: QoSConfig = Field(default_factory=QoSConfig)
+    """Quality of Service settings."""
     params: dict = Field(default_factory=dict)
     """Additional parameters for the module."""
 
@@ -49,22 +57,14 @@ class BridgeConfig(StrictParamsModel):
 
 
 class TopicToComponentModule:
-    """Base class for pluggable ROS->Rerun bridges for a single topic type.
+    """Base class for modules, each logging one ROS topic to Rerun. See docs/EXTENDING.md.
 
-    Subclasses should:
-      * implement `ros_msg_type()` returning a ROS msg class (if msg_type not provided in config)
-      * implement `handle(msg)` to log to Rerun using `self.entity_path`, usually via `self.log(..., frame_id=...)`
-
-    Subclasses MAY define `PARAMS` = <PydanticModelSubclass>.
-    If present, `self.params` will be an instance of that type (validated),
-    otherwise it remains a plain dict.
-
-    Subclasses MAY implement `_extract_time(msg) -> Optional[Time]` to extract
-    a ROS time stamp from the message. The bridge sets Rerun's time to that
-    stamp before calling `handle()`, or to the receive time if there is none.
+    Subclasses implement `ros_msg_type()` (unless the config sets `msg_type`) and `handle(msg)`, and may set `PARAMS`
+    to a params model and implement `_extract_time(msg)`.
     """
 
-    PARAMS: Optional[BaseModel] = None  # subclasses can override
+    PARAMS: type[BaseModel] | None = None
+    """Model the config's `params` are validated into, as `self.params`. Without one, `self.params` is a dict."""
 
     def __init__(self, node: Node, config: ModuleConfig, context: BridgeContext) -> None:
         """Initialize the module.
@@ -94,7 +94,7 @@ class TopicToComponentModule:
 
         self._sub = None
 
-        qos_profile: QoSProfile = make_qos(**config.qos) if config.qos else make_qos()
+        qos_profile = make_qos(config.qos)
 
         msg_type = self._resolve_msg_type()
         # One group per module: topics are handled in parallel, but each module sees its messages one at a time.
@@ -107,7 +107,7 @@ class TopicToComponentModule:
             f"[{config.name}] subscribed to {config.topic} with {msg_type.__name__} -> {config.entity_path}"
         )
 
-    # ——— Overridables ———
+    # Overridables
     @classmethod
     def ros_msg_type(cls):
         """Return the default ROS msg type (class). Subclasses must override unless config.msg_type is set."""
@@ -117,7 +117,7 @@ class TopicToComponentModule:
         """Process & log to Rerun. This method is called when a new message is received. Subclasses must override."""
         raise NotImplementedError
 
-    # ——— Helpers ———
+    # Helpers
     def log(self, *archetypes: Any, frame_id: str = "") -> None:
         """Log archetypes to this module's entity, placed in the named TF frame `frame_id` if one is given.
 
@@ -129,21 +129,21 @@ class TopicToComponentModule:
             archetypes = (*archetypes, rr.CoordinateFrame(frame=frame_id))
         rr.log(self.entity_path, *archetypes)
 
-    # ——— Internals ———
+    # Internals
     def _callback(self, msg: Any) -> None:
-        # Rerun's time is per thread and executor threads are shared between modules, so it must be set for every
-        # message. Unstamped messages (or a zero stamp) fall back to receive time.
-        stamp_getter: Optional[Callable[[Any], Optional["Time"]]] = getattr(self, "_extract_time", None)
-        stamp = stamp_getter(msg) if stamp_getter else None
-        if stamp is None or stamp.nanoseconds == 0:
-            stamp = self.node.get_clock().now()
-        set_rr_time_from_ros(stamp)
+        # An exception would stop the executor, and with it every module
         try:
+            # Rerun's time is per thread and executor threads are shared between modules, so it must be set for every
+            # message
+            stamp_getter = getattr(self, "_extract_time", None)
+            set_rr_time_from_ros(stamp_or_now(stamp_getter(msg) if stamp_getter else None, self.node))
             self.handle(msg)
         except Exception as e:
-            self.node.get_logger().error(f"[{self.name}] handle() error: {e}", throttle_duration_sec=5.0)
+            logger = self.node.get_logger()
+            logger.error(f"[{self.name}] error handling a message: {type(e).__name__}: {e}", throttle_duration_sec=5.0)
+            logger.debug(traceback.format_exc())
 
-    def _resolve_msg_type(self) -> Type:
+    def _resolve_msg_type(self) -> type:
         if self.msg_type:
             return _import_module_by_path(self.msg_type)
         return self.ros_msg_type()

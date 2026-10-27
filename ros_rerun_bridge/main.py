@@ -8,7 +8,6 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict
 from urllib.parse import quote
 
 import rclpy
@@ -27,50 +26,62 @@ from .context import BridgeContext
 class BridgeNode(Node):
     """ROS2 -> Rerun bridge node."""
 
-    def __init__(self, config_path: str) -> None:
-        """Create the bridge node.
+    def __init__(self, cfg: BridgeConfig) -> None:
+        """Create the bridge node and its modules, and log the scene setup.
 
         Args:
-            config_path: Path to YAML config file.
+            cfg: The validated config, from `load_config`.
         """
         super().__init__("ros_rerun_bridge")
 
         # Shared context. Currently only holds the robot model.
         bridge_context = BridgeContext()
 
-        # Load config
-        cfg = BridgeConfig.model_validate(load_yaml(config_path))
-
         # The root entity's frame is the one Rerun's default 3D view renders in. ROS frames are right-handed, Z up.
         rr.log("/", rr.ViewCoordinates.RIGHT_HAND_Z_UP, rr.CoordinateFrame(frame=cfg.global_frame), static=True)
 
         if cfg.blueprint:
-            blueprint = Path(config_path).parent / cfg.blueprint
-            if not blueprint.is_file():
-                raise FileNotFoundError(f"blueprint '{blueprint}' not found")
             # Rerun applies it to this recording's application, whichever it was saved from
-            rr.log_file_from_path(blueprint)
+            rr.log_file_from_path(cfg.blueprint)
 
         # build modules
         builder = BridgeBuilder(self)
         self.modules = builder.build_modules(cfg, bridge_context)
 
 
-def load_yaml(path: str | Path) -> Dict[str, Any]:
-    """Load a YAML file from the given path."""
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
+def load_config(path: str | Path) -> BridgeConfig:
+    """Load and validate a config, with its blueprint path resolved and checked.
+
+    Args:
+        path: Path to the YAML config.
+
+    Returns:
+        The config, with `blueprint` an absolute path if set.
+
+    Raises:
+        pydantic.ValidationError: If the config is invalid.
+        FileNotFoundError: If the config or its blueprint does not exist.
+    """
+    with open(path) as f:
+        cfg = BridgeConfig.model_validate(yaml.safe_load(f))
+    if cfg.blueprint:
+        blueprint = (Path(path).parent / cfg.blueprint).resolve()
+        if not blueprint.is_file():
+            raise FileNotFoundError(f"blueprint '{blueprint}' not found")
+        cfg.blueprint = str(blueprint)
+    return cfg
 
 
-def serve(allowed_origins: list[str] | None) -> None:
+def serve(allowed_origins: list[str] | None, open_browser: bool) -> None:
     """Host a gRPC server and a web viewer, as `rr.script_setup` does for --serve, and print how to connect.
 
     Args:
         allowed_origins: Extra origins whose web viewers may connect to the gRPC server.
+        open_browser: Open the web viewer in a browser on this machine.
     """
     rr.init(application_id="ros_rerun_bridge", default_enabled=True, strict=True)
     grpc_url = rr.get_global_data_recording().serve_grpc(cors_allow_origin=allowed_origins)
-    rr.serve_web_viewer(open_browser=True, connect_to=grpc_url)
+    rr.serve_web_viewer(open_browser=open_browser, connect_to=grpc_url)
     # The web viewer only connects when given the server in its `url` parameter
     print(
         "Connect Rerun viewers with (from another machine, replace 127.0.0.1/localhost with this machine's address):\n"
@@ -110,21 +121,24 @@ def run(argv: list[str] | None = None) -> None:
 
     # Group: Rerun SDK options (show separately)
     rerun_grp = parser.add_argument_group("Rerun options (directly passed to Rerun SDK)")
-    rr.script_add_args(rerun_grp)  # <- key change: add Rerun args to this group
+    rr.script_add_args(rerun_grp)
 
-    # Parse known so leftover go to rclpy
+    # Parse known so leftover go to rclpy, without the `--` separating them
     args, unknownargs = parser.parse_known_args(argv)
+    unknownargs = [arg for arg in unknownargs if arg != "--"]
+    # Before any viewer opens, so a config error is not hidden behind its window
+    cfg = load_config(args.config)
 
     # Spawning the viewer looks `rerun` up on PATH. Use the one installed with this package, which matches the SDK
     # version, also when its environment is not on PATH (e.g. after `uv tool install`).
     os.environ["PATH"] = os.pathsep.join([os.path.dirname(sys.executable), os.environ.get("PATH", "")])
     if args.serve and not args.stdout:
-        serve(args.allow_origin)
+        serve(args.allow_origin, open_browser=not args.headless)
     else:
         rr.script_setup(args, "ros_rerun_bridge")
 
     rclpy.init(args=unknownargs)
-    node = BridgeNode(args.config)
+    node = BridgeNode(cfg)
 
     try:
         rclpy.spin(node, executor=rclpy.executors.MultiThreadedExecutor())

@@ -29,9 +29,5 @@ class ModuleRegistry:
         """Check if a module class is registered under the given name."""
         return name in self._by_name
 
-    def names(self):
-        """Get a sorted list of all registered module names."""
-        return sorted(self._by_name)
-
 
 REGISTRY = ModuleRegistry()

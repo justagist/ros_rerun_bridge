@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List, Literal, Tuple
 
 import numpy as np
+from nav2_msgs.msg import ParticleCloud
 from rclpy.time import Time
 from scipy.spatial.transform import Rotation
 
@@ -12,21 +13,14 @@ from ..base import TopicToComponentModule
 from ..registry import REGISTRY
 from ..types import StrictParamsModel
 
-try:
-    from nav2_msgs.msg import ParticleCloud
-
-    NAV2_MSGS_AVAILABLE = True
-except ImportError:
-    NAV2_MSGS_AVAILABLE = False
-
 
 class ParticleCloudParams(StrictParamsModel):
     """Parameters for the ParticleCloudModule."""
 
     mode: Literal["points", "arrows"] = "points"
-    """Visualization mode. 'points' for Points3D, 'arrows' for LineStrips3D."""
+    """Visualisation mode: "points" for rr.Points3D, "arrows" for rr.Arrows3D."""
     radius: float = 0.0015
-    """Base radius for Points3D or LineStrips3D."""
+    """Base radius for points or arrows."""
     colour: tuple[int, int, int, int] = (255, 255, 255, 255)
     """Base RGBA colour as 4-tuple of uint8."""
     colour_by_weight: bool = True
@@ -43,44 +37,19 @@ class ParticleCloudParams(StrictParamsModel):
 
 @REGISTRY.register("particle_cloud")
 class ParticleCloudModule(TopicToComponentModule):
-    """
-    Visualize nav2_msgs/ParticleCloud as:
-        - mode: "points"  -> rr.Points3D coloured by weight
-        - mode: "arrows"  -> rr.LineStrips3D short arrows oriented by pose and scaled by weight
-    Module-specific extra configuration parameters:
-        - mode: "points" | "arrows"  (default: "points")
-                - points: render as points
-                - arrows: render as arrows oriented by pose
-        - radius: float (default: 0.0015)
-                - base radius for points or arrows
-        - colour: tuple[int, int, int, int] (default: (255, 255, 255, 255))
-                - base RGBA colour as 4-tuple of uint8
-        - colour_by_weight: bool (default: True)
-                - whether to modulate colour alpha by weight
-        - w_min: float | None (default: None)
-                - minimum weight for normalization (auto from current msg if None)
-        - w_max: float | None (default: None)
-                - maximum weight for normalization (auto from current msg if None)
-        - arrow_len: float (default: 0.05)
-                - base arrow length in meters (before weight scaling)
-        - arrow_axis: "x" | "y" | "z" (default: "x")
-                - which body axis defines heading for arrows
-    """
+    """Module for logging nav2_msgs/ParticleCloud to Rerun as points, or as arrows along each particle's heading."""
 
     PARAMS = ParticleCloudParams
     params: ParticleCloudParams  # type hint for self.params
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
-        if not NAV2_MSGS_AVAILABLE:
-            raise RuntimeError("nav2_msgs package is not installed.")
-
+    def ros_msg_type(cls):
         return ParticleCloud
 
-    def _extract_time(self, msg: ParticleCloud) -> Time | None:  # type: ignore[override]
+    def _extract_time(self, msg: ParticleCloud) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: ParticleCloud) -> None:  # noqa: D102
+    def handle(self, msg: ParticleCloud) -> None:
         particles = msg.particles or []
         if not particles:
             return

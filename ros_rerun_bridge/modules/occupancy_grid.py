@@ -26,25 +26,19 @@ class OccupancyGridParams(StrictParamsModel):
 
 @REGISTRY.register("occupancy_grid")
 class OccupancyGridModule(TopicToComponentModule):
-    """Module for logging nav_msgs/OccupancyGrid maps and costmaps to Rerun as a grid map in the message's frame.
-
-    Module-specific extra configuration parameters:
-      - colormap: "RvizMap" | "RvizCostmap" | "Costmap" | "Grayscale" (default "RvizMap")
-      - opacity: float (default 1.0)
-      - draw_order: float (default: none)
-    """
+    """Module for logging nav_msgs/OccupancyGrid maps and costmaps to Rerun as a grid map in the message's frame."""
 
     PARAMS = OccupancyGridParams
     params: OccupancyGridParams  # type hint for self.params
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
+    def ros_msg_type(cls):
         return OccupancyGrid
 
     def _extract_time(self, msg: OccupancyGrid) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
-    def handle(self, msg: OccupancyGrid) -> None:  # noqa: D102
+    def handle(self, msg: OccupancyGrid) -> None:
         info = msg.info
         # ROS grids start at the bottom-left cell, Rerun's at the top row. Unknown cells (-1) become 255, which the
         # rviz colormaps show as unknown.

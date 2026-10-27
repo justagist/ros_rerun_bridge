@@ -26,10 +26,10 @@ class RobotDescriptionModule(TopicToComponentModule):
     """
 
     @classmethod
-    def ros_msg_type(cls):  # noqa: D102
+    def ros_msg_type(cls):
         return String
 
-    def handle(self, msg: String) -> None:  # noqa: D102
+    def handle(self, msg: String) -> None:
         # The importer only reads files. package:// mesh paths are resolved through the ROS environment.
         with tempfile.NamedTemporaryFile("w", suffix=".urdf") as urdf_file:
             urdf_file.write(msg.data)
@@ -54,7 +54,9 @@ class RobotDescriptionModule(TopicToComponentModule):
             tree: The loaded robot model, for the visual geometry entity paths.
         """
         for link in ET.fromstring(urdf).iter("link"):
-            for i, visual in enumerate(link.findall("visual")):
+            # The importer lists a link's visuals in document order
+            paths = tree.get_visual_geometry_paths(link.get("name"))
+            for path, visual in zip(paths, link.findall("visual")):
                 mesh = visual.find("geometry/mesh")
                 if mesh is None or not mesh.get("filename", "").lower().endswith(".dae"):
                     continue
@@ -62,9 +64,7 @@ class RobotDescriptionModule(TopicToComponentModule):
                 if unit == 1.0:
                     continue
                 scale = [float(s) * unit for s in mesh.get("scale", "1 1 1").split()]
-                for path in tree.get_visual_geometry_paths(link.get("name")):
-                    if path.endswith(f"/visual_{i}"):
-                        rr.log(path, rr.InstancePoses3D.from_fields(scales=[scale]), static=True)
+                rr.log(path, rr.InstancePoses3D.from_fields(scales=[scale]), static=True)
 
 
 def _collada_unit(filename: str) -> float:
