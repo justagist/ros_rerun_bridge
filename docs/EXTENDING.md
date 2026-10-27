@@ -1,7 +1,6 @@
-
 # Extending ros-rerun-bridge with a new module
 
-Modules are tiny classes that subscribe to **one ROS message type** and emit **one kind of Rerun data** under an `entity_path`. They get access to the ROS node and a shared context (TF/URDF helpers).
+Modules are small classes that subscribe to **one ROS message type** and log it to Rerun under an `entity_path`. They get access to the ROS node and a shared context (e.g. the robot model).
 
 ### 1) Pick an identifier
 
@@ -51,12 +50,12 @@ class MyPoseModule(TopicToComponentModule):
 * Inherit from `TopicToComponentModule`.
 * Provide `ros_msg_type()` **unless** you require users to set `msg_type` in YAML.
 * If you define `PARAMS = <PydanticModel>`, the bridge will parse `params: {…}` into that model and attach it as `self.params`.
-* Implement `handle(self, msg)` – this is called for every message.
+* Implement `handle(self, msg)`, which is called for every message.
 * Optionally implement `_extract_time(self, msg) -> rclpy.time.Time | None` if you want Rerun timelines to align with ROS stamps.
 
 ### 3) Add it to the package (optional for local use)
 
-If you’re contributing to the package, the registry name must match the file name (`my_pose` in `ros_rerun_bridge/modules/my_pose.py`). The builder imports a built-in module only when a config uses it.
+If you're contributing to the package, the registry name must match the file name (`my_pose` in `ros_rerun_bridge/modules/my_pose.py`). The builder imports a built-in module only when a config uses it.
 
 For **local/private** modules, you can skip the registry and load via Python path in your YAML:
 
@@ -81,30 +80,41 @@ modules:
 
 ### 5) QoS & message types
 
-* If your module’s `ros_msg_type()` is expensive or you want to reuse the same module for multiple aliases, allow users to override using the top‑level `msg_type` field in YAML (e.g. `my_pkg_msgs/WeirdPose`).
-* Expose QoS in your docs; the bridge already converts `qos: { … }` into a `QoSProfile` for your subscription.
+* Users can override your module's message type with the config's `msg_type` field, by its Python path (e.g. `visualization_msgs.msg.Marker`), for a module that handles several message types.
+* The bridge turns the config's `qos: { … }` into the subscription's `QoSProfile`; mention in your docs if your topic needs e.g. `transient_local`.
 
-### 6) Testing tips
+### 6) Testing
 
-* Validate your Pydantic params by constructing the model in isolation.
-* Use `ros2 topic pub` or bag playback to drive the module.
-* Try both the default (spawned viewer) and `--connect` flows.
+The test fixtures in [tests/conftest.py](../tests/conftest.py) run a module without a ROS graph and read back what it logged:
+
+```python
+def test_logs_the_position(node, build, recording):
+    build("my_pose", entity_path="pose")           # builds the module from a config entry
+    msg = PoseStamped()
+    msg.header.frame_id, msg.pose.position.x = "map", 1.0
+    node.publish(msg)                               # delivers it as the executor would
+    row = recording.rows("/pose")[0]               # what the module logged
+    assert row["Points3D:positions"] == [[1.0, 0.0, 0.0]]
+    assert row["CoordinateFrame:frame"] == ["map"]
+```
+
+Run the tests with `uv run pytest`, with ROS sourced. To try a module live, drive it with `ros2 topic pub` or a bag.
 
 ### 7) Common utilities you can use
 
-* `set_rr_time_from_ros(stamp)` – align Rerun time with a ROS stamp.
-* `self.log(*archetypes, frame_id=...)` – log to the module's entity, placed in a named TF frame.
-* `context.urdf_tree` – the robot model (Rerun's `UrdfTree`), once the `robot_description` module has received it.
+* `self.log(*archetypes, frame_id=...)`: log to the module's entity, placed in a named TF frame.
+* `set_rr_time_from_ros(stamp)`: set Rerun's time to a ROS stamp, for messages holding several stamped items (the bridge already sets it from `_extract_time`).
+* `context.urdf_tree`: the robot model (Rerun's `UrdfTree`), once the `robot_description` module has received it.
 
 ---
 
 ### FAQ
 
 **Should a module handle multiple topics?**
-Keep modules single‑responsibility. If you need multiple subscriptions, consider separate modules or a composite module with clearly separated params.
+Keep modules to one responsibility. If you need multiple subscriptions, consider separate modules or a composite module with clearly separated params.
 
 **Can I log to multiple Rerun entities from one module?**
-Yes—derive the paths from `self.entity_path` or add extra params to control sub‑paths.
+Yes. Derive the paths from `self.entity_path`, or add params to control them.
 
 **What about lifecycle?**
-Modules are instantiated once at startup. Use `__init__` for setup and `self.node.create_subscription(...)` inside the base class’ constructor path is already handled for you; you only implement `handle()`.
+Modules are created once at startup, and the base class creates the subscription. Do any other setup in `__init__` after calling `super().__init__`; timers should use `self.callback_group`, so they never run at the same time as `handle()`.
