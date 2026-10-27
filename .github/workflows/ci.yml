@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.2
       - name: Lint
         run: uv run --only-group dev ruff check
       - name: Check formatting
@@ -27,7 +27,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             ros-jazzy-laser-geometry ros-jazzy-sensor-msgs-py ros-jazzy-nav2-msgs
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.2
       - name: Test
         shell: bash
         run: |
