@@ -39,6 +39,13 @@ def test_arrays_are_plotted_as_one_series_per_element(node, build, recording):
     assert scalars(recording, "/plots/position") == [[0.1, 0.2, 0.3]]
 
 
+def test_shorter_arrays_are_padded_to_leave_gaps_in_the_series_they_lack(node, build, recording):
+    build_scalars(build, "sensor_msgs.msg.JointState", "position")
+    node.publish(JointState(position=[0.1, 0.2, 0.3]))
+    node.publish(JointState(position=[0.4]))
+    assert scalars(recording, "/plots/position")[-1] == pytest.approx([0.4, math.nan, math.nan], nan_ok=True)
+
+
 def test_non_finite_values_are_kept_to_break_the_line(node, build, recording):
     build_scalars(build, "sensor_msgs.msg.Range", "range")
     node.publish(Range(range=math.inf))

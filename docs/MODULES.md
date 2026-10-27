@@ -143,7 +143,7 @@ Logs a Nav2 particle cloud as points or as arrows along each particle's heading.
 
 ## `scalars`
 
-Plots numeric fields of any message type as time series, each on `<entity_path>/<field>` with the field's dots as slashes. The config must set the message type with `msg_type`. Fields are checked against it on start: one that does not exist, or is not a number or an array of numbers, is an error. An array is plotted as one series per element.
+Plots numeric fields of any message type as time series, each on `<entity_path>/<field>` with the field's dots as slashes. The config must set the message type with `msg_type`. Fields are checked against it on start: one that does not exist, or is not a number or an array of numbers, is an error. An array is plotted as one series per element, with a gap in a series while an array is too short to have it. Each series follows its element's index, so arrays whose elements change meaning between messages, such as `/joint_states` from several publishers, mix them.
 
 Values are logged as they are: non-finite ones, such as a `Range`'s `+inf` "no detection" readings, break the line. Messages with a header are logged at its stamp, others when received. A topic can be plotted alongside another module's display of it, e.g. the `range` cone.
 

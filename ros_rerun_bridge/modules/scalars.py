@@ -46,7 +46,8 @@ class ScalarsModule(TopicToComponentModule):
     """Module for plotting numeric fields of any message type as time series.
 
     Each field is logged on `<entity_path>/<field>`, with the field's dots as slashes. An array is plotted as one series
-    per element. Non-finite values, such as a Range's +inf, break the line. The config must set `msg_type`.
+    per element, with a gap in a series while an array is too short to have it. Non-finite values, such as a Range's
+    +inf, break the line. The config must set `msg_type`.
     """
 
     PARAMS = ScalarsParams
@@ -69,6 +70,8 @@ class ScalarsModule(TopicToComponentModule):
         self._fields = {
             f"{self.entity_path}/{field.replace('.', '/')}": attrgetter(field) for field in self.params.fields
         }
+        self._sizes: dict[str, int] = {}
+        """Most values logged at once per entity path."""
 
     def _extract_time(self, msg: Any) -> Time | None:
         header = getattr(msg, "header", None)
@@ -76,7 +79,11 @@ class ScalarsModule(TopicToComponentModule):
 
     def handle(self, msg: Any) -> None:
         for path, get in self._fields.items():
-            rr.log(path, rr.Scalars(np.asarray(get(msg), dtype=np.float64)))
+            values = np.atleast_1d(np.asarray(get(msg), dtype=np.float64))
+            # Rerun expects as many values on an entity every time: a shorter array is padded with NaN, which leaves a
+            # gap in the series it lacks
+            size = self._sizes[path] = max(self._sizes.get(path, 0), values.size)
+            rr.log(path, rr.Scalars(np.pad(values, (0, size - values.size), constant_values=np.nan)))
 
 
 def _check_field(msg_type: type, field: str) -> None:
