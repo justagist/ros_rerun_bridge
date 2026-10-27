@@ -21,7 +21,7 @@ PER_POINT = [ColorRGBA(r=1.0, a=1.0), ColorRGBA(g=1.0, a=1.0), ColorRGBA(b=1.0, 
 
 def marker(marker_type: int = Marker.CUBE, ns: str = "ns", marker_id: int = 0, **fields) -> Marker:
     m = Marker(type=marker_type, ns=ns, id=marker_id, **fields)
-    m.header.frame_id = "conveyor"
+    m.header.frame_id = "table"
     m.scale.x, m.scale.y, m.scale.z = 0.2, 0.4, 0.6
     m.color = ColorRGBA(r=1.0, g=0.5, b=0.0, a=1.0)
     m.pose.orientation.w = 1.0
@@ -95,21 +95,21 @@ def test_arrows_from_pose_or_from_two_points():
 
 
 def test_text_markers_are_labels():
-    text = archetype_from_marker(marker(Marker.TEXT_VIEW_FACING, text="tray 3"))
-    assert component(text, "labels") == ["tray 3"]
+    text = archetype_from_marker(marker(Marker.TEXT_VIEW_FACING, text="box 3"))
+    assert component(text, "labels") == ["box 3"]
     assert component(text, "show_labels") == [True]
 
 
 def test_markers_are_posed_in_their_header_frame(node, build, recording):
     build("marker_array", entity_path="markers")
-    m = marker(ns="trays/inlet", marker_id=3)
+    m = marker(ns="boxes/left", marker_id=3)
     m.pose.position.y = 0.5
     node.publish(MarkerArray(markers=[m]))
 
     # The namespace's slash is escaped, so each marker stays one entity
-    row = recording.rows("/markers/trays\\/inlet/3")[0]
-    marker_frame = "marker:markers/trays\\/inlet/3"
-    assert row["Transform3D:parent_frame"] == ["conveyor"]
+    row = recording.rows("/markers/boxes\\/left/3")[0]
+    marker_frame = "marker:markers/boxes\\/left/3"
+    assert row["Transform3D:parent_frame"] == ["table"]
     assert row["Transform3D:child_frame"] == [marker_frame]
     assert row["Transform3D:translation"] == [[0.0, 0.5, 0.0]]
     assert row["CoordinateFrame:frame"] == [marker_frame]

@@ -26,8 +26,8 @@ def test_unstamped_messages_are_logged_at_receive_time(node, build, recording):
 
 def test_data_is_placed_in_the_header_frame(node, build, recording):
     build("range", entity_path="range")
-    node.publish(reading(frame_id="inlet_sensor"))
-    assert recording.rows("/range")[0]["CoordinateFrame:frame"] == ["inlet_sensor"]
+    node.publish(reading(frame_id="front_sensor"))
+    assert recording.rows("/range")[0]["CoordinateFrame:frame"] == ["front_sensor"]
 
 
 def test_handler_errors_are_logged_with_their_type_not_raised(node, build):
