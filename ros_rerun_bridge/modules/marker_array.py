@@ -130,6 +130,8 @@ class MarkerArrayModule(TopicToComponentModule):
             self.node.get_logger().warn(
                 f"[{self.name}] marker type {marker.type} is not supported", throttle_duration_sec=5.0
             )
+            # A marker changing to an unsupported type must not keep showing its old shape
+            self._clear([key])
             return
         path = self._path(key)
         previous = self._shapes.get(key)

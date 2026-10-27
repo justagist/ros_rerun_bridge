@@ -147,8 +147,9 @@ def test_clearing_a_marker_keeps_its_frame(node, build, recording):
 
 
 def clears_shape(row: dict) -> bool:
-    """Whether a row empties a marker's shape: every component it logs is empty."""
-    logged = [value for key, value in row.items() if ":" in key and value is not None]
+    """Whether a row empties a marker's shape: every shape component it logs is empty."""
+    frame = ("Transform3D:", "CoordinateFrame:")
+    logged = [value for key, value in row.items() if ":" in key and not key.startswith(frame) and value is not None]
     return bool(logged) and not any(logged)
 
 
@@ -198,6 +199,13 @@ def test_unsupported_marker_types_warn(node, build, recording):
     node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE)]))
     assert node.log_messages[-1] == ("warn", f"[marker_array] marker type {Marker.MESH_RESOURCE} is not supported")
     assert "/markers/ns/0" not in recording.entities()
+
+
+def test_a_marker_changing_to_an_unsupported_type_loses_its_old_shape(node, build, recording):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.CUBE)]))
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE)]))
+    assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []
 
 
 def test_single_marker_topics(node, build, recording):

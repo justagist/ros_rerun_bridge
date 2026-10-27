@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - A marker changing type, or deleted and re-added with the same stamp, was not drawn.
 - `TRIANGLE_LIST` markers were not drawn.
+- A marker changing to an unsupported type, such as `MESH_RESOURCE`, kept showing its old shape.
 
 ## [0.1.0] - 2026-10-27
 
