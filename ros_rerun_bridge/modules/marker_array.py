@@ -68,10 +68,16 @@ def archetype_from_marker(marker: Marker):
     if marker.type == Marker.TRIANGLE_LIST:
         n = 3 * (len(points) // 3)
         vertices = points[:n] * [s.x, s.y, s.z]
-        # clear_unset: a marker switching between per-vertex colours and one colour must not keep the other
+        # clear_unset: a marker switching between per-vertex colours and one colour must not keep the other. It also
+        # logs unset indices as an empty list, which Rerun draws as no triangles, so they are always given.
+        indices = np.arange(n, dtype=np.uint32).reshape(-1, 3)
         if colours.ndim == 2:
-            return rr.Mesh3D.from_fields(clear_unset=True, vertex_positions=vertices, vertex_colors=colours[:n])
-        return rr.Mesh3D.from_fields(clear_unset=True, vertex_positions=vertices, albedo_factor=colours)
+            return rr.Mesh3D.from_fields(
+                clear_unset=True, vertex_positions=vertices, triangle_indices=indices, vertex_colors=colours[:n]
+            )
+        return rr.Mesh3D.from_fields(
+            clear_unset=True, vertex_positions=vertices, triangle_indices=indices, albedo_factor=colours
+        )
     return None
 
 

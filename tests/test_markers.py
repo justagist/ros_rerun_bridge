@@ -254,6 +254,12 @@ def test_triangle_lists_are_scaled(node, build, recording):
     np.testing.assert_allclose(component(triangles, "vertex_positions"), [[0.2, 0, 0], [0.2, 0.4, 0], [0, 0.4, 0]])
 
 
+def test_triangle_lists_index_every_triangle():
+    # Rerun draws no triangles for an empty index list, so indices are never left to be generated
+    triangles = archetype_from_marker(marker(Marker.TRIANGLE_LIST, points=POINTS + POINTS[:2]))
+    assert component(triangles, "triangle_indices") == [[0, 1, 2], [3, 4, 5]]
+
+
 def test_triangle_lists_switching_to_one_colour_drop_their_vertex_colours(node, build, recording):
     build("marker_array", entity_path="markers")
     node.publish(MarkerArray(markers=[marker(Marker.TRIANGLE_LIST, points=POINTS[:3], colors=PER_POINT[:3])]))
