@@ -130,12 +130,31 @@ def test_a_marker_changing_type_loses_its_old_shape(node, build, recording):
     build("marker_array", entity_path="markers")
     node.publish(MarkerArray(markers=[marker(Marker.CUBE)]))
     node.publish(MarkerArray(markers=[marker(Marker.SPHERE)]))
-    rows = recording.rows("/markers/ns/0")
-    assert "Clear:is_recursive" in rows[1] and rows[2].get("Ellipsoids3D:half_sizes") is not None
+    assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []
+    assert recording.latest("/markers/ns/0", "Ellipsoids3D:half_sizes")
+
+
+def test_clearing_a_marker_keeps_its_frame(node, build, recording):
+    # Rerun keeps a cleared frame over a transform logged at the same time, so an rr.Clear would hide a marker
+    # deleted and re-added with the same stamp
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.CUBE)]))
+    node.publish(MarkerArray(markers=[Marker(action=Marker.DELETEALL), marker(Marker.SPHERE)]))
+    # Including recursive clears from a parent entity
+    rows = [row for entity in recording.entities() for row in recording.rows(entity)]
+    assert all(row.get("Clear:is_recursive") is None for row in rows)
+    assert recording.latest("/markers/ns/0", "Ellipsoids3D:half_sizes")
+
+
+def clears_shape(row: dict) -> bool:
+    """Whether a row empties a marker's shape: every shape component it logs is empty."""
+    frame = ("Transform3D:", "CoordinateFrame:")
+    logged = [value for key, value in row.items() if ":" in key and not key.startswith(frame) and value is not None]
+    return bool(logged) and not any(logged)
 
 
 def is_cleared(recording, entity: str) -> bool:
-    return any(row.get("Clear:is_recursive") is not None for row in recording.rows(entity))
+    return any(clears_shape(row) for row in recording.rows(entity))
 
 
 def test_delete_clears_one_marker(node, build, recording):
@@ -149,14 +168,14 @@ def test_delete_all_with_a_namespace_clears_only_that_namespace(node, build, rec
     build("marker_array", entity_path="markers")
     node.publish(MarkerArray(markers=[marker(ns="a"), marker(ns="b")]))
     node.publish(MarkerArray(markers=[Marker(action=Marker.DELETEALL, ns="a")]))
-    assert is_cleared(recording, "/markers/a") and not is_cleared(recording, "/markers")
+    assert is_cleared(recording, "/markers/a/0") and not is_cleared(recording, "/markers/b/0")
 
 
 def test_delete_all_without_a_namespace_clears_every_marker(node, build, recording):
     build("marker_array", entity_path="markers")
     node.publish(MarkerArray(markers=[marker(ns="a"), marker(ns="b")]))
     node.publish(MarkerArray(markers=[Marker(action=Marker.DELETEALL)]))
-    assert is_cleared(recording, "/markers")
+    assert is_cleared(recording, "/markers/a/0") and is_cleared(recording, "/markers/b/0")
 
 
 def test_markers_expire_at_the_end_of_their_lifetime(node, build, recording):
@@ -170,7 +189,7 @@ def test_markers_expire_at_the_end_of_their_lifetime(node, build, recording):
     node.timers[0]()
 
     expired = recording.rows("/markers/ns/1")
-    assert expired[-1].get("Clear:is_recursive") is not None
+    assert clears_shape(expired[-1])
     assert expired[-1]["ros_time"] == 11_000_000_000
     assert not is_cleared(recording, "/markers/ns/2")
 
@@ -180,6 +199,13 @@ def test_unsupported_marker_types_warn(node, build, recording):
     node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE)]))
     assert node.log_messages[-1] == ("warn", f"[marker_array] marker type {Marker.MESH_RESOURCE} is not supported")
     assert "/markers/ns/0" not in recording.entities()
+
+
+def test_a_marker_changing_to_an_unsupported_type_loses_its_old_shape(node, build, recording):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.CUBE)]))
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE)]))
+    assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []
 
 
 def test_single_marker_topics(node, build, recording):
@@ -217,7 +243,7 @@ def test_expired_markers_are_cleared_a_lifetime_after_their_stamp(node, build, r
     received_late(node, build)
     node.now_ns = 10_000_000_000
     node.timers[0]()
-    cleared = [row for row in recording.rows("/markers/ns/1") if row.get("Clear:is_recursive") is not None]
+    cleared = [row for row in recording.rows("/markers/ns/1") if clears_shape(row)]
     assert [row["ros_time"] for row in cleared] == [6_000_000_000]
 
 
@@ -234,6 +260,12 @@ def test_triangle_lists_are_scaled(node, build, recording):
     triangles = archetype_from_marker(marker(Marker.TRIANGLE_LIST, points=POINTS[1:4]))
     # scale (0.2, 0.4, 0.6) applied to each vertex
     np.testing.assert_allclose(component(triangles, "vertex_positions"), [[0.2, 0, 0], [0.2, 0.4, 0], [0, 0.4, 0]])
+
+
+def test_triangle_lists_index_every_triangle():
+    # Rerun draws no triangles for an empty index list, so indices are never left to be generated
+    triangles = archetype_from_marker(marker(Marker.TRIANGLE_LIST, points=POINTS + POINTS[:2]))
+    assert component(triangles, "triangle_indices") == [[0, 1, 2], [3, 4, 5]]
 
 
 def test_triangle_lists_switching_to_one_colour_drop_their_vertex_colours(node, build, recording):

@@ -68,10 +68,16 @@ def archetype_from_marker(marker: Marker):
     if marker.type == Marker.TRIANGLE_LIST:
         n = 3 * (len(points) // 3)
         vertices = points[:n] * [s.x, s.y, s.z]
-        # clear_unset: a marker switching between per-vertex colours and one colour must not keep the other
+        # clear_unset: a marker switching between per-vertex colours and one colour must not keep the other. It also
+        # logs unset indices as an empty list, which Rerun draws as no triangles, so they are always given.
+        indices = np.arange(n, dtype=np.uint32).reshape(-1, 3)
         if colours.ndim == 2:
-            return rr.Mesh3D.from_fields(clear_unset=True, vertex_positions=vertices, vertex_colors=colours[:n])
-        return rr.Mesh3D.from_fields(clear_unset=True, vertex_positions=vertices, albedo_factor=colours)
+            return rr.Mesh3D.from_fields(
+                clear_unset=True, vertex_positions=vertices, triangle_indices=indices, vertex_colors=colours[:n]
+            )
+        return rr.Mesh3D.from_fields(
+            clear_unset=True, vertex_positions=vertices, triangle_indices=indices, albedo_factor=colours
+        )
     return None
 
 
@@ -92,8 +98,8 @@ class MarkerArrayModule(TopicToComponentModule):
     def __init__(self, *a, **kw) -> None:
         """Initialise the module with its marker bookkeeping and the lifetime timer."""
         super().__init__(*a, **kw)
-        self._types: dict[tuple[str, int], int] = {}
-        """Type last logged per marker (ns, id), to clear the old shape when a marker changes type."""
+        self._shapes: dict[tuple[str, int], tuple[int, type]] = {}
+        """Type and archetype class last logged per marker (ns, id), to clear its shape on a type change or deletion."""
         self._expiries: dict[tuple[str, int], tuple[int, int]] = {}
         """Per marker with a lifetime: when to clear it (node time, ns), and the time to log the clear at (ns)."""
         self.node.create_timer(0.1, self._expire, callback_group=self.callback_group)
@@ -113,11 +119,7 @@ class MarkerArrayModule(TopicToComponentModule):
                 self._clear([key])
             elif marker.action == Marker.DELETEALL:
                 # As rviz: only the message's namespace, or every marker if it has none
-                ns_path = f"{self.entity_path}/{_ns_part(marker.ns)}" if marker.ns else self.entity_path
-                rr.log(ns_path, rr.Clear(recursive=True))
-                for k in [k for k in {*self._types, *self._expiries} if not marker.ns or k[0] == marker.ns]:
-                    self._types.pop(k, None)
-                    self._expiries.pop(k, None)
+                self._clear([k for k in self._shapes if not marker.ns or k[0] == marker.ns])
 
     def _path(self, key: tuple[str, int]) -> str:
         return f"{self.entity_path}/{_ns_part(key[0])}/{key[1]}"
@@ -128,11 +130,14 @@ class MarkerArrayModule(TopicToComponentModule):
             self.node.get_logger().warn(
                 f"[{self.name}] marker type {marker.type} is not supported", throttle_duration_sec=5.0
             )
+            # A marker changing to an unsupported type must not keep showing its old shape
+            self._clear([key])
             return
         path = self._path(key)
-        if self._types.get(key, marker.type) != marker.type:
-            rr.log(path, rr.Clear(recursive=False))
-        self._types[key] = marker.type
+        previous = self._shapes.get(key)
+        if previous is not None and previous[0] != marker.type:
+            self._clear([key])
+        self._shapes[key] = (marker.type, type(archetype))
         # The marker's pose places its own frame in the header frame
         p, q = marker.pose.position, marker.pose.orientation
         # rviz treats an all-zero orientation, common in hand-written publishers, as identity
@@ -157,9 +162,15 @@ class MarkerArrayModule(TopicToComponentModule):
             self._expiries.pop(key, None)
 
     def _clear(self, keys: list[tuple[str, int]]) -> None:
+        """Clear markers' shapes, keeping their transforms.
+
+        An `rr.Clear` would also clear the marker's frame, and Rerun keeps a cleared frame over a transform logged at
+        the same time: a marker re-added, or changing type, with the same stamp would never be drawn.
+        """
         for key in keys:
-            rr.log(self._path(key), rr.Clear(recursive=True))
-            self._types.pop(key, None)
+            shape = self._shapes.pop(key, None)
+            if shape is not None:
+                rr.log(self._path(key), shape[1].cleared())
             self._expiries.pop(key, None)
 
     def _expire(self) -> None:
