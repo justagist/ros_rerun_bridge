@@ -75,6 +75,17 @@ ros-rerun-bridge --config <config.yaml>
 uv tool uninstall ros-rerun-bridge
 ```
 
+The tool's environment also contains the Rerun viewer, matching the bridge's Rerun version. The bridge finds it on its own, but to run it yourself (e.g. to open a `.rrd` file or connect to a remote bridge), either call it from the tool's environment (under `uv tool dir`) or add `--with-executables-from rerun-sdk` to the install command to put `rerun` in `~/.local/bin` too:
+
+```bash
+~/.local/share/uv/tools/ros-rerun-bridge/bin/rerun <file.rrd or url>
+# or
+uv tool install --python-preference only-system -e . --with-executables-from rerun-sdk
+rerun <file.rrd or url>
+```
+
+Other `rerun` installs earlier on your `PATH` would take precedence, and may not match the bridge's version.
+
 Or with pip, in a plain venv created from the distro's Python (on Ubuntu this needs the `python3-venv` package):
 
 ```bash
