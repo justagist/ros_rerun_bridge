@@ -1,7 +1,7 @@
 
 # ros-rerun-bridge
 
-A **config-driven, modular ROS 2 → Rerun** bridge. You describe what to subscribe to and how to visualize it in a YAML file; the bridge loads a set of lightweight **modules** (one topic → one Rerun component) and streams everything into the Rerun viewer.
+A **config-driven, modular ROS 2 -> Rerun** bridge. You describe what to subscribe to and how to visualize it in a YAML file; the bridge loads a set of lightweight **modules** (one topic -> one Rerun component) and streams everything into the Rerun viewer.
 
 > 🚧 In Active Development
 > 
@@ -151,7 +151,7 @@ Below is the current set of bundled modules and their notable params. See params
 
 ### `tf`  -- `tf2_msgs/TFMessage`
 
-* Logs each transform as a `rr.Transform3D` between named frames (`header.frame_id` → `child_frame_id`).
+* Logs each transform as a `rr.Transform3D` between named frames (`header.frame_id` -> `child_frame_id`).
 * Use one module for `/tf` and another for `/tf_static`. Rerun requires a frame relation to always be logged on the same entity, so give them different entities, and log `/tf_static` on `tf_static`, the entity Rerun's URDF importer also logs the robot's joints on.
 * **Params**
 
@@ -204,6 +204,19 @@ Below is the current set of bundled modules and their notable params. See params
 ### `odometry`  -- `nav_msgs/Odometry` (optional dep)
 
 * Logs scalar time‑series for linear/angular velocities. The robot's pose comes from TF.
+
+### `marker_array`  -- `visualization_msgs/MarkerArray`
+
+* Logs markers as rviz shows them, each on `<entity_path>/<ns>/<id>` and posed in its header frame. For a single `visualization_msgs/Marker` topic, set `msg_type: visualization_msgs.msg.Marker`.
+* Supports every marker type except `MESH_RESOURCE`, the `ADD`, `DELETE` and `DELETEALL` actions (`DELETEALL` clears only the message's namespace if it has one, as in rviz), and lifetimes.
+* Text markers are drawn as labels on a point, as Rerun has no 3D text. Markers always move with their frame, as if `frame_locked` were set.
+
+### `range`  -- `sensor_msgs/Range`
+
+* Draws a reading as rviz does: a cone along the sensor frame's x axis, with the measured range as its length and the field of view as its angle. Readings outside `[min_range, max_range]`, including `±inf` "no detection" readings, clear the cone.
+* **Params**
+
+  * `colour: [r, g, b, a]` (default white) and `radius: float` -- line radius in metres (default `0.001`).
 
 ### `occupancy_grid`  -- `nav_msgs/OccupancyGrid`
 

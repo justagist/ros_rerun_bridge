@@ -38,7 +38,7 @@ class ModuleConfig(StrictParamsModel):
 
 
 class BridgeConfig(StrictParamsModel):
-    """Configuration for the ROS→Rerun bridge."""
+    """Configuration for the ROS->Rerun bridge."""
 
     global_frame: str = "map"
     """TF frame that Rerun's default 3D view is rendered in."""
@@ -47,7 +47,7 @@ class BridgeConfig(StrictParamsModel):
 
 
 class TopicToComponentModule:
-    """Base class for pluggable ROS→Rerun bridges for a single topic type.
+    """Base class for pluggable ROS->Rerun bridges for a single topic type.
 
     Subclasses should:
       * implement `ros_msg_type()` returning a ROS msg class (if msg_type not provided in config)
@@ -95,12 +95,14 @@ class TopicToComponentModule:
         qos_profile: QoSProfile = make_qos(**config.qos) if config.qos else make_qos()
 
         msg_type = self._resolve_msg_type()
-        # One group per module: topics are handled in parallel, but each module sees its messages one at a time
+        # One group per module: topics are handled in parallel, but each module sees its messages one at a time.
+        # Modules add their own timers to it to keep that guarantee.
+        self.callback_group = MutuallyExclusiveCallbackGroup()
         self._sub = node.create_subscription(
-            msg_type, config.topic, self._callback, qos_profile, callback_group=MutuallyExclusiveCallbackGroup()
+            msg_type, config.topic, self._callback, qos_profile, callback_group=self.callback_group
         )
         node.get_logger().info(
-            f"[{config.name}] subscribed to {config.topic} with {msg_type.__name__} → {config.entity_path}"
+            f"[{config.name}] subscribed to {config.topic} with {msg_type.__name__} -> {config.entity_path}"
         )
 
     # ——— Overridables ———

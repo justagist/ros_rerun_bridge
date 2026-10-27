@@ -42,7 +42,7 @@ modules:
     params:
       colour_mode: rgb_packed
 
-  # Particle cloud → arrows
+  # Particle cloud -> arrows
   - name: particles_arrows
     module: particle_cloud
     topic: /particle_cloud
@@ -54,7 +54,7 @@ modules:
       radius: 0.002
       colour: [0, 255, 0, 255] # green
 
-  # Laser scan → line strips
+  # Laser scan -> line strips
   - name: scan
     module: laserscan
     topic: /scan
@@ -80,7 +80,7 @@ modules:
       opacity: 0.6
       draw_order: 1.0
 
-  # Odometry → scalar plots
+  # Odometry -> scalar plots
   - name: odom
     module: odometry
     topic: /odom

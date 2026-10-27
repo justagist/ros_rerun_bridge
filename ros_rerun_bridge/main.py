@@ -1,5 +1,5 @@
 """
-The main entry point for the ROS2 → Rerun bridge node.
+The main entry point for the ROS2 -> Rerun bridge node.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 
 class BridgeNode(Node):
-    """ROS2 → Rerun bridge node."""
+    """ROS2 -> Rerun bridge node."""
 
     def __init__(self, config_path: str) -> None:
         """Create the bridge node.
@@ -57,7 +57,7 @@ def load_yaml(path: str | Path) -> Dict[str, Any]:
 
 
 def run(argv: list[str] | None = None) -> None:
-    """Run the ROS2 → Rerun bridge node.
+    """Run the ROS2 -> Rerun bridge node.
 
     Args:
         argv: Command line arguments to use. If `None`, uses `sys.argv`.
@@ -69,7 +69,7 @@ def run(argv: list[str] | None = None) -> None:
         print(f"ros-rerun-bridge version {__version__}")
         sys.exit(0)
 
-    parser = argparse.ArgumentParser(description="ROS2 → Rerun bridge (config + plugins)")
+    parser = argparse.ArgumentParser(description="ROS2 -> Rerun bridge (config + plugins)")
 
     # Group: app options
     bridge_grp = parser.add_argument_group()
