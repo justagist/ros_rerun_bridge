@@ -29,7 +29,7 @@ class FrameAxes:
     """Draws each frame's axes, if the params ask for them, on `frames/<frame>`.
 
     An entity per frame lets the viewer show or hide each frame's axes, and its name, on its own. The path is the same
-    for every module, so a frame that several modules see, e.g. from /tf_static and /joint_states, is drawn once.
+    for every module, so a frame that several modules see, e.g. from /tf_static and /joint_states, has one entity.
     """
 
     def __init__(self, params: FrameAxesParams) -> None:

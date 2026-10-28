@@ -8,6 +8,7 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
+from ..types import StrictParamsModel
 from ..utils.utils import IMAGE_PLANE_SUFFIX
 
 # ROS encoding -> (channel dtype, channels, Rerun colour model). See sensor_msgs/image_encodings.hpp.
@@ -88,6 +89,9 @@ class ImageModule(TopicToComponentModule):
     Supports the RGB(A), BGR(A) and mono encodings at 8 and 16 bits, 8UC1, 16UC1 and 32FC1, Bayer 8-bit and
     yuv422_yuy2.
     """
+
+    # No params, so any given are an error
+    PARAMS = StrictParamsModel
 
     @classmethod
     def ros_msg_type(cls):

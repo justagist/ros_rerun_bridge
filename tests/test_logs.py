@@ -90,3 +90,24 @@ def test_each_status_is_given_the_level_colours_once(node, build, recording):
     [config] = [row for row in recording.rows("/diagnostics/motor") if row["static"]]
     assert config["StateConfiguration:values"] == ["OK", "WARN", "ERROR", "STALE"]
     assert config["StateConfiguration:colors"] == [0x28AA46FF, 0xF0B400FF, 0xDC2828FF, 0x828282FF]
+
+
+def test_an_unknown_level_is_shown_as_its_number_and_logged_as_a_warning(node, build, recording):
+    build("diagnostics", entity_path="diagnostics")
+    node.publish(diagnostics(("motor", bytes([7]), "odd")))
+    assert state_rows(recording, "/diagnostics/motor") == [["7"]]
+    assert log_rows(recording, "/diagnostics/motor") == [(["WARN"], ["odd"])]
+
+
+def test_statuses_earlier_than_the_latest_are_logged_as_they_are(node, build, recording):
+    build("diagnostics", entity_path="diagnostics")
+    for sec, level in [(10, DiagnosticStatus.OK), (20, DiagnosticStatus.ERROR), (5, DiagnosticStatus.ERROR)]:
+        msg = diagnostics(("motor", level, "status"))
+        msg.header.stamp = TimeMsg(sec=sec)
+        node.publish(msg)
+    rows = [row for row in recording.rows("/diagnostics/motor") if "StateChange:state" in row]
+    assert [(row["ros_time"] // 1_000_000_000, row["StateChange:state"]) for row in rows] == [
+        (5, ["ERROR"]),
+        (10, ["OK"]),
+        (20, ["ERROR"]),
+    ]

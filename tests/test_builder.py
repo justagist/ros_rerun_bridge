@@ -55,6 +55,17 @@ def test_unknown_module_name_is_an_error(build):
         build("tff")
 
 
+def test_a_config_error_names_the_module(build):
+    with pytest.raises(ValueError, match=r"^\[scalars\] field 'distance'"):
+        build("scalars", msg_type="sensor_msgs.msg.Range", params={"fields": ["distance"]})
+
+
+@pytest.mark.parametrize("module", ["image", "compressed_image", "robot_description", "marker_array", "diagnostics"])
+def test_params_for_a_module_without_any_are_an_error(build, module):
+    with pytest.raises(ValueError, match="invalid 'params'"):
+        build(module, params={"colormap": "Viridis"})
+
+
 def test_unknown_params_are_an_error(build):
     with pytest.raises(ValueError, match="invalid 'params'"):
         build("tf", params={"statik": True})

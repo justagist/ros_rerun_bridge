@@ -61,8 +61,10 @@ def compressed(image_format: str, data: bytes) -> CompressedImage:
     return CompressedImage(format=image_format, data=data)
 
 
-def test_png_depth_has_its_ros_header_removed():
-    data, media_type = encoded_depth_from_msg(compressed("16UC1; compressedDepth png", HEADER + PNG))
+# Humble's transport names no codec: it only had PNG
+@pytest.mark.parametrize("image_format", ["16UC1; compressedDepth png", "16UC1; compressedDepth"])
+def test_png_depth_has_its_ros_header_removed(image_format):
+    data, media_type = encoded_depth_from_msg(compressed(image_format, HEADER + PNG))
     assert (data, media_type) == (PNG, "image/png")
 
 

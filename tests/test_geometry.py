@@ -135,3 +135,9 @@ def test_wrenches_are_force_and_torque_arrows_from_their_frame(node, build, reco
 def test_lengths_and_scales_must_be_positive(build, module, params):
     with pytest.raises(ValueError, match="greater than 0"):
         build(module, params=params)
+
+
+@pytest.mark.parametrize("msg_type", ["geometry_msgs.msg.Pose", "geometry_msgs.msg.PoseWithCovariance"])
+def test_unstamped_pose_types_are_an_error(build, msg_type):
+    with pytest.raises(ValueError, match="has no header: use a stamped type"):
+        build("pose", msg_type=msg_type)

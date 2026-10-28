@@ -15,6 +15,7 @@ from ..context import BridgeContext
 from ..registry import REGISTRY
 from ..types import Rgba, StrictParamsModel
 from ..utils.fields import field_type, is_single_value, is_string
+from ..utils.utils import stamp_or_now
 
 
 class StateStyle(StrictParamsModel):
@@ -106,7 +107,9 @@ class StatesModule(TopicToComponentModule):
             raise ValueError(f"field '{self.params.field}' is {self._ros_type}, not a number, bool or string")
         self._get = attrgetter(self.params.field)
         self._state: str | None = None
-        """The state last logged, as each change marks a new one."""
+        """The latest state in time, as each change marks a new one."""
+        self._stamp: int | None = None
+        """The latest state's time, in ns."""
         if self.params.states:
             states = self.params.states
             values = [state_text(s.value, self._ros_type) for s in states]
@@ -126,6 +129,12 @@ class StatesModule(TopicToComponentModule):
 
     def handle(self, msg: Any) -> None:
         state = state_text(self._get(msg), self._ros_type)
+        stamp = stamp_or_now(self._extract_time(msg), self.node).nanoseconds
+        if self._stamp is not None and stamp < self._stamp:
+            # Earlier than the latest state, e.g. after a bag is replayed: logged as it is, as it is not a change from
+            # the latest
+            rr.log(self.entity_path, rr.StateChange(state=state))
+            return
         if state != self._state:
             rr.log(self.entity_path, rr.StateChange(state=state))
-            self._state = state
+        self._state, self._stamp = state, stamp

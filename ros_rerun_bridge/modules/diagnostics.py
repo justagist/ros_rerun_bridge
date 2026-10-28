@@ -9,6 +9,8 @@ import rerun as rr
 from ..base import ModuleConfig, TopicToComponentModule
 from ..context import BridgeContext
 from ..registry import REGISTRY
+from ..types import StrictParamsModel
+from ..utils.utils import stamp_or_now
 
 # Label, colour and Rerun log level per diagnostic level, which ROS gives as a byte
 _LEVELS = {
@@ -28,6 +30,9 @@ class DiagnosticsModule(TopicToComponentModule):
     in the text log view, each logged only when it changes.
     """
 
+    # No params, so any given are an error
+    PARAMS = StrictParamsModel
+
     @classmethod
     def ros_msg_type(cls):
         return DiagnosticArray
@@ -41,24 +46,29 @@ class DiagnosticsModule(TopicToComponentModule):
             context: Shared context for all modules.
         """
         super().__init__(node, config, context)
-        self._last: dict[str, tuple[int, str]] = {}
-        """Level and message last logged per entity path."""
+        self._latest: dict[str, tuple[int, str, int]] = {}
+        """Level, message and time, in ns, of the latest status in time, per entity path."""
 
     def _extract_time(self, msg: DiagnosticArray) -> Time | None:
         return Time.from_msg(msg.header.stamp)
 
     def handle(self, msg: DiagnosticArray) -> None:
+        stamp = stamp_or_now(self._extract_time(msg), self.node).nanoseconds
         for status in msg.status:
             parts = [rr.escape_entity_path_part(part) for part in status.name.split("/") if part]
             path = "/".join([self.entity_path, *parts])
             level = ord(status.level)
-            last = self._last.get(path)
-            if last is None:
+            latest = self._latest.get(path)
+            if latest is None:
                 labels, colours, _ = zip(*_LEVELS.values())
                 rr.log(path, rr.StateConfiguration(values=labels, colors=colours), static=True)
             label, _, log_level = _LEVELS.get(level, (str(level), None, "WARN"))
-            if last is None or last[0] != level:
+            # Earlier than the latest status, e.g. after a bag is replayed: logged as it is, as it is not a change from
+            # the latest
+            earlier = latest is not None and stamp < latest[2]
+            if earlier or latest is None or latest[0] != level:
                 rr.log(path, rr.StateChange(state=label))
-            if last != (level, status.message):
+            if earlier or latest is None or latest[:2] != (level, status.message):
                 rr.log(path, rr.TextLog(status.message, level=log_level))
-            self._last[path] = (level, status.message)
+            if not earlier:
+                self._latest[path] = (level, status.message, stamp)

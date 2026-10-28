@@ -22,14 +22,17 @@ def encoded_depth_from_msg(msg: CompressedImage) -> tuple[bytes, str]:
     PNGs are not supported: they hold quantised inverse depth, which Rerun would show as wrong distances.
 
     Args:
-        msg: The image, from compressed_depth_image_transport, e.g. with format "16UC1; compressedDepth png".
+        msg: The image, from compressed_depth_image_transport, e.g. with format "16UC1; compressedDepth png", or
+            "16UC1; compressedDepth" for a PNG from ROS 2 Humble.
 
     Raises:
         ValueError: If the format is not a supported compressedDepth one.
     """
     encoding, _, compression = msg.format.partition(";")
-    codec = compression.split()[-1].lower() if compression.split() else ""
-    if "compresseddepth" not in compression.lower() or codec not in ("png", "rvl"):
+    words = compression.lower().split()
+    # Humble's transport only had PNG, and names no codec: Jazzy's reads a missing one as PNG too
+    codec = words[1] if words[:1] == ["compresseddepth"] and len(words) > 1 else "png"
+    if words[:1] != ["compresseddepth"] or codec not in ("png", "rvl"):
         raise ValueError(f"unsupported compressed depth format '{msg.format}'")
     data = bytes(msg.data)
     encoding = encoding.strip()

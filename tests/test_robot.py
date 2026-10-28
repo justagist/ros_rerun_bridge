@@ -1,6 +1,7 @@
 """Robot model and joint states."""
 
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -164,3 +165,41 @@ def test_joint_states_draw_each_link_frame_on_its_own_entity(robot, node, build,
     axes = recording.rows("/frames/arm")[0]
     assert axes["TransformAxes3D:axis_length"] == pytest.approx([0.1])
     assert axes["TransformAxes3D:show_frame"] == [True]
+
+
+def test_joint_states_draw_the_frames_of_a_new_robot_model(robot, node, build, recording):
+    build("joint_states", entity_path="tf", params={"axis_length": 0.1})
+    node.publish(JointState(name=["shoulder"], position=[0.5]))
+    gripper = (
+        '<link name="gripper"/>'
+        '<joint name="gripper_joint" type="fixed"><parent link="tip"/><child link="gripper"/></joint>'
+    )
+    node.publish(String(data=URDF.replace("</robot>", gripper + "</robot>")), index=0)
+    node.publish(JointState(name=["shoulder"], position=[0.5]))
+    assert "/frames/gripper" in recording.entities()
+
+
+def arrival(recording, entity: str, column: str) -> list:
+    """The values of a column logged on an entity, in the order the recording received them."""
+    values = []
+    for chunk in recording.chunks():
+        batch = chunk.to_record_batch()
+        if chunk.entity_path == entity and column in batch.schema.names:
+            values += batch.column(column).to_pylist()
+    return values
+
+
+def test_a_new_robot_model_clears_the_old_models_geometry_but_not_its_frames(robot, node, recording):
+    # E.g. a link's box replaced by a sphere, and the arm's mesh removed: they would otherwise stay
+    urdf = URDF.replace('<box size="0.2 0.2 0.2"/>', '<sphere radius="0.1"/>', 1)
+    node.publish(String(data=re.sub(r"\s*<visual><geometry><mesh [^>]*/></geometry></visual>", "", urdf)), index=0)
+    assert arrival(recording, BASE, "Boxes3D:half_sizes")[-1] == []
+    assert arrival(recording, ARM, "Asset3D:blob")[-1] == []
+    # Kept, so the removed mesh's entity still has a path to the scene's frames
+    assert [] not in arrival(recording, ARM, "CoordinateFrame:frame")
+
+
+def test_a_new_robot_model_arrives_after_the_old_one_is_cleared(robot, node, recording):
+    # The same model again: Rerun keeps the static data it received last, which must be the new model's
+    node.publish(String(data=URDF), index=0)
+    assert arrival(recording, ARM_BOX, "Boxes3D:half_sizes")[-1] == [pytest.approx([0.05, 0.05, 0.05])]

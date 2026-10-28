@@ -5,12 +5,14 @@ from typing import Any
 import numpy as np
 from geometry_msgs.msg import PoseStamped
 from pydantic import Field
+from rclpy.node import Node
 from rclpy.time import Time
 from scipy.spatial.transform import Rotation
 
 import rerun as rr
 
-from ..base import TopicToComponentModule
+from ..base import ModuleConfig, TopicToComponentModule
+from ..context import BridgeContext
 from ..registry import REGISTRY
 from ..types import Rgba, StrictParamsModel
 
@@ -59,6 +61,20 @@ class PoseModule(TopicToComponentModule):
 
     PARAMS = PoseParams
     params: PoseParams  # type hint for self.params
+
+    def __init__(self, node: Node, config: ModuleConfig, context: BridgeContext) -> None:
+        """Subscribe, and check the message type is stamped.
+
+        Args:
+            node: The ROS node to use for subscriptions & logging.
+            config: The module configuration.
+            context: Shared context for all modules.
+        """
+        super().__init__(node, config, context)
+        msg_type = self._resolve_msg_type()
+        # The pose is drawn in its header's frame, at its stamp
+        if not hasattr(msg_type(), "header"):
+            raise ValueError(f"{msg_type.__name__} has no header: use a stamped type, e.g. PoseStamped")
 
     @classmethod
     def ros_msg_type(cls):

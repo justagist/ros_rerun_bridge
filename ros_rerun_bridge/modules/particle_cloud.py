@@ -52,6 +52,8 @@ class ParticleCloudModule(TopicToComponentModule):
     def handle(self, msg: ParticleCloud) -> None:
         particles = msg.particles or []
         if not particles:
+            shape = rr.Arrows3D if self.params.mode == "arrows" else rr.Points3D
+            self.log(shape.cleared(), frame_id=msg.header.frame_id)
             return
 
         # collect poses & weights
@@ -79,8 +81,8 @@ class ParticleCloudModule(TopicToComponentModule):
         # base colour
         r, g, b, a = [int(x) for x in self.params.colour]
         if colour_by_weight:
-            # modulate alpha by weight (fade weaker particles); avoid fully invisible
-            alpha = np.clip((0.15 + 0.85 * w_norm) * 255.0, 1.0, 255.0).astype(np.uint8)
+            # Fade weaker particles from the colour's alpha, down to 15% of it
+            alpha = np.round((0.15 + 0.85 * w_norm) * a).astype(np.uint8)
             colours = np.column_stack(
                 [
                     np.full_like(alpha, r, dtype=np.uint8),

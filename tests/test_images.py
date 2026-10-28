@@ -78,7 +78,8 @@ def test_images_are_placed_on_the_camera_image_plane(node, build, recording):
 
 @pytest.mark.parametrize(
     ("image_format", "media_type"),
-    [("jpeg", "image/jpeg"), ("bgr8; jpeg compressed bgr8", "image/jpeg"), ("png", "image/png")],
+    # An empty format is JPEG, as sensor_msgs/CompressedImage defines it
+    [("jpeg", "image/jpeg"), ("bgr8; jpeg compressed bgr8", "image/jpeg"), ("png", "image/png"), ("", "image/jpeg")],
 )
 def test_compressed_formats_map_to_media_types(image_format, media_type):
     assert media_type_from_format(image_format) == media_type

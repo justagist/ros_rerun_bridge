@@ -9,6 +9,7 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
+from ..types import StrictParamsModel
 from ..utils.utils import set_rr_time_from_ros, stamp_or_now
 
 
@@ -24,7 +25,8 @@ def archetype_from_marker(marker: Marker):
         marker: An ADD marker.
 
     Returns:
-        The archetype, or None for marker types not supported (MESH_RESOURCE).
+        The archetype, or None for marker types not supported (MESH_RESOURCE, and ARROW_STRIP, which rviz does not
+        draw either).
     """
     s = marker.scale
     points = np.array([[p.x, p.y, p.z] for p in marker.points], dtype=np.float32).reshape(-1, 3)
@@ -47,7 +49,11 @@ def archetype_from_marker(marker: Marker):
     if marker.type == Marker.CYLINDER:
         return rr.Cylinders3D(lengths=[s.z], radii=[s.x / 2], colors=_rgba(marker.color), fill_mode=solid)
     if marker.type == Marker.LINE_STRIP:
-        return rr.LineStrips3D([points], radii=s.x / 2, colors=_rgba(marker.color))
+        if colours.ndim == 2:
+            # A Rerun strip has one colour: one strip per segment, coloured by its first point
+            segments = np.stack([points[:-1], points[1:]], axis=1)
+            return rr.LineStrips3D(segments, radii=s.x / 2, colors=colours[:-1])
+        return rr.LineStrips3D([points], radii=s.x / 2, colors=colours)
     if marker.type == Marker.LINE_LIST:
         # One strip per segment, coloured by its first point
         segment_colours = colours[0 : 2 * (len(points) // 2) : 2] if colours.ndim == 2 else colours
@@ -91,9 +97,12 @@ class MarkerArrayModule(TopicToComponentModule):
     """Module for logging visualization_msgs/MarkerArray (or Marker, via `msg_type`) to Rerun, as rviz shows them.
 
     Each marker is logged on `<entity_path>/<ns>/<id>`, posed in its header frame. Supports every marker type except
-    MESH_RESOURCE, the ADD, DELETE and DELETEALL actions, and marker lifetimes. Markers always move with their frame,
-    as if `frame_locked` were set.
+    MESH_RESOURCE and ARROW_STRIP, the ADD, DELETE and DELETEALL actions, and marker lifetimes. Markers always move
+    with their frame, as if `frame_locked` were set.
     """
+
+    # No params, so any given are an error
+    PARAMS = StrictParamsModel
 
     def __init__(self, *a, **kw) -> None:
         """Initialise the module with its marker bookkeeping and the lifetime timer."""

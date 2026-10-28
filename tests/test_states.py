@@ -127,3 +127,14 @@ def test_states_without_a_label_show_their_value(node, build, recording):
 def test_invalid_config_is_an_error(build, msg_type, params, error):
     with pytest.raises(ValueError, match=error):
         build("states", msg_type=msg_type, params=params)
+
+
+def test_states_earlier_than_the_latest_are_logged_as_they_are(node, build, recording):
+    # E.g. a bag replayed from its start: deduplicating against a later state would leave them out
+    build("states", entity_path="mode", msg_type="sensor_msgs.msg.Range", params={"field": "radiation_type"})
+    for sec, value in [(10, 0), (20, 1), (5, 1), (21, 1), (22, 0)]:
+        msg = Range(radiation_type=value)
+        msg.header.stamp = TimeMsg(sec=sec)
+        node.publish(msg)
+    rows = [(row["ros_time"] // 1_000_000_000, row["StateChange:state"]) for row in state_rows(recording)]
+    assert sorted(rows) == [(5, ["1"]), (10, ["0"]), (20, ["1"]), (22, ["0"])]
