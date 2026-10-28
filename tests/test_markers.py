@@ -271,7 +271,7 @@ def test_empty_and_underscore_namespaces_are_distinct(node, build, recording):
     assert is_cleared(recording, "/markers/__/4")
 
 
-def test_triangle_lists_are_scaled(node, build, recording):
+def test_triangle_lists_are_scaled():
     triangles = archetype_from_marker(marker(Marker.TRIANGLE_LIST, points=POINTS[1:4]))
     # scale (0.2, 0.4, 0.6) applied to each vertex
     np.testing.assert_allclose(component(triangles, "vertex_positions"), [[0.2, 0, 0], [0.2, 0.4, 0], [0, 0.4, 0]])

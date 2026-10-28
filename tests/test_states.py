@@ -102,7 +102,7 @@ def test_state_labels_and_colours_are_logged_once_as_static(node, build, recordi
     assert config["StateConfiguration:colors"] == [0x3C3C3CFF, 0xDC2828FF]
 
 
-def test_states_without_a_label_show_their_value(node, build, recording):
+def test_states_without_a_label_show_their_value(build, recording):
     build_states(build, "std_msgs.msg.Int32", states=[{"value": 2}])
     [config] = [row for row in recording.rows("/mode") if row["static"]]
     assert config["StateConfiguration:labels"] == ["2"]

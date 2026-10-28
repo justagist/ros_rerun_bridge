@@ -13,6 +13,8 @@ from ros_rerun_bridge.modules.compressed_depth_image import encoded_depth_from_m
 PNG = b"\x89PNG\r\n\x1a\n" + bytes(16)
 # compressed_depth_image_transport's config header: the compression format and two quantisation parameters
 HEADER = struct.pack("<iff", 0, 0.0, 0.0)
+# An RVL image's own header, its width and height, then the compressed depths
+RVL = HEADER + struct.pack("<II", 2, 2) + bytes(8)
 
 
 def depth_image(pixels: np.ndarray, encoding: str) -> Image:
@@ -26,6 +28,7 @@ def depth_image(pixels: np.ndarray, encoding: str) -> Image:
     ("encoding", "pixels", "meter"),
     [
         ("16UC1", np.array([[500, 1000], [1500, 0]], np.uint16), 1000.0),
+        ("mono16", np.array([[500, 1000], [1500, 0]], np.uint16), 1000.0),
         ("32FC1", np.array([[0.5, 1.0], [1.5, np.nan]], np.float32), 1.0),
     ],
 )
@@ -51,7 +54,7 @@ def test_depth_display_params_are_passed_to_rerun(node, build, recording):
     assert row["DepthImage:point_fill_ratio"] == pytest.approx([0.5])
 
 
-def test_images_that_are_not_depth_are_an_error(node, build, recording):
+def test_images_that_are_not_depth_are_an_error(node, build):
     build("depth_image", entity_path="camera/depth")
     node.publish(depth_image(np.zeros((2, 2), np.uint8), "mono8"))
     assert "'mono8' is not a depth encoding" in node.log_messages[-2][1]
@@ -70,9 +73,8 @@ def test_png_depth_has_its_ros_header_removed(image_format):
 
 def test_rvl_depth_is_passed_on_with_its_header_for_rerun_to_read():
     # Rerun reads ROS's RVL header itself, including 32FC1's quantisation
-    rvl = HEADER + struct.pack("<II", 2, 2) + bytes(8)
-    data, media_type = encoded_depth_from_msg(compressed("32FC1; compressedDepth rvl", rvl))
-    assert (data, media_type) == (rvl, "application/rvl")
+    data, media_type = encoded_depth_from_msg(compressed("32FC1; compressedDepth rvl", RVL))
+    assert (data, media_type) == (RVL, "application/rvl")
 
 
 @pytest.mark.parametrize(
@@ -91,14 +93,23 @@ def test_unsupported_compressed_depth_is_an_error(image_format, data, error):
         encoded_depth_from_msg(compressed(image_format, data))
 
 
-def test_compressed_depth_images_are_logged_on_the_image_plane(node, build, recording):
+@pytest.mark.parametrize(
+    ("image_format", "data", "blob", "media_type"),
+    [
+        ("16UC1; compressedDepth png", HEADER + PNG, PNG, "image/png"),
+        ("16UC1; compressedDepth rvl", RVL, RVL, "application/rvl"),
+    ],
+)
+def test_compressed_depth_images_are_logged_on_the_image_plane(
+    node, build, recording, image_format, data, blob, media_type
+):
     build("compressed_depth_image", entity_path="camera/depth", params={"colormap": "Turbo"})
-    msg = compressed("16UC1; compressedDepth png", HEADER + PNG)
+    msg = compressed(image_format, data)
     msg.header.frame_id = "camera"
     node.publish(msg)
 
     row = recording.rows("/camera/depth")[0]
-    assert bytes(row["EncodedDepthImage:blob"][0]) == PNG
-    assert row["EncodedDepthImage:media_type"] == ["image/png"]
+    assert bytes(row["EncodedDepthImage:blob"][0]) == blob
+    assert row["EncodedDepthImage:media_type"] == [media_type]
     assert row["EncodedDepthImage:colormap"] == [rr.components.Colormap.Turbo.value]
     assert row["CoordinateFrame:frame"] == ["camera_image_plane"]

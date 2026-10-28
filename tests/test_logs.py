@@ -29,6 +29,12 @@ def test_ros_levels_map_to_rerun_levels(node, build, recording, level, rerun):
     assert log_rows(recording, "/logs/planner") == [([rerun], ["planning"])]
 
 
+def test_entries_without_a_logger_name_are_logged_on_the_entity_path(node, build, recording):
+    build("rosout", entity_path="logs")
+    node.publish(Log(name="", level=Log.INFO, msg="unnamed"))
+    assert log_rows(recording, "/logs") == [(["INFO"], ["unnamed"])]
+
+
 def test_entries_below_the_minimum_level_are_left_out(node, build, recording):
     build("rosout", entity_path="logs", params={"min_level": "warn"})
     node.publish(Log(name="planner", level=Log.INFO, msg="planning"))
