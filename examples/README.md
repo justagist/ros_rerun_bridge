@@ -19,7 +19,7 @@ The `layout.rbl` files are written by [layouts.py](layouts.py): to change a layo
 
 ## [robot_arm](robot_arm)
 
-A small arm from its [URDF](robot_arm/robot.urdf), swinging and opening its gripper. The right finger follows the left one through a mimic joint. Its joint positions are plotted. Modules: `robot_description`, `joint_states`, `scalars`.
+A small arm from its [URDF](robot_arm/robot.urdf), swinging and opening its gripper. The right finger follows the left one through a mimic joint. Its joint positions are plotted over time, and as bars at the time cursor. Modules: `robot_description`, `joint_states`, `scalars`, `bar_chart`.
 
 ![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif?v=3)
 

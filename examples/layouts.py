@@ -21,21 +21,29 @@ def scene(position: list[float], target: list[float]) -> rrb.Spatial3DView:
     return rrb.Spatial3DView(origin="/", eye_controls=camera)
 
 
-def plots(origin: str) -> rrb.TimeSeriesView:
-    """A time series view of the entities under `origin`."""
-    return rrb.TimeSeriesView(origin=origin, time_ranges=RECENT)
+def plots(origin: str, y_range: tuple[float, float]) -> rrb.TimeSeriesView:
+    """A time series view of the entities under `origin`, with its y axis fixed to `y_range`."""
+    # Fixed, rather than fitted to the values shown, so the axis does not jump as the plot scrolls
+    y_axis = rrb.ScalarAxis(range=y_range, zoom_lock=True)
+    return rrb.TimeSeriesView(origin=origin, time_ranges=RECENT, axis_y=y_axis)
 
 
 LAYOUTS = {
-    "robot_arm": rrb.Horizontal(scene([0.9, -0.9, 0.75], [0.1, 0.0, 0.4]), plots("/plots"), column_shares=[2, 1]),
+    "robot_arm": rrb.Horizontal(
+        scene([0.9, -0.9, 0.75], [0.1, 0.0, 0.4]),
+        rrb.Vertical(plots("/plots", (-1.6, 1.6)), rrb.BarChartView(origin="/bars/joints")),
+        column_shares=[2, 1],
+    ),
     "mobile_robot": rrb.Horizontal(
-        scene([-1.0, -6.5, 4.5], [-1.0, 0.0, 0.0]), plots("/plots/odom"), column_shares=[2, 1]
+        scene([-1.0, -6.5, 4.5], [-1.0, 0.0, 0.0]), plots("/plots/odom", (0.0, 0.6)), column_shares=[2, 1]
     ),
     "camera": rrb.Horizontal(scene([-0.5, -0.8, 1.35], [0.7, 0.0, 1.0]), rrb.Spatial2DView(origin="/camera/image")),
     "point_cloud": scene([2.4, -2.4, 2.2], [0.0, 0.0, 1.0]),
-    "range_sensor": rrb.Horizontal(scene([0.9, -1.6, 1.0], [0.6, 0.0, 0.25]), plots("/plots/range")),
+    "range_sensor": rrb.Horizontal(scene([0.9, -1.6, 1.0], [0.6, 0.0, 0.25]), plots("/plots/range", (0.0, 2.0))),
     "markers": scene([1.0, -2.6, 1.5], [1.0, 0.0, 0.2]),
-    "series_styles": rrb.Vertical(plots("/plots/default"), plots("/plots/points"), plots("/plots/mode")),
+    "series_styles": rrb.Vertical(
+        plots("/plots/default", (-1.1, 1.1)), plots("/plots/points", (-1.1, 1.1)), plots("/plots/mode", (-0.2, 2.2))
+    ),
 }
 
 if __name__ == "__main__":
