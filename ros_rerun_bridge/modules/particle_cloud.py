@@ -11,7 +11,7 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..types import StrictParamsModel
+from ..types import Rgba, StrictParamsModel
 
 
 class ParticleCloudParams(StrictParamsModel):
@@ -21,7 +21,7 @@ class ParticleCloudParams(StrictParamsModel):
     """Visualisation mode: "points" for rr.Points3D, "arrows" for rr.Arrows3D."""
     radius: float = 0.0015
     """Base radius for points or arrows."""
-    colour: tuple[int, int, int, int] = (255, 255, 255, 255)
+    colour: Rgba = (255, 255, 255, 255)
     """Base RGBA colour as 4-tuple of uint8."""
     colour_by_weight: bool = True
     """Whether to modulate colour alpha by weight."""

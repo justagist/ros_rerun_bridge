@@ -1,0 +1,10 @@
+# A coloured point cloud from publisher.py. The cloud has an `rgb` field, which the default `auto` colour mode uses.
+global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
+
+modules:
+  - name: cloud
+    module: pointcloud2
+    topic: /points
+    entity_path: points

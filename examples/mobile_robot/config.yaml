@@ -1,0 +1,35 @@
+# A robot from publisher.py driving in a room: the map, the robot's TF, its laser scan, and its speed plotted
+global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
+
+modules:
+  # map -> base_link as the robot moves, and base_link -> base_scan
+  - name: tf
+    module: tf
+    topic: /tf
+    entity_path: tf
+
+  # The map is latched: published once, and received by a transient_local subscription whenever the bridge starts
+  - name: map
+    module: occupancy_grid
+    topic: /map
+    entity_path: map
+    qos: { depth: 1, durability: transient_local }
+
+  # Rays from the scanner to each hit. Sensor drivers usually publish best effort.
+  - name: scan
+    module: laserscan
+    topic: /scan
+    entity_path: scan
+    qos: { reliability: best_effort }
+    params:
+      radius: 0.01
+
+  - name: speed
+    module: scalars
+    topic: /odom
+    msg_type: nav_msgs.msg.Odometry
+    entity_path: plots/odom
+    params:
+      fields: [twist.twist.linear.x, twist.twist.angular.z]

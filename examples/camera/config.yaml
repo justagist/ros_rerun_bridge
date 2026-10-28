@@ -1,0 +1,25 @@
+# A camera from publisher.py: its images are shown in 2D, and in 3D on the image plane in front of the camera
+global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
+
+modules:
+  # Places the camera's optical frame in the map
+  - name: tf_static
+    module: tf
+    topic: /tf_static
+    entity_path: tf_static
+    qos: { depth: 10, durability: transient_local }
+    params:
+      static: true
+
+  # The pinhole from the camera frame to its image plane, where the image is drawn in 3D
+  - name: camera_info
+    module: camera_info
+    topic: /camera/camera_info
+    entity_path: camera/info
+
+  - name: image
+    module: image
+    topic: /camera/image_raw
+    entity_path: camera/image

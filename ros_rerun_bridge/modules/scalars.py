@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import re
 from operator import attrgetter
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
-from pydantic import Field
+from pydantic import Field, model_validator
 from rclpy.node import Node
 from rclpy.time import Time
 
@@ -14,7 +14,7 @@ import rerun as rr
 from ..base import ModuleConfig, TopicToComponentModule
 from ..context import BridgeContext
 from ..registry import REGISTRY
-from ..types import StrictParamsModel
+from ..types import Rgba, StrictParamsModel
 
 # Not octet (`byte`): its values are `bytes` objects, and numeric bytes are uint8 by convention
 _NUMERIC = {
@@ -39,6 +39,30 @@ class ScalarsParams(StrictParamsModel):
 
     fields: list[str] = Field(min_length=1)
     """Dotted paths to the numeric fields, or arrays of numbers, to plot, e.g. `range` or `twist.twist.linear.x`."""
+    style: Literal["lines", "points"] = "lines"
+    """Draw each series as a line or as points."""
+    names: list[str] | None = None
+    """Series names, one per array element, for every field. Rerun's default is the entity path and element index."""
+    colours: list[Rgba] | None = None
+    """RGBA colour per series, as uint8. The last one applies to any remaining series."""
+    width: float | None = None
+    """Line width, in UI points. Lines only."""
+    interpolation: Literal["linear", "step_after", "step_before", "step_mid"] | None = None
+    """How lines join values: linear, or steps, e.g. for discrete values. Lines only."""
+    marker: (
+        Literal["circle", "diamond", "square", "cross", "plus", "up", "down", "left", "right", "asterisk"] | None
+    ) = None
+    """Point marker shape. Points only."""
+    marker_size: float | None = None
+    """Point marker size, in UI points. Points only."""
+
+    @model_validator(mode="after")
+    def _check_style(self) -> ScalarsParams:
+        """Reject options that only apply to the other style."""
+        other = ("marker", "marker_size") if self.style == "lines" else ("width", "interpolation")
+        if given := [name for name in other if getattr(self, name) is not None]:
+            raise ValueError(f"{', '.join(given)} cannot be used with style '{self.style}'")
+        return self
 
 
 @REGISTRY.register("scalars")
@@ -72,6 +96,22 @@ class ScalarsModule(TopicToComponentModule):
         }
         self._sizes: dict[str, int] = {}
         """Most values logged at once per entity path."""
+        if (style := self._series_style()) is not None:
+            for path in self._fields:
+                rr.log(path, style, static=True)
+
+    def _series_style(self) -> rr.SeriesLines | rr.SeriesPoints | None:
+        """The series style from the params, or None to keep Rerun's default lines."""
+        p = self.params
+        if p.style == "points":
+            # Logging any SeriesPoints component is what makes Rerun draw points
+            return rr.SeriesPoints(
+                names=p.names, colors=p.colours, markers=p.marker or "circle", marker_sizes=p.marker_size
+            )
+        if all(value is None for value in (p.names, p.colours, p.width, p.interpolation)):
+            return None
+        interpolation = "".join(word.capitalize() for word in p.interpolation.split("_")) if p.interpolation else None
+        return rr.SeriesLines(names=p.names, colors=p.colours, widths=p.width, interpolation_mode=interpolation)
 
     def _extract_time(self, msg: Any) -> Time | None:
         header = getattr(msg, "header", None)

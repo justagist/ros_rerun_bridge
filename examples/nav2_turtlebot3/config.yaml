@@ -1,6 +1,6 @@
-# this can be used with the example from nav2 starter doc: https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/
-# Run that example, and in another terminal run:
-# ros-rerun-bridge --config <path_to_ros_rerun_bridge>/example_configs/turtlebot3_nav2.config.yaml
+# For the Nav2 getting started demo: https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/
+# Run that demo, and in another terminal run:
+# ros-rerun-bridge --config examples/nav2_turtlebot3/config.yaml
 #
 # Every module places its data in the TF frame named in the message header; the tf modules link those frames into one
 # scene. Sensor topics are subscribed best effort, which also matches reliable publishers.

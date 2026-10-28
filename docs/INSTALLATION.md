@@ -12,12 +12,22 @@ Rerun needs NumPy 2, while ROS distros ship NumPy 1. The bridge therefore runs i
 
 [uv](https://docs.astral.sh/uv/) handles all of this. The repo tells uv to use a Python installed on the system, never one it downloads.
 
+## ROS packages for some modules
+
+A few modules need ROS packages that a minimal ROS install (`ros-base`) leaves out. Install them only for the modules you use:
+
+| Module | Packages (Jazzy) |
+| --- | --- |
+| `pointcloud2` | `ros-jazzy-sensor-msgs-py` |
+| `laserscan` | `ros-jazzy-laser-geometry`, `ros-jazzy-sensor-msgs-py` |
+| `particle_cloud` | `ros-jazzy-nav2-msgs` |
+
 ## From a clone, with `uv run`
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 # From the repo root: creates .venv on first run, then runs the bridge
-uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml
+uv run ros-rerun-bridge --config examples/robot_arm/config.yaml
 ```
 
 ## As a command available everywhere

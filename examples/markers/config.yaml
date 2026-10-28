@@ -1,0 +1,11 @@
+# Markers from publisher.py: one marker changing type every 2 s, and a fixed one. They are in the global frame, so no TF
+# is needed.
+global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
+
+modules:
+  - name: markers
+    module: marker_array
+    topic: /viewer_check/markers
+    entity_path: markers

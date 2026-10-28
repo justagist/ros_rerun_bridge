@@ -1,0 +1,40 @@
+# The scalars module's style params, on three plots of the values from publisher.py
+global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
+
+modules:
+  # Default style: Rerun's lines, series named by entity path and index
+  - name: default_lines
+    module: scalars
+    topic: /viewer_check/joints
+    msg_type: sensor_msgs.msg.JointState
+    entity_path: plots/default
+    params:
+      fields: [position]
+
+  # Named points with diamond markers
+  - name: named_points
+    module: scalars
+    topic: /viewer_check/joints
+    msg_type: sensor_msgs.msg.JointState
+    entity_path: plots/points
+    params:
+      fields: [position]
+      names: [shoulder, elbow, wrist]
+      style: points
+      marker: diamond
+      marker_size: 4.0
+
+  # A mode that jumps between 0, 1 and 2, drawn as thick red steps
+  - name: mode_steps
+    module: scalars
+    topic: /viewer_check/mode
+    msg_type: std_msgs.msg.Int32
+    entity_path: plots/mode
+    params:
+      fields: [data]
+      names: [mode]
+      colours: [[255, 0, 0, 255]]
+      width: 3.0
+      interpolation: step_after
