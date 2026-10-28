@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from operator import attrgetter
 from typing import Any, Literal
 
@@ -15,23 +14,7 @@ from ..base import ModuleConfig, TopicToComponentModule
 from ..context import BridgeContext
 from ..registry import REGISTRY
 from ..types import Rgba, StrictParamsModel
-
-# Not octet (`byte`): its values are `bytes` objects, and numeric bytes are uint8 by convention
-_NUMERIC = {
-    "boolean",
-    "float",
-    "double",
-    "int8",
-    "uint8",
-    "int16",
-    "uint16",
-    "int32",
-    "uint32",
-    "int64",
-    "uint64",
-}
-# Element type of an unbounded or bounded sequence, e.g. "sequence<double, 3>", or of a fixed array, e.g. "double[9]"
-_ARRAY = re.compile(r"sequence<(\w+)(?:, \d+)?>|(\w+)\[\d+\]")
+from ..utils.fields import check_field, is_array
 
 
 class ScalarsParams(StrictParamsModel):
@@ -105,10 +88,10 @@ class ScalarsModule(TopicToComponentModule):
         super().__init__(node, config, context)
         msg_type = self._resolve_msg_type()
         for field in self.params.fields:
-            _check_field(msg_type, field)
+            check_field(msg_type, field)
         if self.params.variance is not None:
             # One variance, applied to every element: arrays of variances could mismatch the values on every message
-            if _ARRAY.fullmatch(variance_type := _check_field(msg_type, self.params.variance)):
+            if is_array(variance_type := check_field(msg_type, self.params.variance)):
                 raise ValueError(f"variance '{self.params.variance}' is {variance_type}, not a single number")
         self._variance = attrgetter(self.params.variance) if self.params.variance is not None else None
         self._fields = {
@@ -159,29 +142,3 @@ class ScalarsModule(TopicToComponentModule):
                 variances = np.broadcast_to(np.asarray(self._variance(msg), dtype=np.float64), values.shape)
                 variances = np.pad(variances, (0, size - values.size), constant_values=np.nan)
                 rr.log(path, rr.Measurements.from_fields(values=padded, variances=variances))
-
-
-def _check_field(msg_type: type, field: str) -> str:
-    """Raise a ValueError unless a dotted field path names a number, or an array of numbers, in a message type.
-
-    Args:
-        msg_type: ROS message class.
-        field: Dotted path, e.g. `twist.twist.linear.x`.
-
-    Returns:
-        The field's ROS type, e.g. `double` or `sequence<double>`.
-    """
-    cls = msg_type
-    names = field.split(".")
-    for i, name in enumerate(names):
-        if not hasattr(cls, "get_fields_and_field_types"):
-            raise ValueError(f"field '{field}': '{'.'.join(names[:i])}' is not a message")
-        field_type = cls.get_fields_and_field_types().get(name)
-        if field_type is None:
-            raise ValueError(f"field '{field}': {cls.__name__} has no field '{name}'")
-        # A default message holds every nested message, so the next level's class comes from it
-        cls = type(getattr(cls(), name))
-    array = _ARRAY.fullmatch(field_type)
-    if (array.group(1) or array.group(2) if array else field_type) not in _NUMERIC:
-        raise ValueError(f"field '{field}' is {field_type}, not a number or an array of numbers")
-    return field_type
