@@ -55,13 +55,30 @@ def image_from_msg(msg: Image) -> rr.Image:
         pixel_format, pixel_bytes = _PACKED_ENCODINGS[msg.encoding]
         packed = rows[:, : msg.width * pixel_bytes].tobytes()
         return rr.Image(bytes=packed, width=msg.width, height=msg.height, pixel_format=pixel_format)
+    return rr.Image(pixels_from_msg(msg), color_model=_PIXEL_ENCODINGS[msg.encoding][2])
+
+
+def pixels_from_msg(msg: Image) -> np.ndarray:
+    """Return a sensor_msgs/Image's pixels as an array, without row padding and in the machine's byte order.
+
+    Args:
+        msg: The ROS image, in one of the unpacked encodings, e.g. rgb8 or 16UC1.
+
+    Returns:
+        The pixels, shaped (height, width) for one channel or (height, width, channels).
+
+    Raises:
+        ValueError: If the encoding is not supported.
+    """
     if msg.encoding not in _PIXEL_ENCODINGS:
         raise ValueError(f"unsupported image encoding '{msg.encoding}'")
-    dtype, channels, colour_model = _PIXEL_ENCODINGS[msg.encoding]
+    dtype, channels, _ = _PIXEL_ENCODINGS[msg.encoding]
     dtype = np.dtype(dtype).newbyteorder(">" if msg.is_bigendian else "<")
+    # Rows can be padded: step is the row length in bytes
+    rows = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step)
     pixels = rows[:, : msg.width * channels * dtype.itemsize].view(dtype).astype(dtype.newbyteorder("="), copy=False)
     shape = (msg.height, msg.width) if channels == 1 else (msg.height, msg.width, channels)
-    return rr.Image(pixels.reshape(shape), color_model=colour_model)
+    return pixels.reshape(shape)
 
 
 @REGISTRY.register("image")
