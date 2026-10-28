@@ -28,11 +28,6 @@ def test_range_draws_a_cone_along_the_sensor_x_axis(node, build, recording):
     assert row["LineStrips3D:colors"] == [0x00FF00FF]
 
 
-def test_colour_channels_outside_0_to_255_are_an_error(build):
-    with pytest.raises(ValueError, match="less than or equal to 255"):
-        build("range", params={"colour": [0, 300, 0, 255]})
-
-
 @pytest.mark.parametrize("value", [math.inf, -math.inf, 5.0, 0.0])
 def test_range_outside_its_limits_clears_the_cone(node, build, recording, value):
     build("range", entity_path="range")

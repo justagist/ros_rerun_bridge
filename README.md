@@ -42,7 +42,7 @@ python3 examples/robot_arm/publisher.py
 
 This opens the Rerun viewer, showing the arm moving and its joint positions plotted. The publisher only provides demo data: with a real robot, the bridge needs just a config listing its topics. [examples](examples) has more, each runnable the same way.
 
-![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif?v=3)
+![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif)
 
 See [INSTALLATION.md](docs/INSTALLATION.md) to make the `ros-rerun-bridge` command available everywhere, for other ways to install, and for why the bridge needs its own environment.
 
@@ -88,7 +88,7 @@ modules:
 
 ## Modules
 
-Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
+Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, and `bar_chart` draws an array field as bars. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
 
 ## Development
 

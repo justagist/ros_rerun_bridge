@@ -25,3 +25,13 @@ modules:
     params:
       fields: [position]
       names: [turntable, elbow, finger_left_joint]
+
+  # The joint positions at the time cursor, one bar per joint
+  - name: joint_bars
+    module: bar_chart
+    topic: /joint_states
+    msg_type: sensor_msgs.msg.JointState
+    entity_path: bars/joints
+    params:
+      field: position
+      colour: [240, 140, 25, 255]

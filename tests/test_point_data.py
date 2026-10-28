@@ -74,9 +74,10 @@ def test_big_endian_clouds_are_read_in_their_byte_order(node, build, recording):
     assert row["Points3D:colors"] == [0x112233FF]
 
 
-def test_no_colour_mode_logs_positions_only(node, build, recording):
+def test_no_colour_mode_ignores_a_colour_field(node, build, recording):
     build("pointcloud2", entity_path="points", params={"colour_mode": "none"})
-    node.publish(cloud([(1.0, 1.0, 1.0)], ["x", "y", "z"], XYZ))
+    xyz_rgb = [("x", "<f4"), ("y", "<f4"), ("z", "<f4"), ("rgb", "<u4")]
+    node.publish(cloud([(1.0, 1.0, 1.0, 0x00112233)], ["x", "y", "z", "rgb"], xyz_rgb))
     row = recording.rows("/points")[0]
     assert row["Points3D:positions"] == [[1.0, 1.0, 1.0]]
     assert row.get("Points3D:colors") is None

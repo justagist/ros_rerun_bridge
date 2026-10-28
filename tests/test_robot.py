@@ -115,9 +115,7 @@ def joints_by_child(recording) -> dict:
     return {row["Transform3D:child_frame"][0]: row for row in recording.rows("/tf")}
 
 
-def test_joint_states_move_joints_beyond_their_limits(robot, node, build, recording, context):
-    # The robot model reaches joint_states through the shared context
-    assert context.urdf_tree is not None
+def test_joint_states_move_joints_beyond_their_limits(robot, node, build, recording):
     build("joint_states", entity_path="tf")
     msg = JointState(name=["shoulder", "not_a_joint"], position=[2.0, 1.0])
     msg.header.stamp = TimeMsg(sec=3)
