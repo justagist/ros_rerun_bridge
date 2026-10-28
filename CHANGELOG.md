@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [0.10.0] - 2026-10-28
+
+### Added
+
+- `pose` module, drawing a pose as axes, and its position covariance as an ellipsoid for `PoseWithCovarianceStamped` and `Odometry`.
+- `pose_array` module, drawing an arrow per pose.
+- `wrench` module, drawing force and torque arrows.
+- A geometry example: a robot's pose with covariance, guesses at it, and a force-torque sensor.
+
+### Changed
+
+- A `module` path that does not name a `TopicToComponentModule` subclass is an error when the bridge starts.
+
 ## [0.9.0] - 2026-10-28
 
 ### Added
@@ -135,6 +148,7 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 
 First version: a config-driven bridge with `image`, `camera_info`, `laserscan`, `pointcloud2`, `particle_cloud`, `odometry`, `robot_description` and `joint_states` modules.
 
+[0.10.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.6.0...v0.7.0

@@ -18,6 +18,9 @@ For messages with a header, spatial modules draw the data in the header's TF fra
 | [`laserscan`](#laserscan) | `sensor_msgs/LaserScan` | Laser scans |
 | [`range`](#range) | `sensor_msgs/Range` | Range sensor readings as cones |
 | [`marker_array`](#marker_array) | `visualization_msgs/MarkerArray` or `Marker` | rviz markers |
+| [`pose`](#pose) | `geometry_msgs/PoseStamped`, `PoseWithCovarianceStamped` or `nav_msgs/Odometry` | A pose as axes, with its covariance |
+| [`pose_array`](#pose_array) | `geometry_msgs/PoseArray` | An arrow per pose |
+| [`wrench`](#wrench) | `geometry_msgs/WrenchStamped` | Force and torque arrows |
 | [`occupancy_grid`](#occupancy_grid) | `nav_msgs/OccupancyGrid` | Maps and costmaps |
 | [`particle_cloud`](#particle_cloud) | `nav2_msgs/ParticleCloud` | Localisation particles |
 | [`scalars`](#scalars) | Any, set with `msg_type` | Numeric fields as plots |
@@ -149,6 +152,45 @@ Logs rviz markers, each on `<entity_path>/<ns>/<id>` and posed in its header fra
 * Markers expire at the end of their lifetime.
 * Text markers are drawn as labels on a point, as Rerun has no 3D text.
 * Markers always move with their frame, as if `frame_locked` were set.
+
+## `pose`
+
+Draws a pose as its x (red), y (green) and z (blue) axes, in the header's frame. For `geometry_msgs/PoseWithCovarianceStamped` or `nav_msgs/Odometry`, set `msg_type`: their position covariance is also drawn, as an ellipsoid on `<entity_path>/covariance`, oriented along the covariance's principal axes. An all-zero orientation is treated as no rotation, as in rviz.
+
+| Param | Default | |
+| --- | --- | --- |
+| `axis_length` | `0.3` | Length of the pose's axes, in metres. |
+| `n_sigma` | `2` | Standard deviations the covariance ellipsoid reaches either side of the pose, along each axis. `null` to leave it out. |
+| `covariance_colour` | `[255, 0, 255, 255]` | RGBA of the covariance ellipsoid. |
+
+```yaml
+- name: robot_pose
+  module: pose
+  topic: /amcl_pose
+  msg_type: geometry_msgs.msg.PoseWithCovarianceStamped
+  entity_path: robot/pose
+```
+
+## `pose_array`
+
+Draws a `geometry_msgs/PoseArray` as an arrow per pose, along its x axis, as rviz does, e.g. waypoints or a localiser's candidate poses.
+
+| Param | Default | |
+| --- | --- | --- |
+| `arrow_length` | `0.3` | Length of each arrow, in metres. |
+| `radius` | `0.01` | Arrow shaft radius, in metres. |
+| `colour` | `[255, 25, 25, 255]` | RGBA of the arrows. |
+
+## `wrench`
+
+Draws a `geometry_msgs/WrenchStamped` as a force arrow and a torque arrow from the origin of the header's frame, e.g. a force-torque sensor's readings. The torque is drawn along its axis, by the right-hand rule, rather than as rviz's curved arrow.
+
+| Param | Default | |
+| --- | --- | --- |
+| `force_scale` | `0.1` | Metres of arrow per newton. |
+| `torque_scale` | `0.1` | Metres of arrow per newton metre. |
+| `force_colour`, `torque_colour` | `[255, 80, 80, 255]`, `[255, 220, 50, 255]` | RGBA of the arrows. |
+| `radius` | `0.01` | Arrow shaft radius, in metres. |
 
 ## `occupancy_grid`
 

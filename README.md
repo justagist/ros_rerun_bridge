@@ -88,7 +88,7 @@ modules:
 
 ## Modules
 
-Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `depth_image`, `compressed_depth_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, `bar_chart` draws an array field as bars, and `states` shows a field as states over time. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
+Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `depth_image`, `compressed_depth_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `pose`, `pose_array`, `wrench`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, `bar_chart` draws an array field as bars, and `states` shows a field as states over time. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
 
 ## Development
 
