@@ -1,4 +1,5 @@
-# A camera from publisher.py: its images are shown in 2D, and in 3D on the image plane in front of the camera
+# An RGB-D camera from publisher.py, looking at a rippling surface. Its colour image is shown in 2D, and in 3D on the
+# image plane in front of the camera. Its aligned depth image is shown in 2D, and in 3D as a point cloud.
 global_frame: map
 # Viewer layout and camera angle, written by ../layouts.py
 blueprint: layout.rbl
@@ -23,3 +24,12 @@ modules:
     module: image
     topic: /camera/image_raw
     entity_path: camera/image
+
+  # Depth in millimetres. Through the camera_info pinhole, Rerun also draws it as a point cloud in 3D.
+  - name: depth
+    module: depth_image
+    topic: /camera/depth/image_raw
+    entity_path: camera/depth
+    params:
+      # The colours span the depths the publisher sends, in millimetres, instead of from 0
+      depth_range: [1700, 2300]

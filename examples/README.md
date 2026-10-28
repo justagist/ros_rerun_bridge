@@ -31,7 +31,7 @@ A robot driving in a circle in a room: the room's map, and the robot's laser sca
 
 ## [camera](camera)
 
-Moving colour bands, in a 2D view and on the camera's image plane in 3D. Modules: `tf`, `camera_info`, `image`.
+An RGB-D camera looking at a rippling surface: its colour image in 2D and on the camera's image plane in 3D, and its aligned depth image in 2D and as a point cloud. Modules: `tf`, `camera_info`, `image`, `depth_image`.
 
 ![camera](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/camera.gif)
 

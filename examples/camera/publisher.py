@@ -1,6 +1,9 @@
-"""Publish a 160x120 image of moving colour bands at 10 Hz, with its camera info, from a camera 1 m above the map.
+"""Publish what an RGB-D camera 1 m above the map sees of a rippling surface, at 10 Hz: a 160x120 colour image, an
+aligned 16UC1 depth image in millimetres, and their camera info.
 
-The camera looks along the map's x axis. Its frame is an optical frame (x right, y down, z forward), as in ROS.
+The surface is about 2 m away, with ripples moving outwards, and is painted in colour bands that follow them. As with
+aligned depth on a real RGB-D camera, both images share one frame and camera info, so their pixels correspond. The
+camera looks along the map's x axis, from an optical frame (x right, y down, z forward), as in ROS.
 """
 
 import numpy as np
@@ -29,15 +32,17 @@ class CameraPublisher(Node):
 
         self.info = self.create_publisher(CameraInfo, "/camera/camera_info", 10)
         self.image = self.create_publisher(Image, "/camera/image_raw", 10)
+        self.depth = self.create_publisher(Image, "/camera/depth/image_raw", 10)
         self.frame = 0
         self.create_timer(0.1, self.tick)
 
     def tick(self):
         self.frame += 1
         stamp = self.get_clock().now().to_msg()
-        # Diagonal bands that drift to the right
+        # The ripples' phase at each pixel: rings moving outwards from the image centre
         u, v = np.meshgrid(np.arange(WIDTH), np.arange(HEIGHT))
-        phase = (u + v - 4 * self.frame) / 20.0
+        phase = np.hypot(u - WIDTH / 2, v - HEIGHT / 2) / 8.0 - self.frame / 3.0
+        # Colour bands painted on the surface, so each colour stays on its ripple
         pixels = np.stack([np.sin(phase), np.sin(phase + 2.1), np.sin(phase + 4.2)], axis=-1)
         pixels = ((pixels + 1) * 127.5).astype(np.uint8)
 
@@ -48,8 +53,14 @@ class CameraPublisher(Node):
         info.header = image.header
         info.k = [100.0, 0.0, WIDTH / 2, 0.0, 100.0, HEIGHT / 2, 0.0, 0.0, 1.0]
         info.p = [100.0, 0.0, WIDTH / 2, 0.0, 0.0, 100.0, HEIGHT / 2, 0.0, 0.0, 0.0, 1.0, 0.0]
+        # Ripples of +-0.25 m around 2 m
+        depth_mm = (2000 + 250 * np.sin(phase)).astype(np.uint16)
+        depth = Image(height=HEIGHT, width=WIDTH, encoding="16UC1", step=2 * WIDTH, data=depth_mm.tobytes())
+        depth.header = image.header
+
         self.info.publish(info)
         self.image.publish(image)
+        self.depth.publish(depth)
 
 
 def main():

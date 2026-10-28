@@ -37,7 +37,11 @@ LAYOUTS = {
     "mobile_robot": rrb.Horizontal(
         scene([-1.0, -6.5, 4.5], [-1.0, 0.0, 0.0]), plots("/plots/odom", (0.0, 0.6)), column_shares=[2, 1]
     ),
-    "camera": rrb.Horizontal(scene([-0.5, -0.8, 1.35], [0.7, 0.0, 1.0]), rrb.Spatial2DView(origin="/camera/image")),
+    "camera": rrb.Horizontal(
+        scene([-1.2, -2.2, 2.2], [1.5, 0.0, 1.0]),
+        rrb.Vertical(rrb.Spatial2DView(origin="/camera/image"), rrb.Spatial2DView(origin="/camera/depth")),
+        column_shares=[2, 1],
+    ),
     "point_cloud": scene([2.4, -2.4, 2.2], [0.0, 0.0, 1.0]),
     "range_sensor": rrb.Horizontal(scene([0.9, -1.6, 1.0], [0.6, 0.0, 0.25]), plots("/plots/range", (0.0, 2.0))),
     "markers": scene([1.0, -2.6, 1.5], [1.0, 0.0, 0.2]),
