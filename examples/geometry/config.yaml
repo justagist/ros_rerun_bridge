@@ -1,0 +1,44 @@
+# A robot's pose with its covariance, guesses at that pose, and a force-torque sensor's readings, from publisher.py
+global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
+
+modules:
+  # Places the force-torque sensor's tool frame in the map
+  - name: tf_static
+    module: tf
+    topic: /tf_static
+    entity_path: tf_static
+    qos: { depth: 10, durability: transient_local }
+    params:
+      static: true
+      axis_length: 0.3
+      frame_names: true
+
+  # The pose as axes, and its position covariance as an ellipsoid two standard deviations across
+  - name: robot_pose
+    module: pose
+    topic: /robot_pose
+    msg_type: geometry_msgs.msg.PoseWithCovarianceStamped
+    entity_path: robot/pose
+    params:
+      axis_length: 0.4
+      n_sigma: 2
+
+  - name: pose_guesses
+    module: pose_array
+    topic: /pose_guesses
+    entity_path: robot/guesses
+    params:
+      arrow_length: 0.2
+      radius: 0.006
+      colour: [80, 200, 255, 255]
+
+  # 2 cm of arrow per newton, and 50 cm per newton metre
+  - name: wrench
+    module: wrench
+    topic: /wrench
+    entity_path: tool/wrench
+    params:
+      force_scale: 0.02
+      torque_scale: 0.5

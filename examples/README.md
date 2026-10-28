@@ -53,6 +53,12 @@ A marker changing type every 2 s, beside a fixed cube. Modules: `marker_array`.
 
 ![markers](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/markers.gif)
 
+## [geometry](geometry)
+
+A robot circling with its pose as axes and its position covariance as an ellipsoid, a cloud of guesses at its pose, and a force-torque sensor's force and torque arrows on a tool. Modules: `tf`, `pose`, `pose_array`, `wrench`.
+
+![geometry](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/geometry.gif)
+
 ## [states](states)
 
 A robot's mode, cycling through idle, moving and charging, and a warning light that blinks while it moves, as coloured states over time. Modules: `states`.
