@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import JointState
 
 import rerun as rr
 
-from ..base import TopicToComponentModule
+from ..base import ModuleConfig, TopicToComponentModule
+from ..context import BridgeContext
 from ..registry import REGISTRY
+from .tf import FrameAxesParams, log_frame_axes
 
 
 @REGISTRY.register("joint_states")
@@ -17,6 +20,20 @@ class JointStatesModule(TopicToComponentModule):
     requires a frame relation's changes over time to be logged on one entity, so if the joints may also arrive on /tf,
     log on the `tf` module's entity (e.g. `tf`): the latest transform then wins, as in tf2.
     """
+
+    PARAMS = FrameAxesParams
+    params: FrameAxesParams  # type hint for self.params
+
+    def __init__(self, node: Node, config: ModuleConfig, context: BridgeContext) -> None:
+        """Subscribe, and draw the robot's link frames if the params ask for them.
+
+        Args:
+            node: The ROS node to use for subscriptions & logging.
+            config: The module configuration.
+            context: Shared context for all modules.
+        """
+        super().__init__(node, config, context)
+        log_frame_axes(self.entity_path, self.params)
 
     @classmethod
     def ros_msg_type(cls):

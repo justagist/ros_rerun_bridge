@@ -147,3 +147,11 @@ def test_joint_states_wait_for_the_robot_model(node, build, recording):
     node.publish(JointState(name=["shoulder"], position=[0.5]))
     assert "/tf" not in recording.entities()
     assert node.log_messages[-1][0] == "warn"
+
+
+def test_joint_states_can_draw_the_link_frames(robot, node, build, recording):
+    build("joint_states", entity_path="tf", params={"axis_length": 0.1, "frame_names": True})
+    node.publish(JointState(name=["shoulder"], position=[0.5]))
+    [axes] = [row for row in recording.rows("/tf") if row["static"]]
+    assert axes["TransformAxes3D:axis_length"] == pytest.approx([0.1])
+    assert axes["TransformAxes3D:show_frame"] == [True]

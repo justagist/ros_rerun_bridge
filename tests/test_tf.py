@@ -1,3 +1,4 @@
+import pytest
 from builtin_interfaces.msg import Time as TimeMsg
 from geometry_msgs.msg import TransformStamped
 from tf2_msgs.msg import TFMessage
@@ -38,3 +39,22 @@ def test_unstamped_transforms_are_logged_at_receive_time(node, build, recording)
     node.now_ns = 42_000_000_000
     node.publish(TFMessage(transforms=[transform("map", "odom", 1.0, sec=0)]))
     assert recording.rows("/tf")[0]["ros_time"] == 42_000_000_000
+
+
+def test_frame_axes_and_names_are_logged_once_as_static(node, build, recording):
+    build("tf", entity_path="tf", params={"axis_length": 0.3, "frame_names": True})
+    node.publish(TFMessage(transforms=[transform("map", "odom", 1.0), transform("odom", "base", 2.0)]))
+    [axes] = [row for row in recording.rows("/tf") if row["static"]]
+    assert axes["TransformAxes3D:axis_length"] == pytest.approx([0.3])
+    assert axes["TransformAxes3D:show_frame"] == [True]
+
+
+def test_without_axis_length_no_axes_are_drawn(node, build, recording):
+    build("tf", entity_path="tf")
+    node.publish(TFMessage(transforms=[transform("map", "odom", 1.0)]))
+    assert not [row for row in recording.rows("/tf") if row["static"]]
+
+
+def test_frame_names_need_axes(build):
+    with pytest.raises(ValueError, match="frame_names needs axis_length"):
+        build("tf", params={"frame_names": True})

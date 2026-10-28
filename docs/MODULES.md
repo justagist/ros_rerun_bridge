@@ -47,6 +47,8 @@ Use two `tf` modules, one for `/tf` and one for `/tf_static`, each with its own 
 | Param | Default | |
 | --- | --- | --- |
 | `static` | `false` | Log transforms as valid at all times. Set for `/tf_static`. |
+| `axis_length` | none | Draw each frame's x (red), y (green) and z (blue) axes, this long in metres, as rviz's TF display does. Rerun draws none otherwise. |
+| `frame_names` | `false` | Label each frame's axes with its name. Needs `axis_length`. |
 
 ## `robot_description`
 
@@ -63,6 +65,11 @@ Loads the URDF from `/robot_description` with Rerun's URDF importer and logs eac
 Moves the robot model's joints from `/joint_states`. Needs the [`robot_description`](#robot_description) module. Joint positions are shown as reported, even outside the URDF's limits. Mimic joints follow the joint they mimic, as with `robot_state_publisher`, unless the message gives their position.
 
 Not needed if `robot_state_publisher` already publishes the joints on `/tf`. Give it the `tf` module's `entity_path` (`tf`). A joint can then arrive on both `/tf` and `/joint_states` without conflict (the latest value wins, as in tf2), and `/tf` can still carry other frames, such as a camera's.
+
+| Param | Default | |
+| --- | --- | --- |
+| `axis_length` | none | Draw each link's frame as axes, this long in metres, as for [`tf`](#tf). |
+| `frame_names` | `false` | Label each frame's axes with its name. Needs `axis_length`. |
 
 ## `image`
 
