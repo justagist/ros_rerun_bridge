@@ -1,6 +1,12 @@
 # Examples
 
-Each folder holds a bridge config. Most also have a `publisher.py` that publishes made-up data, so the example runs without a robot or simulator. From the repo root, with ROS sourced, run the bridge and the publisher in two terminals:
+Each folder holds what an example needs:
+
+* `config.yaml`: the bridge config. This is the only file the bridge needs, and the part to copy for your own robot: point its topics at yours.
+* `layout.rbl` (optional): the viewer layout and camera angle the config opens with. Without it, Rerun picks a layout itself.
+* `publisher.py`: publishes made-up data for the demo, so it runs without a robot or simulator. On a real robot, your own nodes publish the data instead. The robot arm's `robot.urdf` is part of its demo data.
+
+From the repo root, with ROS sourced, run the bridge and the publisher in two terminals:
 
 ```bash
 uv run ros-rerun-bridge --config examples/<name>/config.yaml
@@ -8,6 +14,8 @@ python3 examples/<name>/publisher.py
 ```
 
 The publishers run with ROS's own Python, not the bridge's environment. They publish on common topics such as `/tf` and `/joint_states`, so run them away from a live robot, or in a ROS domain of their own (the same `export ROS_DOMAIN_ID=<n>` in both terminals).
+
+The `layout.rbl` files are written by [layouts.py](layouts.py): to change a layout, edit it there and run `uv run python examples/layouts.py`. In your own config, drop the `blueprint:` line to let Rerun choose a layout, or point it at one you saved from the viewer.
 
 ## [robot_arm](robot_arm)
 

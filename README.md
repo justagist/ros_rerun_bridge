@@ -40,7 +40,7 @@ uv run ros-rerun-bridge --config examples/robot_arm/config.yaml
 python3 examples/robot_arm/publisher.py
 ```
 
-This opens the Rerun viewer, showing the arm moving and its joint positions plotted. [examples](examples) has more, each runnable the same way.
+This opens the Rerun viewer, showing the arm moving and its joint positions plotted. The publisher only provides demo data: with a real robot, the bridge needs just a config listing its topics. [examples](examples) has more, each runnable the same way.
 
 ![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif?v=2)
 
@@ -80,7 +80,7 @@ modules:
     params: { mode: points }
 ```
 
-[CONFIGURATION.md](docs/CONFIGURATION.md) describes every field, and covers frames, QoS and saving a viewer layout. The [examples](examples) each pair a config with a publisher of made-up data, and are a good starting point.
+[CONFIGURATION.md](docs/CONFIGURATION.md) describes every field, and covers frames, QoS and saving a viewer layout. The [examples](examples) are a good starting point: each has a config, an optional viewer layout, and a publisher of demo data that only stands in for a real robot.
 
 ## Modules
 
