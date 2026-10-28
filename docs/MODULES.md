@@ -11,6 +11,8 @@ For messages with a header, spatial modules draw the data in the header's TF fra
 | [`joint_states`](#joint_states) | `sensor_msgs/JointState` | Robot joints, without TF |
 | [`image`](#image) | `sensor_msgs/Image` | Camera images |
 | [`compressed_image`](#compressed_image) | `sensor_msgs/CompressedImage` | JPEG and PNG camera images |
+| [`depth_image`](#depth_image) | `sensor_msgs/Image` | Depth images, also as point clouds |
+| [`compressed_depth_image`](#compressed_depth_image) | `sensor_msgs/CompressedImage` | `compressedDepth` images, also as point clouds |
 | [`camera_info`](#camera_info) | `sensor_msgs/CameraInfo` | Camera intrinsics, to show images in 3D |
 | [`pointcloud2`](#pointcloud2) | `sensor_msgs/PointCloud2` | Point clouds |
 | [`laserscan`](#laserscan) | `sensor_msgs/LaserScan` | Laser scans |
@@ -66,11 +68,30 @@ Not needed if `robot_state_publisher` already publishes the joints on `/tf`. Giv
 
 Logs images in the frame `<frame_id>_image_plane`, where the [`camera_info`](#camera_info) module's pinhole shows them in 3D.
 
-Supports the RGB(A), BGR(A) and mono encodings at 8 and 16 bits, `8UC1`, `16UC1`, `32FC1`, 8-bit Bayer and `yuv422_yuy2`. Rerun displays them natively, so nothing is converted.
+Supports the RGB(A), BGR(A) and mono encodings at 8 and 16 bits, `8UC1`, `16UC1`, `32FC1`, 8-bit Bayer and `yuv422_yuy2`. Rerun displays them natively, so nothing is converted. For depth images, use [`depth_image`](#depth_image), which also draws them as point clouds.
 
 ## `compressed_image`
 
-Logs JPEG and PNG images as they are, for the viewer to decode, in the frame `<frame_id>_image_plane` like [`image`](#image). `compressedDepth` images are not supported.
+Logs JPEG and PNG images as they are, for the viewer to decode, in the frame `<frame_id>_image_plane` like [`image`](#image). For `compressedDepth` images, use [`compressed_depth_image`](#compressed_depth_image).
+
+## `depth_image`
+
+Logs `16UC1` and `mono16` depth images in millimetres, and `32FC1` ones in metres, as ROS's depth image conventions set them. They are logged on the image plane like [`image`](#image), so with the [`camera_info`](#camera_info) module's pinhole, Rerun also draws them as a point cloud in 3D, coloured by depth.
+
+| Param | Default | |
+| --- | --- | --- |
+| `colormap` | `Turbo` | `Turbo`, `Viridis`, `Inferno`, `Magma`, `Plasma`, `Grayscale` or `CyanToYellow`. |
+| `depth_range` | 0 to the image's maximum | Depths the colormap spans, in the image's units, e.g. `[500, 3000]` millimetres for `16UC1`. |
+| `point_fill_ratio` | Rerun's default | Size of each 3D point, relative to the gap between neighbouring points. |
+
+## `compressed_depth_image`
+
+Logs depth images as `compressed_depth_image_transport` publishes them (e.g. on `/camera/depth/image_raw/compressedDepth`), for the viewer to decode, like [`depth_image`](#depth_image). It takes the same params.
+
+* `PNG`: `16UC1` only. A `32FC1` PNG holds quantised inverse depth, which Rerun would show as the wrong distances.
+* `RVL`: `16UC1` and `32FC1`.
+
+This uses Rerun's encoded depth images, which Rerun marks as unstable in 0.40.
 
 ## `camera_info`
 
