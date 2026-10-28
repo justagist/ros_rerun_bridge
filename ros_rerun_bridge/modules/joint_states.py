@@ -9,7 +9,7 @@ import rerun as rr
 from ..base import ModuleConfig, TopicToComponentModule
 from ..context import BridgeContext
 from ..registry import REGISTRY
-from .tf import FrameAxesParams, log_frame_axes
+from .tf import FrameAxes, FrameAxesParams
 
 
 @REGISTRY.register("joint_states")
@@ -25,7 +25,7 @@ class JointStatesModule(TopicToComponentModule):
     params: FrameAxesParams  # type hint for self.params
 
     def __init__(self, node: Node, config: ModuleConfig, context: BridgeContext) -> None:
-        """Subscribe, and draw the robot's link frames if the params ask for them.
+        """Subscribe, and set up drawing the robot's link frames.
 
         Args:
             node: The ROS node to use for subscriptions & logging.
@@ -33,7 +33,7 @@ class JointStatesModule(TopicToComponentModule):
             context: Shared context for all modules.
         """
         super().__init__(node, config, context)
-        log_frame_axes(self.entity_path, self.params)
+        self._frame_axes = FrameAxes(self.params)
 
     @classmethod
     def ros_msg_type(cls):
@@ -62,4 +62,8 @@ class JointStatesModule(TopicToComponentModule):
             joint = tree.get_joint_by_name(name)
             if joint is not None:
                 # Show what the robot reports, even outside its URDF limits
-                rr.log(self.entity_path, joint.compute_transform(position, clamp=False))
+                transform = joint.compute_transform(position, clamp=False)
+                rr.log(self.entity_path, transform)
+                # The frame names as the transform has them, e.g. with the URDF's frame prefix
+                frames = (transform.parent_frame, transform.child_frame)
+                self._frame_axes.add(*(frame.as_arrow_array().to_pylist()[0] for frame in frames))

@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-- `axis_length` and `frame_names` params for `tf` and `joint_states`, drawing each frame's axes and name, as rviz's TF display does.
+- `axis_length` and `frame_names` params for `tf` and `joint_states`, drawing each frame's axes and name, as rviz's TF display does. Each frame is drawn once, on its own entity under `frames`, so the viewer can show or hide each one.
 
 ### Changed
 

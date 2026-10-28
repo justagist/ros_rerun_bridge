@@ -149,9 +149,10 @@ def test_joint_states_wait_for_the_robot_model(node, build, recording):
     assert node.log_messages[-1][0] == "warn"
 
 
-def test_joint_states_can_draw_the_link_frames(robot, node, build, recording):
+def test_joint_states_draw_each_link_frame_on_its_own_entity(robot, node, build, recording):
     build("joint_states", entity_path="tf", params={"axis_length": 0.1, "frame_names": True})
     node.publish(JointState(name=["shoulder"], position=[0.5]))
-    [axes] = [row for row in recording.rows("/tf") if row["static"]]
-    assert axes["TransformAxes3D:axis_length"] == pytest.approx([0.1])
-    assert axes["TransformAxes3D:show_frame"] == [True]
+    # The shoulder's links, and the mimic joints' ones, which follow it
+    frames = sorted(entity for entity in recording.entities() if entity.startswith("/frames/"))
+    assert frames == ["/frames/arm", "/frames/base", "/frames/finger", "/frames/tip"]
+    assert recording.rows("/frames/arm")[0]["TransformAxes3D:axis_length"] == pytest.approx([0.1])

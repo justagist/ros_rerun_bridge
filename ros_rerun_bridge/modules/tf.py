@@ -30,16 +30,39 @@ class FrameAxesParams(StrictParamsModel):
         return self
 
 
-def log_frame_axes(entity_path: str, params: FrameAxesParams) -> None:
-    """Draw the axes of every frame whose transform is logged on an entity, if the params ask for them.
+class FrameAxes:
+    """Draws each frame's axes, if the params ask for them, on `frames/<frame>`.
 
-    Args:
-        entity_path: The entity the transforms are logged on.
-        params: The module's frame axes params.
+    An entity per frame lets the viewer show or hide each frame's axes, and its name, on its own. The path is the same
+    for every module, so a frame that several modules see, e.g. from /tf_static and /joint_states, is drawn once.
     """
-    if params.axis_length is not None:
-        axes = rr.TransformAxes3D(axis_length=params.axis_length, show_frame=params.frame_names)
-        rr.log(entity_path, axes, static=True)
+
+    def __init__(self, params: FrameAxesParams) -> None:
+        """Set up drawing frames.
+
+        Args:
+            params: The module's frame axes params.
+        """
+        self._params = params
+        self._drawn: set[str] = set()
+
+    def add(self, *frames: str) -> None:
+        """Draw frames not drawn yet. Their axes then follow the frames as their transforms change.
+
+        Args:
+            frames: Frame names, e.g. a transform's parent and child frames.
+        """
+        if self._params.axis_length is None:
+            return
+        for frame in frames:
+            if frame and frame not in self._drawn:
+                rr.log(
+                    f"frames/{rr.escape_entity_path_part(frame)}",
+                    rr.CoordinateFrame(frame=frame),
+                    rr.TransformAxes3D(axis_length=self._params.axis_length, show_frame=self._params.frame_names),
+                    static=True,
+                )
+                self._drawn.add(frame)
 
 
 class TFParams(FrameAxesParams):
@@ -64,7 +87,7 @@ class TFModule(TopicToComponentModule):
     params: TFParams  # type hint for self.params
 
     def __init__(self, node: Node, config: ModuleConfig, context: BridgeContext) -> None:
-        """Subscribe, and log the frame axes if they are drawn.
+        """Subscribe, and set up drawing the frames' axes.
 
         Args:
             node: The ROS node to use for subscriptions & logging.
@@ -72,7 +95,7 @@ class TFModule(TopicToComponentModule):
             context: Shared context for all modules.
         """
         super().__init__(node, config, context)
-        log_frame_axes(self.entity_path, self.params)
+        self._frame_axes = FrameAxes(self.params)
 
     @classmethod
     def ros_msg_type(cls):
@@ -95,3 +118,4 @@ class TFModule(TopicToComponentModule):
                 ),
                 static=self.params.static,
             )
+            self._frame_axes.add(tf.header.frame_id, tf.child_frame_id)
