@@ -52,19 +52,28 @@ def test_subscribes_with_the_configured_topic_qos_and_message_type(node, build):
     assert subscription.qos.durability == DurabilityPolicy.TRANSIENT_LOCAL
 
 
-def test_qos_values_are_validated(build):
-    with pytest.raises(ValidationError, match="reliability"):
-        build("tf", qos={"reliability": "best-effort"})
+@pytest.mark.parametrize(
+    ("qos", "error"), [({"reliability": "best-effort"}, "reliability"), ({"depth": 0}, "depth"), ({"deph": 5}, "deph")]
+)
+def test_invalid_qos_is_an_error(build, qos, error):
+    with pytest.raises(ValidationError, match=error):
+        build("tf", qos=qos)
 
 
-def test_qos_depth_must_be_positive(build):
-    with pytest.raises(ValidationError, match="depth"):
-        build("tf", qos={"depth": 0})
-
-
-def test_unknown_qos_keys_are_an_error(build):
-    with pytest.raises(ValidationError, match="deph"):
-        build("tf", qos={"deph": 5})
+@pytest.mark.parametrize(
+    ("module", "params"),
+    [
+        ("range", {"colour": [0, 300, 0, 255]}),
+        ("particle_cloud", {"colour": [-1, 0, 0, 255]}),
+        ("scalars", {"fields": ["range"], "colours": [[0, 0, 256, 255]]}),
+        ("bar_chart", {"field": "effort", "colour": [0, 0, 0, 300]}),
+    ],
+)
+def test_colour_channels_outside_0_to_255_are_an_error(build, module, params):
+    # Rerun would wrap them round instead of rejecting them
+    msg_type = {"scalars": "sensor_msgs.msg.Range", "bar_chart": "sensor_msgs.msg.JointState"}.get(module)
+    with pytest.raises(ValueError, match="(less|greater) than or equal to"):
+        build(module, msg_type=msg_type, params=params)
 
 
 def write_config(directory, text: str):
