@@ -150,6 +150,13 @@ Plots numeric fields of any message type as time series. Set the message type wi
 | Param | Default | |
 | --- | --- | --- |
 | `fields` | required | Dotted paths to the fields to plot, e.g. `range` or `twist.twist.linear.x`. |
+| `style` | `lines` | `lines` or `points`. |
+| `names` | entity path and element index | Series names, one per array element. |
+| `colours` | Rerun's palette | RGBA per series. The last one applies to any remaining series. |
+| `width` | Rerun's default | Line width, in UI points. Lines only. |
+| `interpolation` | `linear` | `linear`, or `step_after`, `step_before` or `step_mid` for values that jump, such as modes or flags. Lines only. |
+| `marker` | `circle` | `circle`, `diamond`, `square`, `cross`, `plus`, `up`, `down`, `left`, `right` or `asterisk`. Points only. |
+| `marker_size` | Rerun's default | Marker size, in UI points. Points only. |
 
 ```yaml
 - name: velocity_plot
@@ -159,4 +166,19 @@ Plots numeric fields of any message type as time series. Set the message type wi
   entity_path: plots/odom
   params:
     fields: [twist.twist.linear.x, twist.twist.angular.z]
+```
+
+The style params apply to every field of the module. To style fields differently, plot them with separate modules. The same settings can also be changed in the viewer, and kept with a [saved layout](CONFIGURATION.md#viewer-layout).
+
+```yaml
+- name: joint_positions
+  module: scalars
+  topic: /joint_states
+  msg_type: sensor_msgs.msg.JointState
+  entity_path: plots/joints
+  params:
+    fields: [position]
+    names: [shoulder, elbow, wrist]
+    style: points
+    marker: diamond
 ```

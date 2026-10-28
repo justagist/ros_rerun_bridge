@@ -8,6 +8,8 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState, Range
 from std_msgs.msg import Float64
 
+import rerun as rr
+
 
 def build_scalars(build, msg_type: str, *fields: str):
     return build("scalars", entity_path="plots", msg_type=msg_type, params={"fields": list(fields)})
@@ -81,3 +83,63 @@ def test_values_are_logged_at_their_stamp_or_receive_time(node, build, recording
 def test_invalid_config_is_an_error(build, msg_type, fields, error):
     with pytest.raises(ValueError, match=error):
         build("scalars", msg_type=msg_type, params={"fields": fields})
+
+
+def static_rows(recording, entity: str) -> list[dict]:
+    return [row for row in recording.rows(entity) if row["static"]]
+
+
+def test_line_style_is_logged_once_as_static(node, build, recording):
+    build(
+        "scalars",
+        entity_path="plots",
+        msg_type="sensor_msgs.msg.JointState",
+        params={
+            "fields": ["position"],
+            "names": ["shoulder", "elbow"],
+            "colours": [[255, 0, 0, 255]],
+            "width": 2.0,
+            "interpolation": "step_after",
+        },
+    )
+    node.publish(JointState(position=[0.1, 0.2]))
+    node.publish(JointState(position=[0.3, 0.4]))
+
+    [style] = static_rows(recording, "/plots/position")
+    assert style["SeriesLines:names"] == ["shoulder", "elbow"]
+    assert style["SeriesLines:colors"] == [0xFF0000FF]
+    assert style["SeriesLines:widths"] == [2.0]
+    assert style["SeriesLines:interpolation_mode"] == [rr.components.InterpolationMode.StepAfter.value]
+
+
+def test_point_style_draws_points(node, build, recording):
+    build(
+        "scalars",
+        entity_path="plots",
+        msg_type="sensor_msgs.msg.Range",
+        params={"fields": ["range"], "style": "points", "marker_size": 3.0},
+    )
+    [style] = static_rows(recording, "/plots/range")
+    # A SeriesPoints component on the entity is what makes Rerun draw points
+    assert style["SeriesPoints:markers"] == [rr.components.MarkerShape.Circle.value]
+    assert style["SeriesPoints:marker_sizes"] == [3.0]
+    assert not any(key.startswith("SeriesLines:") for key in style)
+
+
+def test_without_style_params_rerun_default_lines_are_kept(node, build, recording):
+    build_scalars(build, "sensor_msgs.msg.Range", "range")
+    node.publish(Range(range=0.5))
+    assert static_rows(recording, "/plots/range") == []
+
+
+@pytest.mark.parametrize(
+    ("params", "error"),
+    [
+        ({"marker": "square"}, "marker cannot be used with style 'lines'"),
+        ({"style": "points", "width": 2.0, "interpolation": "step_mid"}, "width, interpolation cannot be used"),
+        ({"interpolation": "steps"}, "interpolation"),
+    ],
+)
+def test_invalid_style_is_an_error(build, params, error):
+    with pytest.raises(ValueError, match=error):
+        build("scalars", msg_type="sensor_msgs.msg.Range", params={"fields": ["range"], **params})
