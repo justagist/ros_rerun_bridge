@@ -20,6 +20,31 @@ _NUMERIC = {
 }
 # Element type of an unbounded or bounded sequence, e.g. "sequence<double, 3>", or of a fixed array, e.g. "double[9]"
 _ARRAY = re.compile(r"sequence<(\w+)(?:, \d+)?>|(\w+)\[\d+\]")
+# A string or wide string, unbounded or bounded, e.g. "string<=10"
+_STRING = re.compile(r"w?string(?:<=\d+)?")
+
+
+def field_type(msg_type: type, field: str) -> str:
+    """Return the ROS type of a field named by a dotted path, raising a ValueError if the message has no such field.
+
+    Args:
+        msg_type: ROS message class.
+        field: Dotted path, e.g. `twist.twist.linear.x`.
+
+    Returns:
+        The field's ROS type, e.g. `double`, `sequence<double>` or `std_msgs/Header`.
+    """
+    cls = msg_type
+    names = field.split(".")
+    for i, name in enumerate(names):
+        if not hasattr(cls, "get_fields_and_field_types"):
+            raise ValueError(f"field '{field}': '{'.'.join(names[:i])}' is not a message")
+        ros_type = cls.get_fields_and_field_types().get(name)
+        if ros_type is None:
+            raise ValueError(f"field '{field}': {cls.__name__} has no field '{name}'")
+        # A default message holds every nested message, so the next level's class comes from it
+        cls = type(getattr(cls(), name))
+    return ros_type
 
 
 def check_field(msg_type: type, field: str) -> str:
@@ -32,20 +57,16 @@ def check_field(msg_type: type, field: str) -> str:
     Returns:
         The field's ROS type, e.g. `double` or `sequence<double>`.
     """
-    cls = msg_type
-    names = field.split(".")
-    for i, name in enumerate(names):
-        if not hasattr(cls, "get_fields_and_field_types"):
-            raise ValueError(f"field '{field}': '{'.'.join(names[:i])}' is not a message")
-        field_type = cls.get_fields_and_field_types().get(name)
-        if field_type is None:
-            raise ValueError(f"field '{field}': {cls.__name__} has no field '{name}'")
-        # A default message holds every nested message, so the next level's class comes from it
-        cls = type(getattr(cls(), name))
-    array = _ARRAY.fullmatch(field_type)
-    if (array.group(1) or array.group(2) if array else field_type) not in _NUMERIC:
-        raise ValueError(f"field '{field}' is {field_type}, not a number or an array of numbers")
-    return field_type
+    ros_type = field_type(msg_type, field)
+    array = _ARRAY.fullmatch(ros_type)
+    if (array.group(1) or array.group(2) if array else ros_type) not in _NUMERIC:
+        raise ValueError(f"field '{field}' is {ros_type}, not a number or an array of numbers")
+    return ros_type
+
+
+def is_single_value(field_type: str) -> bool:
+    """Whether a ROS field type is one number, bool or string: not an array or a message."""
+    return field_type in _NUMERIC or _STRING.fullmatch(field_type) is not None
 
 
 def is_array(field_type: str) -> bool:
