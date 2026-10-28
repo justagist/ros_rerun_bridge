@@ -34,6 +34,9 @@ ENCODINGS = [
     ("mono8", RNG.integers(0, 255, (3, 5), dtype=np.uint8), "L"),
     ("mono16", RNG.integers(0, 65535, (3, 5), dtype=np.uint16), "L"),
     ("rgb16", RNG.integers(0, 65535, (3, 5, 3), dtype=np.uint16), "RGB"),
+    ("bgr16", RNG.integers(0, 65535, (3, 5, 3), dtype=np.uint16), "BGR"),
+    ("rgba16", RNG.integers(0, 65535, (3, 5, 4), dtype=np.uint16), "RGBA"),
+    ("bgra16", RNG.integers(0, 65535, (3, 5, 4), dtype=np.uint16), "BGRA"),
     ("32FC1", RNG.random((3, 5), dtype=np.float32), "L"),
 ]
 
@@ -51,7 +54,13 @@ def test_images_keep_their_exact_pixels_and_colour_model(encoding, pixels, colou
 
 @pytest.mark.parametrize(
     ("encoding", "pixel_format", "row_bytes"),
-    [("bayer_rggb8", rr.PixelFormat.BayerRGGB8, 6), ("yuv422_yuy2", rr.PixelFormat.YUY2, 12)],
+    [
+        ("bayer_rggb8", rr.PixelFormat.BayerRGGB8, 6),
+        ("bayer_bggr8", rr.PixelFormat.BayerBGGR8, 6),
+        ("bayer_gbrg8", rr.PixelFormat.BayerGBRG8, 6),
+        ("bayer_grbg8", rr.PixelFormat.BayerGRBG8, 6),
+        ("yuv422_yuy2", rr.PixelFormat.YUY2, 12),
+    ],
 )
 @pytest.mark.parametrize("padding", [0, 2], ids=["plain", "padded"])
 def test_packed_encodings_are_passed_to_rerun_to_decode_without_row_padding(encoding, pixel_format, row_bytes, padding):
@@ -78,7 +87,8 @@ def test_images_are_placed_on_the_camera_image_plane(node, build, recording):
 
 @pytest.mark.parametrize(
     ("image_format", "media_type"),
-    [("jpeg", "image/jpeg"), ("bgr8; jpeg compressed bgr8", "image/jpeg"), ("png", "image/png")],
+    # An empty format is JPEG, as sensor_msgs/CompressedImage defines it
+    [("jpeg", "image/jpeg"), ("bgr8; jpeg compressed bgr8", "image/jpeg"), ("png", "image/png"), ("", "image/jpeg")],
 )
 def test_compressed_formats_map_to_media_types(image_format, media_type):
     assert media_type_from_format(image_format) == media_type

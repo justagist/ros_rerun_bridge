@@ -74,7 +74,7 @@ def test_axis_length_must_be_finite_and_positive(build, axis_length):
         build("tf", params={"axis_length": axis_length})
 
 
-def test_a_frame_seen_by_two_modules_is_drawn_once(node, build, recording):
+def test_a_frame_seen_by_two_modules_has_one_entity(node, build, recording):
     # E.g. a robot's base, the child of a static transform and the parent of its first joint
     build("tf", entity_path="tf_static", params={"static": True, "axis_length": 0.3})
     node.publish(TFMessage(transforms=[transform("world", "base", 1.0)]), index=0)

@@ -7,6 +7,7 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
+from ..types import StrictParamsModel
 from ..utils.utils import IMAGE_PLANE_SUFFIX
 
 
@@ -14,7 +15,7 @@ def media_type_from_format(image_format: str) -> str:
     """Return the media type of a sensor_msgs/CompressedImage, from its `format` field.
 
     Args:
-        image_format: e.g. "jpeg", "png", or image_transport's "bgr8; jpeg compressed bgr8".
+        image_format: e.g. "jpeg", "png", or image_transport's "bgr8; jpeg compressed bgr8". Empty for JPEG.
 
     Returns:
         The media type, for Rerun to decode the image with.
@@ -23,6 +24,9 @@ def media_type_from_format(image_format: str) -> str:
         ValueError: If the format is not plain JPEG or PNG, e.g. compressedDepth, which adds its own header.
     """
     lowered = image_format.lower()
+    # As sensor_msgs/CompressedImage defines it
+    if not lowered.strip():
+        return "image/jpeg"
     if "compresseddepth" not in lowered:
         if "jpeg" in lowered or "jpg" in lowered:
             return "image/jpeg"
@@ -34,6 +38,9 @@ def media_type_from_format(image_format: str) -> str:
 @REGISTRY.register("compressed_image")
 class CompressedImageModule(TopicToComponentModule):
     """Module for logging JPEG and PNG CompressedImage messages to Rerun as is, for the viewer to decode."""
+
+    # No params, so any given are an error
+    PARAMS = StrictParamsModel
 
     @classmethod
     def ros_msg_type(cls):

@@ -99,14 +99,12 @@ class StatesModule(TopicToComponentModule):
             context: Shared context for all modules.
         """
         if not config.msg_type:
-            raise ValueError(f"[{config.name}] the states module needs `msg_type` set")
+            raise ValueError("the states module needs `msg_type` set")
         super().__init__(node, config, context)
         self._ros_type = field_type(self._resolve_msg_type(), self.params.field)
         if not is_single_value(self._ros_type):
             raise ValueError(f"field '{self.params.field}' is {self._ros_type}, not a number, bool or string")
         self._get = attrgetter(self.params.field)
-        self._state: str | None = None
-        """The state last logged, as each change marks a new one."""
         if self.params.states:
             states = self.params.states
             values = [state_text(s.value, self._ros_type) for s in states]
@@ -125,7 +123,6 @@ class StatesModule(TopicToComponentModule):
         return Time.from_msg(header.stamp) if header is not None else None
 
     def handle(self, msg: Any) -> None:
-        state = state_text(self._get(msg), self._ros_type)
-        if state != self._state:
-            rr.log(self.entity_path, rr.StateChange(state=state))
-            self._state = state
+        # Every message, rather than only changes: Rerun joins repeated states into one, and a message arriving late,
+        # e.g. from a replayed bag, would otherwise hide the later messages deduplicated against it
+        rr.log(self.entity_path, rr.StateChange(state=state_text(self._get(msg), self._ros_type)))

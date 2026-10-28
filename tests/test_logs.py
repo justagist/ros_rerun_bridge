@@ -29,6 +29,12 @@ def test_ros_levels_map_to_rerun_levels(node, build, recording, level, rerun):
     assert log_rows(recording, "/logs/planner") == [([rerun], ["planning"])]
 
 
+def test_entries_without_a_logger_name_are_logged_on_the_entity_path(node, build, recording):
+    build("rosout", entity_path="logs")
+    node.publish(Log(name="", level=Log.INFO, msg="unnamed"))
+    assert log_rows(recording, "/logs") == [(["INFO"], ["unnamed"])]
+
+
 def test_entries_below_the_minimum_level_are_left_out(node, build, recording):
     build("rosout", entity_path="logs", params={"min_level": "warn"})
     node.publish(Log(name="planner", level=Log.INFO, msg="planning"))
@@ -52,7 +58,7 @@ def state_rows(recording, entity: str) -> list:
     return [row["StateChange:state"] for row in recording.rows(entity) if "StateChange:state" in row]
 
 
-def test_a_status_is_logged_only_when_its_level_or_message_changes(node, build, recording):
+def test_every_status_is_a_state_and_its_message_is_logged_when_it_changes(node, build, recording):
     build("diagnostics", entity_path="diagnostics")
     for level, message in [
         (DiagnosticStatus.OK, "ok"),
@@ -62,7 +68,7 @@ def test_a_status_is_logged_only_when_its_level_or_message_changes(node, build, 
         (DiagnosticStatus.ERROR, "too hot"),
     ]:
         node.publish(diagnostics(("motor", level, message)))
-    assert state_rows(recording, "/diagnostics/motor") == [["OK"], ["ERROR"]]
+    assert state_rows(recording, "/diagnostics/motor") == [["OK"], ["OK"], ["OK"], ["ERROR"], ["ERROR"]]
     assert log_rows(recording, "/diagnostics/motor") == [
         (["INFO"], ["ok"]),
         (["INFO"], ["warming up"]),
@@ -90,3 +96,39 @@ def test_each_status_is_given_the_level_colours_once(node, build, recording):
     [config] = [row for row in recording.rows("/diagnostics/motor") if row["static"]]
     assert config["StateConfiguration:values"] == ["OK", "WARN", "ERROR", "STALE"]
     assert config["StateConfiguration:colors"] == [0x28AA46FF, 0xF0B400FF, 0xDC2828FF, 0x828282FF]
+
+
+def test_an_unknown_level_is_shown_as_its_number_and_logged_as_a_warning(node, build, recording):
+    build("diagnostics", entity_path="diagnostics")
+    node.publish(diagnostics(("motor", bytes([7]), "odd")))
+    assert state_rows(recording, "/diagnostics/motor") == [["7"]]
+    assert log_rows(recording, "/diagnostics/motor") == [(["WARN"], ["odd"])]
+
+
+def test_a_late_status_leaves_the_later_statuses_in_place(node, build, recording):
+    # E.g. from a replayed bag: the motor is OK again at 21 s, though the error at 15 s arrived after it
+    build("diagnostics", entity_path="diagnostics")
+    arrivals = [
+        (10, DiagnosticStatus.OK),
+        (20, DiagnosticStatus.OK),
+        (15, DiagnosticStatus.ERROR),
+        (21, DiagnosticStatus.OK),
+    ]
+    for sec, level in arrivals:
+        msg = diagnostics(("motor", level, "status"))
+        msg.header.stamp = TimeMsg(sec=sec)
+        node.publish(msg)
+    rows = [row for row in recording.rows("/diagnostics/motor") if "StateChange:state" in row]
+    assert [(row["ros_time"] // 1_000_000_000, row["StateChange:state"]) for row in rows] == [
+        (10, ["OK"]),
+        (15, ["ERROR"]),
+        (20, ["OK"]),
+        (21, ["OK"]),
+    ]
+    # The late message is logged too, as a log entry of its own
+    assert [
+        row["ros_time"] // 1_000_000_000 for row in recording.rows("/diagnostics/motor") if "TextLog:text" in row
+    ] == [
+        10,
+        15,
+    ]

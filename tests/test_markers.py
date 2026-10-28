@@ -48,11 +48,26 @@ def component(archetype, name: str):
         (Marker.TRIANGLE_LIST, rr.Mesh3D, "vertex_positions", 3),
     ],
 )
-def test_every_marker_type_but_mesh_resource_converts_to_its_instances(marker_type, archetype, instances, count):
+def test_every_marker_type_rviz_draws_but_mesh_resource_converts_to_its_instances(
+    marker_type, archetype, instances, count
+):
     # Four points: list markers draw one instance per point (or per segment, or per whole triangle)
     converted = archetype_from_marker(marker(marker_type, points=POINTS, text="t"))
     assert isinstance(converted, archetype)
     assert len(component(converted, instances)) == count
+
+
+def test_arrow_strips_are_not_converted_as_rviz_does_not_draw_them():
+    assert archetype_from_marker(marker(Marker.ARROW_STRIP, points=POINTS)) is None
+
+
+def test_line_strips_with_per_point_colours_draw_a_segment_per_colour():
+    strip = archetype_from_marker(marker(Marker.LINE_STRIP, points=POINTS[:3], colors=PER_POINT[:3]))
+    assert component(strip, "strips") == [[[0, 0, 0], [1, 0, 0]], [[1, 0, 0], [1, 1, 0]]]
+    # Each segment takes its first point's colour
+    assert component(strip, "colors") == [0xFF0000FF, 0x00FF00FF]
+    plain = archetype_from_marker(marker(Marker.LINE_STRIP, points=POINTS[:3]))
+    assert len(component(plain, "strips")) == 1 and component(plain, "colors") == [0xFF8000FF]
 
 
 def test_list_shapes_are_centred_on_their_points():
@@ -256,7 +271,7 @@ def test_empty_and_underscore_namespaces_are_distinct(node, build, recording):
     assert is_cleared(recording, "/markers/__/4")
 
 
-def test_triangle_lists_are_scaled(node, build, recording):
+def test_triangle_lists_are_scaled():
     triangles = archetype_from_marker(marker(Marker.TRIANGLE_LIST, points=POINTS[1:4]))
     # scale (0.2, 0.4, 0.6) applied to each vertex
     np.testing.assert_allclose(component(triangles, "vertex_positions"), [[0.2, 0, 0], [0.2, 0.4, 0], [0, 0.4, 0]])

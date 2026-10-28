@@ -55,7 +55,7 @@ Use two `tf` modules, one for `/tf` and one for `/tf_static`, each with its own 
 | `axis_length` | none | Draw each frame's x (red), y (green) and z (blue) axes, this long in metres (above 0), as rviz's TF display does. Rerun draws none otherwise. |
 | `frame_names` | `false` | Label each frame's axes with its name. Needs `axis_length`. |
 
-Each frame's axes are drawn on an entity of their own, `frames/<frame>`, whichever module's `entity_path` the transform is on. A frame that several modules see, e.g. one from `/tf_static` and `/joint_states`, is drawn once, with the settings of the module that drew it last: give modules the same settings, or set them on one only. In the viewer, hide one frame's axes with the eye next to it under `frames`, or select it and override *Show frame* to show or hide its name alone.
+Each frame's axes are drawn on an entity of their own, `frames/<frame>`, whichever module's `entity_path` the transform is on. A frame that several modules see, e.g. one from `/tf_static` and `/joint_states`, has one entity, drawn with the settings of the module that drew it last: give modules the same settings, or set them on one only. In the viewer, hide one frame's axes with the eye next to it under `frames`, or select it and override *Show frame* to show or hide its name alone.
 
 ## `robot_description`
 
@@ -65,6 +65,7 @@ Loads the URDF from `/robot_description` with Rerun's URDF importer and logs eac
 * Collision geometry is not logged.
 * Collada (`.dae`) meshes are scaled by the unit they declare (`<unit meter="...">`), as rviz does. Rerun's importer ignores it, so a mesh authored in inches would otherwise render about 40 times too large.
 * Each joint's zero position is logged on `tf_static` as a default, so the robot is drawn assembled before TF or joint states arrive.
+* A new model replaces the old one's geometry, e.g. when a tool is changed.
 * The model is shared with other modules as `context.urdf_tree`.
 
 ## `joint_states`
@@ -88,7 +89,7 @@ Supports the RGB(A), BGR(A) and mono encodings at 8 and 16 bits, `8UC1`, `16UC1`
 
 ## `compressed_image`
 
-Logs JPEG and PNG images as they are, for the viewer to decode, in the frame `<frame_id>_image_plane` like [`image`](#image). For `compressedDepth` images, use [`compressed_depth_image`](#compressed_depth_image).
+Logs JPEG and PNG images as they are, for the viewer to decode, in the frame `<frame_id>_image_plane` like [`image`](#image). An empty `format` is read as JPEG, as `sensor_msgs/CompressedImage` defines. For `compressedDepth` images, use [`compressed_depth_image`](#compressed_depth_image).
 
 ## `depth_image`
 
@@ -97,14 +98,14 @@ Logs `16UC1` and `mono16` depth images in millimetres, and `32FC1` ones in metre
 | Param | Default | |
 | --- | --- | --- |
 | `colormap` | `Turbo` | `Turbo`, `Viridis`, `Inferno`, `Magma`, `Plasma`, `Grayscale` or `CyanToYellow`. |
-| `depth_range` | 0 to the image's maximum | Depths the colormap spans, in the image's units, e.g. `[500, 3000]` millimetres for `16UC1`. |
+| `depth_range` | estimated from the data | Depths the colormap spans, in the image's units, e.g. `[500, 3000]` millimetres for `16UC1`. Rerun's estimate may be wider than the image's own range. |
 | `point_fill_ratio` | Rerun's default | Size of each 3D point, relative to the gap between neighbouring points. |
 
 ## `compressed_depth_image`
 
 Logs depth images as `compressed_depth_image_transport` publishes them (e.g. on `/camera/depth/image_raw/compressedDepth`), for the viewer to decode, like [`depth_image`](#depth_image). It takes the same params.
 
-* `PNG`: `16UC1` only. A `32FC1` PNG holds quantised inverse depth, which Rerun would show as the wrong distances.
+* `PNG`: `16UC1` only. A `32FC1` PNG holds quantised inverse depth, which Rerun would show as the wrong distances. ROS 2 Humble's format names no codec, e.g. `16UC1; compressedDepth`, and is read as PNG.
 * `RVL`: `16UC1` and `32FC1`.
 
 This uses Rerun's encoded depth images, which Rerun marks as unstable in 0.40.
@@ -119,7 +120,7 @@ Logs the camera's intrinsics as a pinhole projection from the camera frame to th
 
 ## `pointcloud2`
 
-Logs points with their colours. Points with a NaN coordinate are dropped. Needs `sensor_msgs_py`.
+Logs points with their colours. Points with a NaN coordinate are dropped, as is the padding at the end of an organised cloud's rows. Needs `sensor_msgs_py`.
 
 | Param | Default | |
 | --- | --- | --- |
@@ -149,7 +150,8 @@ Draws a reading as rviz does: a cone along the sensor frame's x axis, with the m
 
 Logs rviz markers, each on `<entity_path>/<ns>/<id>` and posed in its header frame. For a single `visualization_msgs/Marker` topic, set `msg_type: visualization_msgs.msg.Marker`.
 
-* Supports every marker type except `MESH_RESOURCE`.
+* Supports every marker type except `MESH_RESOURCE`, and `ARROW_STRIP`, which rviz does not draw either.
+* A line strip with per-point colours is drawn as a segment per point, in that point's colour: Rerun colours a whole strip, where rviz blends the colours along it.
 * Supports the `ADD`, `DELETE` and `DELETEALL` actions. As in rviz, `DELETEALL` clears only the message's namespace if it has one.
 * Markers expire at the end of their lifetime.
 * Text markers are drawn as labels on a point, as Rerun has no 3D text.
@@ -157,7 +159,7 @@ Logs rviz markers, each on `<entity_path>/<ns>/<id>` and posed in its header fra
 
 ## `pose`
 
-Draws a pose as its x (red), y (green) and z (blue) axes, in the header's frame. For `geometry_msgs/PoseWithCovarianceStamped` or `nav_msgs/Odometry`, set `msg_type`: their position covariance is also drawn, as an ellipsoid on `<entity_path>/covariance`, oriented along the covariance's principal axes. An all-zero orientation is treated as no rotation, as in rviz.
+Draws a pose as its x (red), y (green) and z (blue) axes, in the header's frame. For `geometry_msgs/PoseWithCovarianceStamped` or `nav_msgs/Odometry`, set `msg_type`; unstamped types such as `Pose` are an error. Their position covariance is also drawn, as an ellipsoid on `<entity_path>/covariance`, oriented along the covariance's principal axes. An all-zero orientation is treated as no rotation, as in rviz.
 
 | Param | Default | |
 | --- | --- | --- |
@@ -213,7 +215,7 @@ Logs a Nav2 particle cloud as points or as arrows along each particle's heading.
 | `mode` | `points` | `points` or `arrows`. |
 | `radius` | `0.0015` | Point or arrow radius, in metres. |
 | `colour` | `[255, 255, 255, 255]` | Base RGBA. |
-| `colour_by_weight` | `true` | Fade lighter particles. |
+| `colour_by_weight` | `true` | Fade lighter particles, down to 15% of the colour's alpha. |
 | `w_min`, `w_max` | from each message | Weight range for scaling. |
 | `arrow_len` | `0.05` | Arrow length for the heaviest particle, in metres. |
 | `arrow_axis` | `x` | Body axis giving the heading. |
@@ -306,7 +308,7 @@ The chart's y axis fits the bars shown, so it rescales as the values change: Rer
 
 ## `states`
 
-Shows a field of any message type as discrete states over time, e.g. a robot's mode, a controller's status, or whether a light is on. Set the message type with `msg_type`. Each change of the field's value starts a new state, drawn as a coloured lane in Rerun's state timeline view.
+Shows a field of any message type as discrete states over time, e.g. a robot's mode, a controller's status, or whether a light is on. Set the message type with `msg_type`. Each change of the field's value starts a new state, drawn as a coloured lane in Rerun's state timeline view. Every message is logged, and Rerun joins repeats, so a message arriving late, e.g. from a replayed bag, lands in its place.
 
 The field must be a single number, bool or string, which is checked on start, as are the config's `states` values. A value matches when it is equal at the field's precision: `1`, `1.0` and a float32 1.0 are the same state, as are `0.3` and a float32 0.3. Quote string values such as `"on"`, `"off"`, `"yes"` and `"no"`, which YAML otherwise reads as booleans.
 
@@ -352,7 +354,7 @@ Each entry costs the bridge about 50 µs to receive and log, so a few hundred a 
 
 ## `diagnostics`
 
-Shows `diagnostic_msgs/DiagnosticArray` statuses, from `/diagnostics` or an aggregator's `/diagnostics_agg`. Each status is logged on `<entity_path>/<status name>`, with the name split on slashes, so aggregated names such as `/Robot/Arm/Motor` nest as a tree. Its level is shown as a state, OK, WARN, ERROR or STALE, in Rerun's state timeline view, and its message in the text log view, each logged only when it changes. A status's key/values are not shown: plot one with [`scalars`](#scalars) on the topic the node publishes it on, if it has one.
+Shows `diagnostic_msgs/DiagnosticArray` statuses, from `/diagnostics` or an aggregator's `/diagnostics_agg`. Each status is logged on `<entity_path>/<status name>`, with the name split on slashes, so aggregated names such as `/Robot/Arm/Motor` nest as a tree. Its level is shown as a state, OK, WARN, ERROR or STALE, in Rerun's state timeline view, and its message in the text log view, logged only when it changes, or when it arrives late, e.g. from a replayed bag. A status's key/values are not shown: plot one with [`scalars`](#scalars) on the topic the node publishes it on, if it has one.
 
 ```yaml
 - name: diagnostics

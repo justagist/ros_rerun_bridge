@@ -112,7 +112,7 @@ def test_line_style_is_logged_once_as_static(node, build, recording):
     assert style["SeriesLines:interpolation_mode"] == [rr.components.InterpolationMode.StepAfter.value]
 
 
-def test_point_style_draws_points(node, build, recording):
+def test_point_style_draws_points(build, recording):
     build(
         "scalars",
         entity_path="plots",

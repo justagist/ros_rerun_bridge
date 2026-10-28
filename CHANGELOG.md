@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [0.11.1] - 2026-10-28
+
+### Changed
+
+- Every module's config, its `params` and fields included, is checked before a viewer opens. A config error stops the bridge with its message, naming the module, instead of a traceback.
+- An error handling a message says where it was raised.
+
+### Fixed
+
+- compressedDepth images from ROS 2 Humble, whose format names no codec, are read as PNG.
+- An unstamped `msg_type` for `pose`, e.g. `Pose`, is an error when the bridge starts, instead of on every message.
+- A new robot model replaces the old one's geometry, instead of being drawn over it.
+- Organised point clouds with padded rows keep every point, and a cloud without colours no longer keeps an earlier cloud's.
+- An empty particle cloud clears the particles, and weight fading starts from the configured colour's alpha.
+- `states` and `diagnostics` show messages arriving late, e.g. from a replayed bag, in their place, which were left out as unchanged.
+- A compressed image with an empty `format` is read as JPEG, as `sensor_msgs/CompressedImage` defines.
+- A line strip marker keeps its per-point colours.
+- `params` given to a module that takes none are an error.
+
 ## [0.11.0] - 2026-10-28
 
 ### Added
@@ -28,7 +47,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-- `axis_length` and `frame_names` params for `tf` and `joint_states`, drawing each frame's axes and name, as rviz's TF display does. Each frame is drawn once, on its own entity under `frames`, so the viewer can show or hide each one.
+- `axis_length` and `frame_names` params for `tf` and `joint_states`, drawing each frame's axes and name, as rviz's TF display does. Each frame is drawn on its own entity under `frames`, so the viewer can show or hide each one.
 
 ### Changed
 
@@ -157,6 +176,8 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 
 First version: a config-driven bridge with `image`, `camera_info`, `laserscan`, `pointcloud2`, `particle_cloud`, `odometry`, `robot_description` and `joint_states` modules.
 
+[0.11.1]: https://github.com/justagist/ros_rerun_bridge/compare/v0.11.0...v0.11.1
+[0.11.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.7.0...v0.8.0

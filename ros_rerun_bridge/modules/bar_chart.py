@@ -45,7 +45,7 @@ class BarChartModule(TopicToComponentModule):
             context: Shared context for all modules.
         """
         if not config.msg_type:
-            raise ValueError(f"[{config.name}] the bar_chart module needs `msg_type` set")
+            raise ValueError("the bar_chart module needs `msg_type` set")
         super().__init__(node, config, context)
         field_type = check_field(self._resolve_msg_type(), self.params.field)
         if not is_array(field_type):

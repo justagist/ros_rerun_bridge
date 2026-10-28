@@ -3,6 +3,7 @@
 import math
 
 import numpy as np
+import pytest
 from geometry_msgs.msg import Pose
 from nav2_msgs.msg import Particle, ParticleCloud
 from sensor_msgs.msg import LaserScan, PointCloud2, PointField
@@ -62,7 +63,30 @@ def test_clouds_without_colour_get_no_colour_by_default(node, build, recording):
     node.publish(cloud([(1.0, 2.0, 3.0)], ["x", "y", "z"], XYZ))
     row = recording.rows("/points")[0]
     assert row["Points3D:positions"] == [[1.0, 2.0, 3.0]]
-    assert row.get("Points3D:colors") is None
+    # Empty, so Rerun's default colour is used
+    assert row["Points3D:colors"] == []
+
+
+def test_a_cloud_without_colour_does_not_keep_an_earlier_clouds_colours(node, build, recording):
+    build("pointcloud2", entity_path="points")
+    xyz_rgb = [("x", "<f4"), ("y", "<f4"), ("z", "<f4"), ("rgb", "<u4")]
+    node.publish(cloud([(1.0, 1.0, 1.0, 0x00FF0000)], ["x", "y", "z", "rgb"], xyz_rgb))
+    node.publish(cloud([(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)], ["x", "y", "z"], XYZ))
+    assert [row["Points3D:colors"] for row in recording.rows("/points")] == [[0xFF0000FF], []]
+
+
+def test_organised_clouds_with_row_padding_keep_every_point(node, build, recording):
+    build("pointcloud2", entity_path="points")
+    xyz_rgb = [("x", "<f4"), ("y", "<f4"), ("z", "<f4"), ("rgb", "<u4")]
+    msg = cloud([(1.0, 2.0, 3.0, 0x00FF0000), (4.0, 5.0, 6.0, 0x000000FF)], ["x", "y", "z", "rgb"], xyz_rgb)
+    # One point per row, each row followed by 8 bytes of padding, which must not be read as a point
+    rows = np.frombuffer(msg.data, np.uint8).reshape(2, 16)
+    msg.height, msg.width, msg.row_step = 2, 1, 24
+    msg.data = np.hstack([rows, np.full((2, 8), 0x7F, np.uint8)]).tobytes()
+    node.publish(msg)
+    row = recording.rows("/points")[0]
+    assert row["Points3D:positions"] == [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+    assert row["Points3D:colors"] == [0xFF0000FF, 0x0000FFFF]
 
 
 def test_big_endian_clouds_are_read_in_their_byte_order(node, build, recording):
@@ -80,7 +104,7 @@ def test_no_colour_mode_ignores_a_colour_field(node, build, recording):
     node.publish(cloud([(1.0, 1.0, 1.0, 0x00112233)], ["x", "y", "z", "rgb"], xyz_rgb))
     row = recording.rows("/points")[0]
     assert row["Points3D:positions"] == [[1.0, 1.0, 1.0]]
-    assert row.get("Points3D:colors") is None
+    assert row["Points3D:colors"] == []
 
 
 def scan() -> LaserScan:
@@ -161,3 +185,33 @@ def test_particle_weights_can_be_normalised_over_a_fixed_range(node, build, reco
     node.publish(particle_cloud())
     vectors = np.array(recording.rows("/particles")[0]["Arrows3D:vectors"])
     np.testing.assert_allclose(vectors[:, 0], [0.1 * (0.2 + 0.8 * 0.1), 0.1 * (0.2 + 0.8 * 0.5)], rtol=1e-5)
+
+
+def test_particles_keep_their_colour_without_colour_by_weight(node, build, recording):
+    build("particle_cloud", entity_path="particles", params={"colour_by_weight": False, "colour": [0, 200, 255, 128]})
+    node.publish(particle_cloud())
+    assert recording.rows("/particles")[0]["Points3D:colors"] == [0x00C8FF80, 0x00C8FF80]
+
+
+@pytest.mark.parametrize(("arrow_axis", "axis"), [("y", 1), ("z", 2)])
+def test_particle_arrows_point_along_the_chosen_body_axis(node, build, recording, arrow_axis, axis):
+    build("particle_cloud", entity_path="particles", params={"mode": "arrows", "arrow_axis": arrow_axis})
+    node.publish(particle_cloud())
+    vectors = np.array(recording.rows("/particles")[0]["Arrows3D:vectors"])
+    # The particles are unrotated: every arrow is along that world axis
+    assert np.count_nonzero(vectors, axis=0).tolist() == [2 if i == axis else 0 for i in range(3)]
+
+
+@pytest.mark.parametrize(("mode", "shape"), [("points", "Points3D:positions"), ("arrows", "Arrows3D:vectors")])
+def test_an_empty_particle_cloud_clears_the_particles(node, build, recording, mode, shape):
+    build("particle_cloud", entity_path="particles", params={"mode": mode})
+    node.publish(particle_cloud())
+    node.publish(ParticleCloud())
+    assert [len(row[shape]) for row in recording.rows("/particles")] == [2, 0]
+
+
+def test_particles_fade_from_the_colours_own_alpha(node, build, recording):
+    build("particle_cloud", entity_path="particles", params={"colour": [255, 255, 255, 100]})
+    node.publish(particle_cloud())
+    # 15% of the alpha for the lightest particle, all of it for the heaviest
+    assert recording.rows("/particles")[0]["Points3D:colors"] == [0xFFFFFF0F, 0xFFFFFF64]

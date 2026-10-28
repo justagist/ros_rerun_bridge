@@ -1,6 +1,6 @@
 # Configuration
 
-A config is a YAML file listing the topics to show and how. The bridge checks it on start: an unknown key or invalid value stops it before a viewer opens. Each module's `params` are checked when the module is created, after the viewer has opened.
+A config is a YAML file listing the topics to show and how. The bridge checks it on start, including each module's `params`: an unknown key or invalid value stops it before a viewer opens. A [module of your own](EXTENDING.md) has its `params` checked if it sets `PARAMS`.
 
 ```yaml
 global_frame: map          # optional: the TF frame the 3D view is rendered in (default: map)

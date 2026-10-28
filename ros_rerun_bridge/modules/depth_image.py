@@ -23,7 +23,8 @@ class DepthParams(StrictParamsModel):
     colormap: Literal["Turbo", "Viridis", "Inferno", "Magma", "Plasma", "Grayscale", "CyanToYellow"] | None = None
     """Colours of the depths in 2D and in the point cloud. Rerun's default, Turbo, if unset."""
     depth_range: tuple[float, float] | None = None
-    """Depths the colormap spans, in the image's units (e.g. millimetres for 16UC1). The image's own range if unset."""
+    """Depths the colormap spans, in the image's units (e.g. millimetres for 16UC1). Estimated by Rerun from the data if
+    unset, which may be wider than the image's own range."""
     point_fill_ratio: float | None = None
     """Size of each 3D point, relative to the gap between neighbouring points. Rerun's default if unset."""
 
