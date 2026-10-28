@@ -1,5 +1,7 @@
 """Behaviour every module gets from the base class: message time, frame placement and error handling."""
 
+import re
+
 from builtin_interfaces.msg import Time as TimeMsg
 from sensor_msgs.msg import Image, Range
 from std_msgs.msg import String
@@ -30,12 +32,15 @@ def test_data_is_placed_in_the_header_frame(node, build, recording):
     assert recording.rows("/range")[0]["CoordinateFrame:frame"] == ["front_sensor"]
 
 
-def test_handler_errors_are_logged_with_their_type_not_raised(node, build):
+def test_handler_errors_are_logged_with_their_type_and_place_not_raised(node, build):
     build("image", entity_path="image")
     node.publish(Image(height=1, width=1, encoding="nv21", step=1, data=b"\x00"))
-    assert node.log_messages[-2] == (
-        "error",
-        "[image] error handling a message: ValueError: unsupported image encoding 'nv21'",
+    level, message = node.log_messages[-2]
+    assert level == "error"
+    assert re.fullmatch(
+        r"\[image\] error handling a message: ValueError: unsupported image encoding 'nv21', "
+        r"in pixels_from_msg \(image\.py:\d+\)",
+        message,
     )
     assert node.log_messages[-1][0] == "debug" and "Traceback" in node.log_messages[-1][1]
 

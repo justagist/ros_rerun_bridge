@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import traceback
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -140,7 +141,13 @@ class TopicToComponentModule:
             self.handle(msg)
         except Exception as e:
             logger = self.node.get_logger()
-            logger.error(f"[{self.name}] error handling a message: {type(e).__name__}: {e}", throttle_duration_sec=5.0)
+            # Where it was raised, as the full traceback is only logged at debug level
+            frame = traceback.extract_tb(e.__traceback__)[-1]
+            where = f"{frame.name} ({os.path.basename(frame.filename)}:{frame.lineno})"
+            logger.error(
+                f"[{self.name}] error handling a message: {type(e).__name__}: {e}, in {where}",
+                throttle_duration_sec=5.0,
+            )
             logger.debug(traceback.format_exc())
 
     def _resolve_msg_type(self) -> type:
