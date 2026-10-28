@@ -79,6 +79,7 @@ def test_rvl_depth_is_passed_on_with_its_header_for_rerun_to_read():
         # Quantised inverse depth: Rerun would show wrong distances
         ("32FC1; compressedDepth png", HEADER + PNG, "only 16UC1 depth can be sent as PNG"),
         ("16UC1; compressedDepth png", PNG, "not a PNG after its header"),
+        ("8UC1; compressedDepth rvl", HEADER + PNG, "RVL depth must be 16UC1 or 32FC1"),
         ("16UC1; compressedDepth tiff", HEADER + PNG, "unsupported compressed depth format"),
         ("png", PNG, "unsupported compressed depth format"),
     ],

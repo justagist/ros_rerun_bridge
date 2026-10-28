@@ -32,9 +32,12 @@ def encoded_depth_from_msg(msg: CompressedImage) -> tuple[bytes, str]:
     if "compresseddepth" not in compression.lower() or codec not in ("png", "rvl"):
         raise ValueError(f"unsupported compressed depth format '{msg.format}'")
     data = bytes(msg.data)
+    encoding = encoding.strip()
     if codec == "rvl":
+        if encoding not in ("16UC1", "32FC1"):
+            raise ValueError(f"'{msg.format}' is not supported: RVL depth must be 16UC1 or 32FC1")
         return data, "application/rvl"
-    if encoding.strip() != "16UC1":
+    if encoding != "16UC1":
         raise ValueError(f"'{msg.format}' is not supported: only 16UC1 depth can be sent as PNG")
     png = data[_CONFIG_HEADER_BYTES:]
     if not png.startswith(_PNG_SIGNATURE):
