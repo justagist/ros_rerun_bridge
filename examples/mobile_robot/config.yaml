@@ -1,5 +1,7 @@
 # A robot from publisher.py driving in a room: the map, the robot's TF, its laser scan, and its speed plotted
 global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
 
 modules:
   # map -> base_link as the robot moves, and base_link -> base_scan

@@ -1,5 +1,7 @@
 # The robot arm from publisher.py, from its URDF and joint states. No TF needed: joint_states moves the model.
 global_frame: base_link
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
 
 modules:
   # The URDF, published once on a latched topic

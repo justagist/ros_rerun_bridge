@@ -1,5 +1,7 @@
 # A camera from publisher.py: its images are shown in 2D, and in 3D on the image plane in front of the camera
 global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
 
 modules:
   # Places the camera's optical frame in the map

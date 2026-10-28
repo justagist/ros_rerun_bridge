@@ -7,7 +7,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - Series style params for `scalars`: lines or points, names, colours, line width and interpolation (e.g. steps), and marker shape and size.
-- `examples/`: runnable examples, each a config and a publisher of made-up data, for a robot arm, a mobile robot, a camera, a point cloud, a range sensor, markers and plot styles.
+- `examples/`: runnable examples, each a config, a viewer layout and a publisher of made-up data, for a robot arm, a mobile robot, a camera, a point cloud, a range sensor, markers and plot styles.
 
 ### Changed
 

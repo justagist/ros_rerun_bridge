@@ -1,5 +1,7 @@
 # The scalars module's style params, on three plots of the values from publisher.py
 global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
 
 modules:
   # Default style: Rerun's lines, series named by entity path and index
