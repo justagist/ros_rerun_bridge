@@ -160,7 +160,7 @@ Draws a pose as its x (red), y (green) and z (blue) axes, in the header's frame.
 | Param | Default | |
 | --- | --- | --- |
 | `axis_length` | `0.3` | Length of the pose's axes, in metres. |
-| `n_sigma` | `2` | Standard deviations the covariance ellipsoid spans along each axis. `null` to leave it out. |
+| `n_sigma` | `2` | Standard deviations the covariance ellipsoid reaches either side of the pose, along each axis. `null` to leave it out. |
 | `covariance_colour` | `[255, 0, 255, 255]` | RGBA of the covariance ellipsoid. |
 
 ```yaml

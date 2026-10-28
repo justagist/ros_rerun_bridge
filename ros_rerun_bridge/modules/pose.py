@@ -21,8 +21,8 @@ class PoseParams(StrictParamsModel):
     axis_length: float = Field(default=0.3, gt=0, allow_inf_nan=False)
     """Length of the pose's x (red), y (green) and z (blue) axes, in metres."""
     n_sigma: float | None = Field(default=2.0, gt=0, allow_inf_nan=False)
-    """Draw the position covariance as an ellipsoid this many standard deviations across each axis. None to not draw
-    it. Only for messages with a covariance."""
+    """Draw the position covariance as an ellipsoid reaching this many standard deviations either side of the pose,
+    along each axis. None to not draw it. Only for messages with a covariance."""
     covariance_colour: Rgba = (255, 0, 255, 255)
     """RGBA colour of the covariance ellipsoid, as uint8."""
 
@@ -38,7 +38,7 @@ def covariance_ellipsoid(covariance: Any, n_sigma: float) -> tuple[list[float], 
 
     Args:
         covariance: The pose's row-major 6x6 covariance, of x, y, z and the rotations about them.
-        n_sigma: How many standard deviations the ellipsoid spans along each of its axes.
+        n_sigma: How many standard deviations the ellipsoid reaches either side of its centre, along each axis.
     """
     position = np.reshape(np.asarray(covariance, dtype=np.float64), (6, 6))[:3, :3]
     variances, axes = np.linalg.eigh(position)

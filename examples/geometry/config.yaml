@@ -15,7 +15,7 @@ modules:
       axis_length: 0.3
       frame_names: true
 
-  # The pose as axes, and its position covariance as an ellipsoid two standard deviations across
+  # The pose as axes, and its position covariance as an ellipsoid two standard deviations either side
   - name: robot_pose
     module: pose
     topic: /robot_pose
