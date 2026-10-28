@@ -71,13 +71,17 @@ A config lists the topics to show. Each topic is handled by a module, which deci
 ```yaml
 global_frame: map            # the TF frame the 3D view is rendered in
 modules:
-  - { name: tf, module: tf, topic: /tf, entity_path: tf }
+  - name: tf
+    module: tf
+    topic: /tf
+    entity_path: tf
   - name: scan
     module: laserscan
     topic: /scan
     entity_path: scan
     qos: { reliability: best_effort }   # most sensor drivers publish best effort
-    params: { mode: points }
+    params:
+      mode: points
 ```
 
 [CONFIGURATION.md](docs/CONFIGURATION.md) describes every field, and covers frames, QoS and saving a viewer layout. The [examples](examples) are a good starting point: each has a config, an optional viewer layout, and a publisher of demo data that only stands in for a real robot.

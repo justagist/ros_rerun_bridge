@@ -27,13 +27,17 @@ Logs each transform as a link between named frames (`header.frame_id` to `child_
 Use two `tf` modules, one for `/tf` and one for `/tf_static`, each with its own `entity_path`: Rerun only lets the transform between two frames change over time on one entity, though a static transform on another entity can act as its default. Use `entity_path: tf_static` for `/tf_static`, where the `robot_description` module also logs the robot's default joint positions.
 
 ```yaml
-- { name: tf, module: tf, topic: /tf, entity_path: tf }
+- name: tf
+  module: tf
+  topic: /tf
+  entity_path: tf
 - name: tf_static
   module: tf
   topic: /tf_static
   entity_path: tf_static
   qos: { depth: 10, durability: transient_local }
-  params: { static: true }
+  params:
+    static: true
 ```
 
 | Param | Default | |
