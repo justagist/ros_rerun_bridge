@@ -232,7 +232,7 @@ The chart's y axis fits the bars shown, so it rescales as the values change: Rer
 
 Shows a field of any message type as discrete states over time, e.g. a robot's mode, a controller's status, or whether a light is on. Set the message type with `msg_type`. Each change of the field's value starts a new state, drawn as a coloured lane in Rerun's state timeline view.
 
-The field must be a single number, bool or string, which is checked on start. Numbers are compared as written in the config: `1`, `1.0` and a float32 1.0 are the same state, and booleans are `true` or `false`.
+The field must be a single number, bool or string, which is checked on start, as are the config's `states` values. A value matches when it is equal at the field's precision: `1`, `1.0` and a float32 1.0 are the same state, as are `0.3` and a float32 0.3. Quote string values such as `"on"`, `"off"`, `"yes"` and `"no"`, which YAML otherwise reads as booleans.
 
 | Param | Default | |
 | --- | --- | --- |

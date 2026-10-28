@@ -4,6 +4,7 @@ from operator import attrgetter
 from typing import Any
 
 from pydantic import model_validator
+import numpy as np
 from rclpy.node import Node
 from rclpy.time import Time
 
@@ -13,7 +14,7 @@ from ..base import ModuleConfig, TopicToComponentModule
 from ..context import BridgeContext
 from ..registry import REGISTRY
 from ..types import Rgba, StrictParamsModel
-from ..utils.fields import field_type, is_single_value
+from ..utils.fields import field_type, is_single_value, is_string
 
 
 class StateStyle(StrictParamsModel):
@@ -44,13 +45,38 @@ class StatesParams(StrictParamsModel):
         return self
 
 
-def state_text(value: bool | int | float | str) -> str:
-    """A field or config value as a state: `1`, `1.0` and a float32 1.0 all give "1", and booleans are lowercase."""
-    if isinstance(value, bool):
+def state_text(value: bool | int | float | str, ros_type: str) -> str:
+    """A field's value, or a config value for that field, as a state.
+
+    Values that are equal in the field's type give the same text: `1`, `1.0` and a float32 1.0 are all "1", and a
+    float32 0.3 is "0.3". Booleans are "true" or "false".
+
+    Args:
+        value: The value, from a message or from the config.
+        ros_type: The field's ROS type, e.g. `float` or `string`.
+
+    Raises:
+        ValueError: If the field could never hold the value.
+    """
+    if ros_type == "boolean":
+        if not isinstance(value, bool):
+            raise ValueError(f"state value {value!r} is not a bool")
         return str(value).lower()
-    if isinstance(value, float):
-        return f"{value:g}"
-    return str(value)
+    if is_string(ros_type):
+        if isinstance(value, bool):
+            raise ValueError(
+                f"state value {value!r} is not a string: quote it, as YAML reads on, off, yes and no as bools"
+            )
+        return str(value)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"state value {value!r} is not a number")
+    if ros_type in ("float", "double"):
+        number = np.float32(value) if ros_type == "float" else np.float64(value)
+        # The shortest digits that give back the same number at the field's precision, never in exponent notation
+        return np.format_float_positional(number, unique=True, trim="-")
+    if not float(value).is_integer():
+        raise ValueError(f"state value {value!r} is not an integer")
+    return str(int(value))
 
 
 @REGISTRY.register("states")
@@ -75,19 +101,20 @@ class StatesModule(TopicToComponentModule):
         if not config.msg_type:
             raise ValueError(f"[{config.name}] the states module needs `msg_type` set")
         super().__init__(node, config, context)
-        ros_type = field_type(self._resolve_msg_type(), self.params.field)
-        if not is_single_value(ros_type):
-            raise ValueError(f"field '{self.params.field}' is {ros_type}, not a number, bool or string")
+        self._ros_type = field_type(self._resolve_msg_type(), self.params.field)
+        if not is_single_value(self._ros_type):
+            raise ValueError(f"field '{self.params.field}' is {self._ros_type}, not a number, bool or string")
         self._get = attrgetter(self.params.field)
         self._state: str | None = None
         """The state last logged, as each change marks a new one."""
         if self.params.states:
             states = self.params.states
+            values = [state_text(s.value, self._ros_type) for s in states]
             rr.log(
                 self.entity_path,
                 rr.StateConfiguration(
-                    values=[state_text(s.value) for s in states],
-                    labels=[s.label if s.label is not None else state_text(s.value) for s in states],
+                    values=values,
+                    labels=[s.label if s.label is not None else value for s, value in zip(states, values)],
                     colors=[s.colour for s in states] if states[0].colour is not None else None,
                 ),
                 static=True,
@@ -98,7 +125,7 @@ class StatesModule(TopicToComponentModule):
         return Time.from_msg(header.stamp) if header is not None else None
 
     def handle(self, msg: Any) -> None:
-        state = state_text(self._get(msg))
+        state = state_text(self._get(msg), self._ros_type)
         if state != self._state:
             rr.log(self.entity_path, rr.StateChange(state=state))
             self._state = state

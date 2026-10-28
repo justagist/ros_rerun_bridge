@@ -20,8 +20,8 @@ _NUMERIC = {
 }
 # Element type of an unbounded or bounded sequence, e.g. "sequence<double, 3>", or of a fixed array, e.g. "double[9]"
 _ARRAY = re.compile(r"sequence<(\w+)(?:, \d+)?>|(\w+)\[\d+\]")
-# A string or wide string, unbounded or bounded, e.g. "string<=10"
-_STRING = re.compile(r"w?string(?:<=\d+)?")
+# A string or wide string, unbounded or bounded, e.g. "string<10>"
+_STRING = re.compile(r"w?string(?:<=?\d+>?)?")
 
 
 def field_type(msg_type: type, field: str) -> str:
@@ -67,6 +67,11 @@ def check_field(msg_type: type, field: str) -> str:
 def is_single_value(field_type: str) -> bool:
     """Whether a ROS field type is one number, bool or string: not an array or a message."""
     return field_type in _NUMERIC or _STRING.fullmatch(field_type) is not None
+
+
+def is_string(field_type: str) -> bool:
+    """Whether a ROS field type is a string or wide string."""
+    return _STRING.fullmatch(field_type) is not None
 
 
 def is_array(field_type: str) -> bool:

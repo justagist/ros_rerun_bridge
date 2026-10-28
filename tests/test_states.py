@@ -6,6 +6,7 @@ from sensor_msgs.msg import Range
 from std_msgs.msg import Bool, Float32, Int32, String
 
 from ros_rerun_bridge.modules.states import state_text
+from ros_rerun_bridge.utils.fields import is_single_value
 
 
 def build_states(build, msg_type: str, field: str = "data", **params):
@@ -24,10 +25,48 @@ def test_a_state_is_logged_only_when_the_value_changes(node, build, recording):
 
 
 @pytest.mark.parametrize(
-    ("value", "text"), [(1, "1"), (1.0, "1"), (0.25, "0.25"), (True, "true"), (False, "false"), ("idle", "idle")]
+    ("value", "ros_type", "text"),
+    [
+        (1, "float", "1"),
+        (1.0, "float", "1"),
+        # A float32 field's 0.3 is 0.30000001192092896 in Python
+        (0.30000001192092896, "float", "0.3"),
+        (0.3, "float", "0.3"),
+        # Distinct values stay distinct, and large ones are not in exponent notation
+        (1.0000001, "float", "1.0000001"),
+        (1.0000002, "float", "1.0000002"),
+        (1000000.0, "double", "1000000"),
+        (1000000, "double", "1000000"),
+        (2.0, "int32", "2"),
+        (True, "boolean", "true"),
+        ("idle", "string", "idle"),
+        (1, "string", "1"),
+    ],
 )
-def test_values_and_config_values_give_the_same_state_text(value, text):
-    assert state_text(value) == text
+def test_values_equal_in_the_field_type_give_the_same_state_text(value, ros_type, text):
+    assert state_text(value, ros_type) == text
+
+
+@pytest.mark.parametrize(
+    ("value", "ros_type", "error"),
+    [
+        # YAML reads an unquoted on as True
+        (True, "string", "quote it"),
+        ("on", "boolean", "is not a bool"),
+        ("fast", "double", "is not a number"),
+        (True, "int32", "is not a number"),
+        (1.5, "int32", "is not an integer"),
+    ],
+)
+def test_config_values_the_field_could_never_hold_are_an_error(value, ros_type, error):
+    with pytest.raises(ValueError, match=error):
+        state_text(value, ros_type)
+
+
+@pytest.mark.parametrize("ros_type", ["string", "string<22>", "wstring<5>"])
+def test_bounded_and_wide_string_fields_are_single_values(ros_type):
+    # As ROS spells them, e.g. test_msgs/Strings.bounded_string_value is string<22>
+    assert is_single_value(ros_type)
 
 
 def test_float32_fields_match_config_values(node, build, recording):
@@ -82,6 +121,7 @@ def test_states_without_a_label_show_their_value(node, build, recording):
             {"field": "data", "states": [{"value": 0, "colour": [0, 0, 0, 255]}, {"value": 1}]},
             "a colour for every state, or for none",
         ),
+        ("std_msgs.msg.String", {"field": "data", "states": [{"value": True}]}, "quote it"),
     ],
 )
 def test_invalid_config_is_an_error(build, msg_type, params, error):
