@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [0.11.0] - 2026-10-28
+
+### Added
+
+- `rosout` module, showing ROS log entries in Rerun's text log view, per logger.
+- `diagnostics` module, showing each diagnostic status's level as states over time, and its messages as text logs.
+- A logs and diagnostics example.
+- The README covers recording, and viewing ROS bags through the bridge or in Rerun directly.
+
 ## [0.10.0] - 2026-10-28
 
 ### Added

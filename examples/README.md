@@ -65,6 +65,12 @@ A robot's mode, cycling through idle, moving and charging, and a warning light t
 
 ![states](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/states.gif)
 
+## [logs_and_diagnostics](logs_and_diagnostics)
+
+An arm and a planner node logging through a pick-and-place cycle, and the arm's diagnostics: its motor heating up to a warning and an error, its gripper going stale, and its battery running low. Modules: `rosout`, `diagnostics`.
+
+![logs_and_diagnostics](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/logs_and_diagnostics.gif)
+
 ## [series_styles](series_styles)
 
 The same values as lines and as named points, and a mode drawn in red steps. Modules: `scalars`.

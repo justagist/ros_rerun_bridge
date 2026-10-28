@@ -64,6 +64,17 @@ ros-rerun-bridge --config <config.yaml> [options] [-- <ROS arguments>]
 
 Arguments after `--` are passed to ROS, e.g. `-- --ros-args -p use_sim_time:=true`.
 
+### Recordings and bags
+
+Recording, with `--save`, and opening recordings are Rerun's features: see [Rerun's docs](https://rerun.io/docs/getting-started/data-in/open-any-file). To view a ROS bag as a live robot would be shown, play it into the bridge on the bag's clock:
+
+```bash
+ros-rerun-bridge --config <config.yaml> -- --ros-args -p use_sim_time:=true
+ros2 bag play <bag> --clock
+```
+
+Rerun can also open an `.mcap` bag directly, without the bridge, converting [common ROS 2 messages](https://rerun.io/docs/reference/mcap/message-formats) itself. The bridge covers more, such as markers, laser scans, the robot model and diagnostics, and keeps a config's layout.
+
 ## Configuration
 
 A config lists the topics to show. Each topic is handled by a module, which decides how it is drawn:
@@ -88,7 +99,7 @@ modules:
 
 ## Modules
 
-Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `depth_image`, `compressed_depth_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `pose`, `pose_array`, `wrench`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, `bar_chart` draws an array field as bars, and `states` shows a field as states over time. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
+Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `depth_image`, `compressed_depth_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `pose`, `pose_array`, `wrench`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, `bar_chart` draws an array field as bars, and `states` shows a field as states over time. `rosout` shows ROS log entries, and `diagnostics` each component's diagnostic status over time. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
 
 ## Development
 

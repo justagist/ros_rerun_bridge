@@ -26,6 +26,8 @@ For messages with a header, spatial modules draw the data in the header's TF fra
 | [`scalars`](#scalars) | Any, set with `msg_type` | Numeric fields as plots |
 | [`bar_chart`](#bar_chart) | Any, set with `msg_type` | An array field as bars |
 | [`states`](#states) | Any, set with `msg_type` | A field as discrete states over time |
+| [`rosout`](#rosout) | `rcl_interfaces/Log` | ROS log entries |
+| [`diagnostics`](#diagnostics) | `diagnostic_msgs/DiagnosticArray` | Diagnostic statuses over time |
 
 ## `tf`
 
@@ -324,4 +326,37 @@ The field must be a single number, bool or string, which is checked on start, as
     states:
       - { value: idle, label: Idle, colour: [120, 120, 120, 255] }
       - { value: moving, label: Moving, colour: [40, 160, 240, 255] }
+```
+
+## `rosout`
+
+Shows ROS log entries, from `/rosout`, in Rerun's text log view, where they can be filtered by level and searched. Each logger's entries are logged on `<entity_path>/<logger name>`, with the name's dots as slashes, so each node's logs can be shown or hidden. ROS's FATAL is shown as Rerun's CRITICAL.
+
+Nodes publish `/rosout` with transient local durability, keeping their last 1000 entries for 10 s: subscribing the same way also gets the entries each node logged in the 10 s before the bridge started.
+
+| Param | Default | |
+| --- | --- | --- |
+| `min_level` | `debug` | Least severe level shown: `debug`, `info`, `warn`, `error` or `fatal`. |
+
+```yaml
+- name: logs
+  module: rosout
+  topic: /rosout
+  entity_path: logs
+  qos: { depth: 1000, durability: transient_local }
+  params:
+    min_level: info
+```
+
+Each entry costs the bridge about 50 µs to receive and log, so a few hundred a second is light. `min_level` filters in the bridge, after every entry has reached it: to cut a busy node's debug output at the source, lower its log level instead, e.g. with `--ros-args --log-level info`.
+
+## `diagnostics`
+
+Shows `diagnostic_msgs/DiagnosticArray` statuses, from `/diagnostics` or an aggregator's `/diagnostics_agg`. Each status is logged on `<entity_path>/<status name>`, with the name split on slashes, so aggregated names such as `/Robot/Arm/Motor` nest as a tree. Its level is shown as a state, OK, WARN, ERROR or STALE, in Rerun's state timeline view, and its message in the text log view, each logged only when it changes. A status's key/values are not shown: plot one with [`scalars`](#scalars) on the topic the node publishes it on, if it has one.
+
+```yaml
+- name: diagnostics
+  module: diagnostics
+  topic: /diagnostics
+  entity_path: diagnostics
 ```

@@ -1,0 +1,19 @@
+# Log entries from publisher.py's nodes, and its robot's diagnostics, as text logs and states over time
+global_frame: map
+# Viewer layout, written by ../layouts.py
+blueprint: layout.rbl
+
+modules:
+  # Transient local, as nodes publish /rosout, to also get what they logged just before the bridge started
+  - name: logs
+    module: rosout
+    topic: /rosout
+    entity_path: logs
+    qos: { depth: 1000, durability: transient_local }
+    params:
+      min_level: info
+
+  - name: diagnostics
+    module: diagnostics
+    topic: /diagnostics
+    entity_path: diagnostics
