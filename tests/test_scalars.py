@@ -5,7 +5,7 @@ import math
 import pytest
 from builtin_interfaces.msg import Time as TimeMsg
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import JointState, Range
+from sensor_msgs.msg import BatteryState, JointState, Range
 from std_msgs.msg import Float64
 
 import rerun as rr
@@ -145,3 +145,59 @@ def test_without_style_params_rerun_default_lines_are_kept(node, build, recordin
 def test_invalid_style_is_an_error(build, params, error):
     with pytest.raises(ValueError, match=error):
         build("scalars", msg_type="sensor_msgs.msg.Range", params={"fields": ["range"], **params})
+
+
+def test_variance_is_logged_with_each_value_as_a_measurement(node, build, recording):
+    build(
+        "scalars",
+        entity_path="plots",
+        msg_type="sensor_msgs.msg.Range",
+        params={"fields": ["range"], "variance": "variance"},
+    )
+    node.publish(Range(range=1.5, variance=0.04))
+    [row] = [row for row in recording.rows("/plots/range") if not row["static"]]
+    assert row["Measurements:values"] == [1.5]
+    assert row["Measurements:variances"] == pytest.approx([0.04])
+    assert "Scalars:scalars" not in row
+
+
+def test_one_variance_applies_to_every_element_of_an_array(node, build, recording):
+    build(
+        "scalars",
+        entity_path="plots",
+        msg_type="sensor_msgs.msg.BatteryState",
+        params={"fields": ["cell_voltage"], "variance": "voltage"},
+    )
+    node.publish(BatteryState(cell_voltage=[3.7, 3.8], voltage=0.01))
+    [row] = [row for row in recording.rows("/plots/cell_voltage") if not row["static"]]
+    assert row["Measurements:variances"] == pytest.approx([0.01, 0.01])
+
+
+def test_measurement_unit_and_style_are_logged_once_as_static(node, build, recording):
+    build(
+        "scalars",
+        entity_path="plots",
+        msg_type="sensor_msgs.msg.Range",
+        params={"fields": ["range"], "unit": "m", "names": ["distance"], "colours": [[0, 200, 255, 255]]},
+    )
+    node.publish(Range(range=1.5))
+    [style] = static_rows(recording, "/plots/range")
+    assert style["Measurements:units"] == ["m"]
+    assert style["Measurements:names"] == ["distance"]
+    assert style["Measurements:colors"] == [0x00C8FFFF]
+    # A unit alone also makes the values measurements
+    [row] = [row for row in recording.rows("/plots/range") if not row["static"]]
+    assert row["Measurements:values"] == [1.5]
+
+
+@pytest.mark.parametrize(
+    ("params", "error"),
+    [
+        ({"fields": ["range"], "variance": "variance", "style": "points"}, "cannot be used with style 'points'"),
+        ({"fields": ["range", "max_range"], "variance": "variance"}, "variance needs exactly one field"),
+        ({"fields": ["range"], "variance": "header"}, "is std_msgs/Header, not a number"),
+    ],
+)
+def test_invalid_measurement_params_are_an_error(build, params, error):
+    with pytest.raises(ValueError, match=error):
+        build("scalars", msg_type="sensor_msgs.msg.Range", params=params)

@@ -157,6 +157,8 @@ Plots numeric fields of any message type as time series. Set the message type wi
 | `interpolation` | `linear` | `linear`, or `step_after`, `step_before` or `step_mid` for values that jump, such as modes or flags. Lines only. |
 | `marker` | `circle` | `circle`, `diamond`, `square`, `cross`, `plus`, `up`, `down`, `left`, `right` or `asterisk`. Points only. |
 | `marker_size` | Rerun's default | Marker size, in UI points. Points only. |
+| `variance` | none | Dotted path to the field's variance, e.g. `variance`, drawn as a band one standard deviation either side. Needs exactly one field. |
+| `unit` | none | Unit of the values, e.g. `m`, shown in the legend. |
 
 ```yaml
 - name: velocity_plot
@@ -166,6 +168,20 @@ Plots numeric fields of any message type as time series. Set the message type wi
   entity_path: plots/odom
   params:
     fields: [twist.twist.linear.x, twist.twist.angular.z]
+```
+
+With `variance` or `unit`, values are logged as Rerun measurements, drawn as lines. Many sensor messages carry a `variance`, e.g. `Range`, `Temperature` and `FluidPressure`. Rerun marks measurements as unstable in 0.40, so their recorded format may change in a later Rerun version.
+
+```yaml
+- name: temperature_plot
+  module: scalars
+  topic: /temperature
+  msg_type: sensor_msgs.msg.Temperature
+  entity_path: plots/temperature
+  params:
+    fields: [temperature]
+    variance: variance
+    unit: °C
 ```
 
 The style params apply to every field of the module. To style fields differently, plot them with separate modules. The same settings can also be changed in the viewer, and kept with a [saved layout](CONFIGURATION.md#viewer-layout).
