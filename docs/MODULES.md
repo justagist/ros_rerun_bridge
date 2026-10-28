@@ -19,6 +19,7 @@ For messages with a header, spatial modules draw the data in the header's TF fra
 | [`occupancy_grid`](#occupancy_grid) | `nav_msgs/OccupancyGrid` | Maps and costmaps |
 | [`particle_cloud`](#particle_cloud) | `nav2_msgs/ParticleCloud` | Localisation particles |
 | [`scalars`](#scalars) | Any, set with `msg_type` | Numeric fields as plots |
+| [`bar_chart`](#bar_chart) | Any, set with `msg_type` | An array field as bars |
 
 ## `tf`
 
@@ -201,4 +202,27 @@ The style params apply to every field of the module. To style fields differently
     names: [shoulder, elbow, wrist]
     style: points
     marker: diamond
+```
+
+## `bar_chart`
+
+Draws an array field of any message type as a bar chart, one bar per element, e.g. joint efforts or battery cell voltages. Set the message type with `msg_type`. The chart shows the array at the viewer's time cursor, so scrubbing the timeline replays it.
+
+The field is checked against the message type on start: one that does not exist, or is not an array of numbers, is an error.
+
+The chart's y axis fits the bars shown, so it rescales as the values change: Rerun 0.40 has no setting to fix it.
+
+| Param | Default | |
+| --- | --- | --- |
+| `field` | required | Dotted path to the array to draw, e.g. `effort`. |
+| `colour` | Rerun's default | RGBA of the bars. |
+
+```yaml
+- name: joint_efforts
+  module: bar_chart
+  topic: /joint_states
+  msg_type: sensor_msgs.msg.JointState
+  entity_path: bars/efforts
+  params:
+    field: effort
 ```
