@@ -28,6 +28,18 @@ def test_only_imports_the_built_in_modules_a_config_uses():
     assert result.stdout.strip() == "['ros_rerun_bridge.modules.tf']"
 
 
+def test_joint_states_does_not_import_the_tf_module():
+    # It shares the frame axes code with tf, which must not pull in tf2_msgs or register tf
+    code = (
+        "import sys\n"
+        "import ros_rerun_bridge.modules.joint_states\n"
+        "print('ros_rerun_bridge.modules.tf' in sys.modules, 'tf2_msgs.msg' in sys.modules)\n"
+    )
+    root = os.path.dirname(os.path.dirname(__file__))
+    result = subprocess.run([sys.executable, "-c", code], cwd=root, capture_output=True, text=True, check=True)
+    assert result.stdout.strip() == "False False"
+
+
 def test_resolves_a_module_by_python_path(build):
     assert isinstance(build("ros_rerun_bridge.modules.tf:TFModule"), TFModule)
 

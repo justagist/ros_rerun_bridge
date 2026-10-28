@@ -23,6 +23,12 @@ URDF = f"""<robot name="tester">
   </link>
   <link name="finger"/>
   <link name="tip"/>
+  <!-- A fixed link, which joint states never carry -->
+  <link name="camera"/>
+  <joint name="camera_joint" type="fixed">
+    <parent link="arm"/><child link="camera"/>
+    <origin xyz="0 0 0.2"/>
+  </joint>
   <!-- Mimics a mimic joint, and comes first so a single pass would miss it -->
   <joint name="tip_joint" type="revolute">
     <parent link="finger"/><child link="tip"/>
@@ -68,7 +74,7 @@ def test_collision_geometry_is_not_logged(robot, recording):
 def test_joints_at_zero_are_logged_as_static_defaults(robot, recording):
     rows = recording.rows("/tf_static")
     assert all(row["static"] for row in rows)
-    assert sorted(row["Transform3D:child_frame"][0] for row in rows) == ["arm", "finger", "tip"]
+    assert sorted(row["Transform3D:child_frame"][0] for row in rows) == ["arm", "camera", "finger", "tip"]
 
 
 def test_collada_meshes_are_scaled_by_their_unit_and_urdf_scale(robot, recording):
@@ -147,3 +153,14 @@ def test_joint_states_wait_for_the_robot_model(node, build, recording):
     node.publish(JointState(name=["shoulder"], position=[0.5]))
     assert "/tf" not in recording.entities()
     assert node.log_messages[-1][0] == "warn"
+
+
+def test_joint_states_draw_each_link_frame_on_its_own_entity(robot, node, build, recording):
+    build("joint_states", entity_path="tf", params={"axis_length": 0.1, "frame_names": True})
+    node.publish(JointState(name=["shoulder"], position=[0.5]))
+    # Every link, including the fixed camera link and links not in the message
+    frames = sorted(entity for entity in recording.entities() if entity.startswith("/frames/"))
+    assert frames == ["/frames/arm", "/frames/base", "/frames/camera", "/frames/finger", "/frames/tip"]
+    axes = recording.rows("/frames/arm")[0]
+    assert axes["TransformAxes3D:axis_length"] == pytest.approx([0.1])
+    assert axes["TransformAxes3D:show_frame"] == [True]

@@ -15,6 +15,8 @@ modules:
     qos: { depth: 10, durability: transient_local }
     params:
       static: true
+      # The world frame's axes. The robot's link frames are drawn by the joint_states module.
+      axis_length: 0.1
 
   # URDF logged once (latching /robot_description)
   - name: robot_description
@@ -29,3 +31,6 @@ modules:
     module: joint_states
     topic: /joint_states
     entity_path: tf
+    params:
+      # Each link's frame as axes. Add `frame_names: true` to label them with their names.
+      axis_length: 0.1

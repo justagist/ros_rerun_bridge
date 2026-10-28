@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+from rclpy.node import Node
 from rclpy.time import Time
 from tf2_msgs.msg import TFMessage
 
 import rerun as rr
 
-from ..base import TopicToComponentModule
+from ..base import ModuleConfig, TopicToComponentModule
+from ..context import BridgeContext
 from ..registry import REGISTRY
-from ..types import StrictParamsModel
+from ..utils.frame_axes import FrameAxes, FrameAxesParams
 from ..utils.utils import set_rr_time_from_ros, stamp_or_now
 
 
-class TFParams(StrictParamsModel):
+class TFParams(FrameAxesParams):
     """Parameters for the TFModule."""
 
     static: bool = False
@@ -31,6 +33,17 @@ class TFModule(TopicToComponentModule):
 
     PARAMS = TFParams
     params: TFParams  # type hint for self.params
+
+    def __init__(self, node: Node, config: ModuleConfig, context: BridgeContext) -> None:
+        """Subscribe, and set up drawing the frames' axes.
+
+        Args:
+            node: The ROS node to use for subscriptions & logging.
+            config: The module configuration.
+            context: Shared context for all modules.
+        """
+        super().__init__(node, config, context)
+        self._frame_axes = FrameAxes(self.params)
 
     @classmethod
     def ros_msg_type(cls):
@@ -53,3 +66,4 @@ class TFModule(TopicToComponentModule):
                 ),
                 static=self.params.static,
             )
+            self._frame_axes.add(tf.header.frame_id, tf.child_frame_id)
