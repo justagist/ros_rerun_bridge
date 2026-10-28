@@ -1,4 +1,5 @@
-# A range sensor from publisher.py, drawn as a cone in 3D and plotted over time. Two modules subscribe to the same topic.
+# A range sensor from publisher.py, drawn as a cone in 3D and plotted over time with its uncertainty. Two modules
+# subscribe to the same topic.
 global_frame: map
 # Viewer layout and camera angle, written by ../layouts.py
 blueprint: layout.rbl
@@ -20,11 +21,14 @@ modules:
     params:
       colour: [0, 200, 255, 255]
 
-  # Readings with no detection (+inf) leave a gap in the plot
+  # The reading with a band one standard deviation either side, from its variance. Readings with no detection (+inf)
+  # leave a gap.
   - name: range_plot
     module: scalars
     topic: /range
     msg_type: sensor_msgs.msg.Range
     entity_path: plots/range
     params:
-      fields: [range, max_range]
+      fields: [range]
+      variance: variance
+      unit: m

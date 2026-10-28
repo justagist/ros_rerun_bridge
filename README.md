@@ -42,7 +42,7 @@ python3 examples/robot_arm/publisher.py
 
 This opens the Rerun viewer, showing the arm moving and its joint positions plotted. The publisher only provides demo data: with a real robot, the bridge needs just a config listing its topics. [examples](examples) has more, each runnable the same way.
 
-![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif?v=2)
+![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif?v=3)
 
 See [INSTALLATION.md](docs/INSTALLATION.md) to make the `ros-rerun-bridge` command available everywhere, for other ways to install, and for why the bridge needs its own environment.
 
@@ -71,13 +71,17 @@ A config lists the topics to show. Each topic is handled by a module, which deci
 ```yaml
 global_frame: map            # the TF frame the 3D view is rendered in
 modules:
-  - { name: tf, module: tf, topic: /tf, entity_path: tf }
+  - name: tf
+    module: tf
+    topic: /tf
+    entity_path: tf
   - name: scan
     module: laserscan
     topic: /scan
     entity_path: scan
     qos: { reliability: best_effort }   # most sensor drivers publish best effort
-    params: { mode: points }
+    params:
+      mode: points
 ```
 
 [CONFIGURATION.md](docs/CONFIGURATION.md) describes every field, and covers frames, QoS and saving a viewer layout. The [examples](examples) are a good starting point: each has a config, an optional viewer layout, and a publisher of demo data that only stands in for a real robot.

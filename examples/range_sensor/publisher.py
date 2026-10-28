@@ -1,6 +1,6 @@
 """Publish a range sensor 0.5 m above the map, tilted down, reading a distance that rises and falls at 10 Hz.
 
-For 1 s in every 5 it detects nothing, and reads +inf.
+For 1 s in every 5 it detects nothing, and reads +inf. Its variance grows with the distance, as with real sensors.
 """
 
 import math
@@ -35,6 +35,8 @@ class RangePublisher(Node):
         msg.header.frame_id = "range_sensor"
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.range = math.inf if self.t % 5 > 4 else 1.0 + 0.6 * math.sin(self.t)
+        # A standard deviation of 5 % of the distance
+        msg.variance = (0.05 * msg.range) ** 2 if math.isfinite(msg.range) else 0.0
         self.range.publish(msg)
 
 

@@ -21,7 +21,7 @@ The `layout.rbl` files are written by [layouts.py](layouts.py): to change a layo
 
 A small arm from its [URDF](robot_arm/robot.urdf), swinging and opening its gripper. The right finger follows the left one through a mimic joint. Its joint positions are plotted. Modules: `robot_description`, `joint_states`, `scalars`.
 
-![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif?v=2)
+![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif?v=3)
 
 ## [mobile_robot](mobile_robot)
 
@@ -43,9 +43,9 @@ A rotating rainbow helix, coloured from the cloud's `rgb` field. Modules: `point
 
 ## [range_sensor](range_sensor)
 
-A tilted range sensor's cone, and its readings plotted. The cone disappears, and the plot has a gap, while it detects nothing. Modules: `tf`, `range`, `scalars`.
+A tilted range sensor's cone, and its readings plotted with a band showing their uncertainty. The cone disappears, and the plot has a gap, while it detects nothing. Modules: `tf`, `range`, `scalars`.
 
-![range_sensor](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/range_sensor.gif)
+![range_sensor](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/range_sensor.gif?v=2)
 
 ## [markers](markers)
 
