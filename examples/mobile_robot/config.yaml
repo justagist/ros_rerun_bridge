@@ -4,11 +4,14 @@ global_frame: map
 blueprint: layout.rbl
 
 modules:
-  # map -> base_link as the robot moves, and base_link -> base_scan
+  # map -> base_link as the robot moves, and base_link -> base_scan, drawn as named axes
   - name: tf
     module: tf
     topic: /tf
     entity_path: tf
+    params:
+      axis_length: 0.5
+      frame_names: true
 
   # The map is latched: published once, and received by a transient_local subscription whenever the bridge starts
   - name: map

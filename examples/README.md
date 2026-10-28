@@ -19,13 +19,13 @@ The `layout.rbl` files are written by [layouts.py](layouts.py): to change a layo
 
 ## [robot_arm](robot_arm)
 
-A small arm from its [URDF](robot_arm/robot.urdf), swinging and opening its gripper. The right finger follows the left one through a mimic joint. Its joint positions are plotted over time, and as bars at the time cursor. Modules: `robot_description`, `joint_states`, `scalars`, `bar_chart`.
+A small arm from its [URDF](robot_arm/robot.urdf), swinging and opening its gripper, with its link frames as named axes. The right finger follows the left one through a mimic joint. Its joint positions are plotted over time, and as bars at the time cursor. Modules: `robot_description`, `joint_states`, `scalars`, `bar_chart`.
 
 ![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif)
 
 ## [mobile_robot](mobile_robot)
 
-A robot driving in a circle in a room: the room's map, and the robot's laser scan as rays to each hit, with a shadow behind the pillar. Its speed is plotted too. Modules: `tf`, `occupancy_grid`, `laserscan`, `scalars`.
+A robot driving in a circle in a room: the room's map, the robot's frames as named axes, and its laser scan as rays to each hit, with a shadow behind the pillar. Its speed is plotted too. Modules: `tf`, `occupancy_grid`, `laserscan`, `scalars`.
 
 ![mobile_robot](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/mobile_robot.gif)
 

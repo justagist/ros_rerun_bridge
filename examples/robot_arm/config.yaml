@@ -16,6 +16,10 @@ modules:
     module: joint_states
     topic: /joint_states
     entity_path: tf
+    params:
+      # Each link's frame, as named axes
+      axis_length: 0.1
+      frame_names: true
 
   - name: joint_plot
     module: scalars

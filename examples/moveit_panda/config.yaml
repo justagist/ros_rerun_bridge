@@ -29,3 +29,6 @@ modules:
     module: joint_states
     topic: /joint_states
     entity_path: tf
+    params:
+      # Each link's frame as axes. Add `frame_names: true` to label them with their names.
+      axis_length: 0.1
