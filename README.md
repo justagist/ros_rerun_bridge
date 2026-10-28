@@ -64,6 +64,17 @@ ros-rerun-bridge --config <config.yaml> [options] [-- <ROS arguments>]
 
 Arguments after `--` are passed to ROS, e.g. `-- --ros-args -p use_sim_time:=true`.
 
+### Recordings and bags
+
+Recording, with `--save`, and opening recordings are Rerun's features: see [Rerun's docs](https://rerun.io/docs/getting-started/data-in/open-any-file). To view a ROS bag as a live robot would be shown, play it into the bridge on the bag's clock:
+
+```bash
+ros-rerun-bridge --config <config.yaml> -- --ros-args -p use_sim_time:=true
+ros2 bag play <bag> --clock
+```
+
+Rerun can also open an `.mcap` bag directly, without the bridge, converting [common ROS 2 messages](https://rerun.io/docs/reference/mcap/message-formats) itself. The bridge covers more, such as markers, laser scans, the robot model and diagnostics, and keeps a config's layout.
+
 ## Configuration
 
 A config lists the topics to show. Each topic is handled by a module, which decides how it is drawn:
