@@ -42,7 +42,7 @@ python3 examples/robot_arm/publisher.py
 
 This opens the Rerun viewer, showing the arm moving and its joint positions plotted. The publisher only provides demo data: with a real robot, the bridge needs just a config listing its topics. [examples](examples) has more, each runnable the same way.
 
-![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif?v=3)
+![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif)
 
 See [INSTALLATION.md](docs/INSTALLATION.md) to make the `ros-rerun-bridge` command available everywhere, for other ways to install, and for why the bridge needs its own environment.
 
