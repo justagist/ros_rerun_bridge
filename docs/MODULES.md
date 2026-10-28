@@ -20,6 +20,7 @@ For messages with a header, spatial modules draw the data in the header's TF fra
 | [`particle_cloud`](#particle_cloud) | `nav2_msgs/ParticleCloud` | Localisation particles |
 | [`scalars`](#scalars) | Any, set with `msg_type` | Numeric fields as plots |
 | [`bar_chart`](#bar_chart) | Any, set with `msg_type` | An array field as bars |
+| [`states`](#states) | Any, set with `msg_type` | A field as discrete states over time |
 
 ## `tf`
 
@@ -225,4 +226,28 @@ The chart's y axis fits the bars shown, so it rescales as the values change: Rer
   entity_path: bars/efforts
   params:
     field: effort
+```
+
+## `states`
+
+Shows a field of any message type as discrete states over time, e.g. a robot's mode, a controller's status, or whether a light is on. Set the message type with `msg_type`. Each change of the field's value starts a new state, drawn as a coloured lane in Rerun's state timeline view.
+
+The field must be a single number, bool or string, which is checked on start, as are the config's `states` values. A value matches when it is equal at the field's precision: `1`, `1.0` and a float32 1.0 are the same state, as are `0.3` and a float32 0.3. Quote string values such as `"on"`, `"off"`, `"yes"` and `"no"`, which YAML otherwise reads as booleans.
+
+| Param | Default | |
+| --- | --- | --- |
+| `field` | required | Dotted path to the field, e.g. `data` or `brightness`. |
+| `states` | none | Label and colour per value: `value`, and optionally `label` and `colour` (RGBA). Give a colour for every listed state, or for none. Values not listed are still shown, labelled with the value itself, in a colour Rerun picks for it. |
+
+```yaml
+- name: robot_mode
+  module: states
+  topic: /robot_mode
+  msg_type: std_msgs.msg.String
+  entity_path: states/mode
+  params:
+    field: data
+    states:
+      - { value: idle, label: Idle, colour: [120, 120, 120, 255] }
+      - { value: moving, label: Moving, colour: [40, 160, 240, 255] }
 ```

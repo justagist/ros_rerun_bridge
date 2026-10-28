@@ -53,6 +53,12 @@ A marker changing type every 2 s, beside a fixed cube. Modules: `marker_array`.
 
 ![markers](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/markers.gif)
 
+## [states](states)
+
+A robot's mode, cycling through idle, moving and charging, and a warning light that blinks while it moves, as coloured states over time. Modules: `states`.
+
+![states](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/states.gif)
+
 ## [series_styles](series_styles)
 
 The same values as lines and as named points, and a mode drawn in red steps. Modules: `scalars`.

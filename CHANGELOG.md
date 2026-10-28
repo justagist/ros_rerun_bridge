@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [0.7.0] - 2026-10-28
+
+### Added
+
+- `states` module, showing a field of any message type as discrete states over time, with labels and colours per value.
+- A states example: a robot's mode and a warning light.
+
 ## [0.6.0] - 2026-10-28
 
 ### Added
@@ -107,6 +114,7 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 
 First version: a config-driven bridge with `image`, `camera_info`, `laserscan`, `pointcloud2`, `particle_cloud`, `odometry`, `robot_description` and `joint_states` modules.
 
+[0.7.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.3.0...v0.4.0
