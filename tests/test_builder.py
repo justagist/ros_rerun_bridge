@@ -44,6 +44,12 @@ def test_resolves_a_module_by_python_path(build):
     assert isinstance(build("ros_rerun_bridge.modules.tf:TFModule"), TFModule)
 
 
+@pytest.mark.parametrize("path", ["ros_rerun_bridge.utils.utils:make_qos", "rclpy.node:Node"])
+def test_module_path_to_anything_but_a_module_class_is_an_error(build, path):
+    with pytest.raises(ValueError, match="is not a TopicToComponentModule subclass"):
+        build(path)
+
+
 def test_unknown_module_name_is_an_error(build):
     with pytest.raises(ValueError, match="built-in module"):
         build("tff")

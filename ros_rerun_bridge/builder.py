@@ -4,13 +4,14 @@ import importlib
 import importlib.util
 from typing import TYPE_CHECKING, List
 
+from .base import TopicToComponentModule
 from .registry import REGISTRY
 from .utils.utils import _import_module_by_path
 
 if TYPE_CHECKING:
     from rclpy.node import Node
 
-    from .base import BridgeConfig, TopicToComponentModule
+    from .base import BridgeConfig
     from .context import BridgeContext
 
 
@@ -49,4 +50,8 @@ class BridgeBuilder:
             importlib.import_module(builtin)
         if REGISTRY.has(module_id):
             return REGISTRY.get(module_id)
-        return _import_module_by_path(module_id)
+        # Modules of other packages are loaded by path, without registering
+        cls = _import_module_by_path(module_id)
+        if not (isinstance(cls, type) and issubclass(cls, TopicToComponentModule)):
+            raise ValueError(f"'{module_id}' is not a TopicToComponentModule subclass")
+        return cls

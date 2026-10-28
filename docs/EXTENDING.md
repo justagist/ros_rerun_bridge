@@ -53,6 +53,8 @@ modules:
       radius: 0.05
 ```
 
+It needs no registering, unlike a built-in module. The path must name a `TopicToComponentModule` subclass, or the bridge stops with an error.
+
 **Conventions**
 
 * Inherit from `TopicToComponentModule`.
