@@ -1,0 +1,29 @@
+# A robot's mode and a warning light from publisher.py, shown as coloured states over time
+global_frame: map
+# Viewer layout, written by ../layouts.py
+blueprint: layout.rbl
+
+modules:
+  # Values not listed under `states` would still be shown, with Rerun's colours
+  - name: robot_mode
+    module: states
+    topic: /robot_mode
+    msg_type: std_msgs.msg.String
+    entity_path: states/mode
+    params:
+      field: data
+      states:
+        - { value: idle, label: Idle, colour: [120, 120, 120, 255] }
+        - { value: moving, label: Moving, colour: [40, 160, 240, 255] }
+        - { value: charging, label: Charging, colour: [80, 200, 90, 255] }
+
+  - name: warning_light
+    module: states
+    topic: /warning_light
+    msg_type: std_msgs.msg.Bool
+    entity_path: states/warning_light
+    params:
+      field: data
+      states:
+        - { value: false, label: "off", colour: [50, 50, 50, 255] }
+        - { value: true, label: "on", colour: [250, 170, 20, 255] }

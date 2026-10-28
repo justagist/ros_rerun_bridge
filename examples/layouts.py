@@ -41,6 +41,7 @@ LAYOUTS = {
     "point_cloud": scene([2.4, -2.4, 2.2], [0.0, 0.0, 1.0]),
     "range_sensor": rrb.Horizontal(scene([0.9, -1.6, 1.0], [0.6, 0.0, 0.25]), plots("/plots/range", (0.0, 2.0))),
     "markers": scene([1.0, -2.6, 1.5], [1.0, 0.0, 0.2]),
+    "states": rrb.StateTimelineView(origin="/states", time_ranges=RECENT),
     "series_styles": rrb.Vertical(
         plots("/plots/default", (-1.1, 1.1)), plots("/plots/points", (-1.1, 1.1)), plots("/plots/mode", (-0.2, 2.2))
     ),
