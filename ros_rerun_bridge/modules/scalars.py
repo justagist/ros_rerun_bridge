@@ -56,8 +56,8 @@ class ScalarsParams(StrictParamsModel):
     marker_size: float | None = None
     """Point marker size, in UI points. Points only."""
     variance: str | None = None
-    """Dotted path to the field's variance, e.g. `variance`, drawn as a band one standard deviation either side. Needs
-    exactly one field."""
+    """Dotted path to the field's variance, a single number, e.g. `variance`. Drawn as a band one standard deviation
+    either side. Needs exactly one field."""
     unit: str | None = None
     """Unit of the values, e.g. `m`, shown in the plot."""
 
@@ -107,7 +107,9 @@ class ScalarsModule(TopicToComponentModule):
         for field in self.params.fields:
             _check_field(msg_type, field)
         if self.params.variance is not None:
-            _check_field(msg_type, self.params.variance)
+            # One variance, applied to every element: arrays of variances could mismatch the values on every message
+            if _ARRAY.fullmatch(variance_type := _check_field(msg_type, self.params.variance)):
+                raise ValueError(f"variance '{self.params.variance}' is {variance_type}, not a single number")
         self._variance = attrgetter(self.params.variance) if self.params.variance is not None else None
         self._fields = {
             f"{self.entity_path}/{field.replace('.', '/')}": attrgetter(field) for field in self.params.fields
@@ -159,12 +161,15 @@ class ScalarsModule(TopicToComponentModule):
                 rr.log(path, rr.Measurements.from_fields(values=padded, variances=variances))
 
 
-def _check_field(msg_type: type, field: str) -> None:
+def _check_field(msg_type: type, field: str) -> str:
     """Raise a ValueError unless a dotted field path names a number, or an array of numbers, in a message type.
 
     Args:
         msg_type: ROS message class.
         field: Dotted path, e.g. `twist.twist.linear.x`.
+
+    Returns:
+        The field's ROS type, e.g. `double` or `sequence<double>`.
     """
     cls = msg_type
     names = field.split(".")
@@ -179,3 +184,4 @@ def _check_field(msg_type: type, field: str) -> None:
     array = _ARRAY.fullmatch(field_type)
     if (array.group(1) or array.group(2) if array else field_type) not in _NUMERIC:
         raise ValueError(f"field '{field}' is {field_type}, not a number or an array of numbers")
+    return field_type

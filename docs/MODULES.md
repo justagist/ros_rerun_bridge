@@ -161,7 +161,7 @@ Plots numeric fields of any message type as time series. Set the message type wi
 | `interpolation` | `linear` | `linear`, or `step_after`, `step_before` or `step_mid` for values that jump, such as modes or flags. Lines only. |
 | `marker` | `circle` | `circle`, `diamond`, `square`, `cross`, `plus`, `up`, `down`, `left`, `right` or `asterisk`. Points only. |
 | `marker_size` | Rerun's default | Marker size, in UI points. Points only. |
-| `variance` | none | Dotted path to the field's variance, e.g. `variance`, drawn as a band one standard deviation either side. Needs exactly one field. |
+| `variance` | none | Dotted path to the field's variance, e.g. `variance`, drawn as a band one standard deviation either side. Must be a single number, which applies to every element of an array. Needs exactly one field. |
 | `unit` | none | Unit of the values, e.g. `m`, shown in the legend. |
 
 ```yaml

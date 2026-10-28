@@ -161,7 +161,7 @@ def test_variance_is_logged_with_each_value_as_a_measurement(node, build, record
     assert "Scalars:scalars" not in row
 
 
-def test_one_variance_applies_to_every_element_of_an_array(node, build, recording):
+def test_variance_applies_to_array_elements_and_pads_shrinking_arrays(node, build, recording):
     build(
         "scalars",
         entity_path="plots",
@@ -169,8 +169,11 @@ def test_one_variance_applies_to_every_element_of_an_array(node, build, recordin
         params={"fields": ["cell_voltage"], "variance": "voltage"},
     )
     node.publish(BatteryState(cell_voltage=[3.7, 3.8], voltage=0.01))
-    [row] = [row for row in recording.rows("/plots/cell_voltage") if not row["static"]]
-    assert row["Measurements:variances"] == pytest.approx([0.01, 0.01])
+    node.publish(BatteryState(cell_voltage=[3.9], voltage=0.02))
+    [first, second] = [row for row in recording.rows("/plots/cell_voltage") if not row["static"]]
+    assert first["Measurements:variances"] == pytest.approx([0.01, 0.01])
+    assert second["Measurements:values"] == pytest.approx([3.9, math.nan], nan_ok=True)
+    assert second["Measurements:variances"] == pytest.approx([0.02, math.nan], nan_ok=True)
 
 
 def test_measurement_unit_and_style_are_logged_once_as_static(node, build, recording):
@@ -201,3 +204,9 @@ def test_measurement_unit_and_style_are_logged_once_as_static(node, build, recor
 def test_invalid_measurement_params_are_an_error(build, params, error):
     with pytest.raises(ValueError, match=error):
         build("scalars", msg_type="sensor_msgs.msg.Range", params=params)
+
+
+def test_an_array_of_variances_is_an_error(build):
+    # Its length could differ from the values' on any message
+    with pytest.raises(ValueError, match="variance 'd' is sequence<double>, not a single number"):
+        build("scalars", msg_type="sensor_msgs.msg.CameraInfo", params={"fields": ["k"], "variance": "d"})
