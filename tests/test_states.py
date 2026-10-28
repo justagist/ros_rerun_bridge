@@ -17,11 +17,12 @@ def state_rows(recording) -> list:
     return [row for row in recording.rows("/mode") if not row["static"]]
 
 
-def test_a_state_is_logged_only_when_the_value_changes(node, build, recording):
+def test_every_message_is_logged_as_a_state(node, build, recording):
+    # Rerun joins repeated states into one
     build_states(build, "std_msgs.msg.Int32")
-    for value in (0, 0, 1, 1, 0):
+    for value in (0, 0, 1):
         node.publish(Int32(data=value))
-    assert [row["StateChange:state"] for row in state_rows(recording)] == [["0"], ["1"], ["0"]]
+    assert [row["StateChange:state"] for row in state_rows(recording)] == [["0"], ["0"], ["1"]]
 
 
 @pytest.mark.parametrize(
@@ -129,12 +130,12 @@ def test_invalid_config_is_an_error(build, msg_type, params, error):
         build("states", msg_type=msg_type, params=params)
 
 
-def test_states_earlier_than_the_latest_are_logged_as_they_are(node, build, recording):
-    # E.g. a bag replayed from its start: deduplicating against a later state would leave them out
+def test_a_late_message_leaves_the_later_states_in_place(node, build, recording):
+    # E.g. from a replayed bag: the state at 21 s is still 0, though the 1 at 15 s arrived after it
     build("states", entity_path="mode", msg_type="sensor_msgs.msg.Range", params={"field": "radiation_type"})
-    for sec, value in [(10, 0), (20, 1), (5, 1), (21, 1), (22, 0)]:
+    for sec, value in [(10, 0), (20, 0), (15, 1), (21, 0)]:
         msg = Range(radiation_type=value)
         msg.header.stamp = TimeMsg(sec=sec)
         node.publish(msg)
     rows = [(row["ros_time"] // 1_000_000_000, row["StateChange:state"]) for row in state_rows(recording)]
-    assert sorted(rows) == [(5, ["1"]), (10, ["0"]), (20, ["1"]), (22, ["0"])]
+    assert rows == [(10, ["0"]), (15, ["1"]), (20, ["0"]), (21, ["0"])]

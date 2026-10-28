@@ -58,7 +58,7 @@ def state_rows(recording, entity: str) -> list:
     return [row["StateChange:state"] for row in recording.rows(entity) if "StateChange:state" in row]
 
 
-def test_a_status_is_logged_only_when_its_level_or_message_changes(node, build, recording):
+def test_every_status_is_a_state_and_its_message_is_logged_when_it_changes(node, build, recording):
     build("diagnostics", entity_path="diagnostics")
     for level, message in [
         (DiagnosticStatus.OK, "ok"),
@@ -68,7 +68,7 @@ def test_a_status_is_logged_only_when_its_level_or_message_changes(node, build, 
         (DiagnosticStatus.ERROR, "too hot"),
     ]:
         node.publish(diagnostics(("motor", level, message)))
-    assert state_rows(recording, "/diagnostics/motor") == [["OK"], ["ERROR"]]
+    assert state_rows(recording, "/diagnostics/motor") == [["OK"], ["OK"], ["OK"], ["ERROR"], ["ERROR"]]
     assert log_rows(recording, "/diagnostics/motor") == [
         (["INFO"], ["ok"]),
         (["INFO"], ["warming up"]),
@@ -105,15 +105,30 @@ def test_an_unknown_level_is_shown_as_its_number_and_logged_as_a_warning(node, b
     assert log_rows(recording, "/diagnostics/motor") == [(["WARN"], ["odd"])]
 
 
-def test_statuses_earlier_than_the_latest_are_logged_as_they_are(node, build, recording):
+def test_a_late_status_leaves_the_later_statuses_in_place(node, build, recording):
+    # E.g. from a replayed bag: the motor is OK again at 21 s, though the error at 15 s arrived after it
     build("diagnostics", entity_path="diagnostics")
-    for sec, level in [(10, DiagnosticStatus.OK), (20, DiagnosticStatus.ERROR), (5, DiagnosticStatus.ERROR)]:
+    arrivals = [
+        (10, DiagnosticStatus.OK),
+        (20, DiagnosticStatus.OK),
+        (15, DiagnosticStatus.ERROR),
+        (21, DiagnosticStatus.OK),
+    ]
+    for sec, level in arrivals:
         msg = diagnostics(("motor", level, "status"))
         msg.header.stamp = TimeMsg(sec=sec)
         node.publish(msg)
     rows = [row for row in recording.rows("/diagnostics/motor") if "StateChange:state" in row]
     assert [(row["ros_time"] // 1_000_000_000, row["StateChange:state"]) for row in rows] == [
-        (5, ["ERROR"]),
         (10, ["OK"]),
-        (20, ["ERROR"]),
+        (15, ["ERROR"]),
+        (20, ["OK"]),
+        (21, ["OK"]),
+    ]
+    # The late message is logged too, as a log entry of its own
+    assert [
+        row["ros_time"] // 1_000_000_000 for row in recording.rows("/diagnostics/motor") if "TextLog:text" in row
+    ] == [
+        10,
+        15,
     ]

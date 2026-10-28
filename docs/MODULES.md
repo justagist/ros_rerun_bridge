@@ -308,7 +308,7 @@ The chart's y axis fits the bars shown, so it rescales as the values change: Rer
 
 ## `states`
 
-Shows a field of any message type as discrete states over time, e.g. a robot's mode, a controller's status, or whether a light is on. Set the message type with `msg_type`. Each change of the field's value starts a new state, drawn as a coloured lane in Rerun's state timeline view. A message older than the latest, e.g. from a bag replayed from its start, is logged whether it changed or not.
+Shows a field of any message type as discrete states over time, e.g. a robot's mode, a controller's status, or whether a light is on. Set the message type with `msg_type`. Each change of the field's value starts a new state, drawn as a coloured lane in Rerun's state timeline view. Every message is logged, and Rerun joins repeats, so a message arriving late, e.g. from a replayed bag, lands in its place.
 
 The field must be a single number, bool or string, which is checked on start, as are the config's `states` values. A value matches when it is equal at the field's precision: `1`, `1.0` and a float32 1.0 are the same state, as are `0.3` and a float32 0.3. Quote string values such as `"on"`, `"off"`, `"yes"` and `"no"`, which YAML otherwise reads as booleans.
 
@@ -354,7 +354,7 @@ Each entry costs the bridge about 50 µs to receive and log, so a few hundred a 
 
 ## `diagnostics`
 
-Shows `diagnostic_msgs/DiagnosticArray` statuses, from `/diagnostics` or an aggregator's `/diagnostics_agg`. Each status is logged on `<entity_path>/<status name>`, with the name split on slashes, so aggregated names such as `/Robot/Arm/Motor` nest as a tree. Its level is shown as a state, OK, WARN, ERROR or STALE, in Rerun's state timeline view, and its message in the text log view, each logged only when it changes, or when the message is older than the latest. A status's key/values are not shown: plot one with [`scalars`](#scalars) on the topic the node publishes it on, if it has one.
+Shows `diagnostic_msgs/DiagnosticArray` statuses, from `/diagnostics` or an aggregator's `/diagnostics_agg`. Each status is logged on `<entity_path>/<status name>`, with the name split on slashes, so aggregated names such as `/Robot/Arm/Motor` nest as a tree. Its level is shown as a state, OK, WARN, ERROR or STALE, in Rerun's state timeline view, and its message in the text log view, logged only when it changes, or when it arrives late, e.g. from a replayed bag. A status's key/values are not shown: plot one with [`scalars`](#scalars) on the topic the node publishes it on, if it has one.
 
 ```yaml
 - name: diagnostics

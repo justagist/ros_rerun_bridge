@@ -203,3 +203,19 @@ def test_a_new_robot_model_arrives_after_the_old_one_is_cleared(robot, node, rec
     # The same model again: Rerun keeps the static data it received last, which must be the new model's
     node.publish(String(data=URDF), index=0)
     assert arrival(recording, ARM_BOX, "Boxes3D:half_sizes")[-1] == [pytest.approx([0.05, 0.05, 0.05])]
+
+
+def test_a_robot_model_that_fails_to_load_leaves_the_old_one(robot, node, context, recording):
+    node.publish(String(data="<robot"), index=0)
+    assert node.log_messages[-2][0] == "error"
+    assert [] not in arrival(recording, BASE, "Boxes3D:half_sizes")
+    assert context.urdf_tree is robot
+
+
+def test_a_new_robot_model_clears_the_old_one_under_an_escaped_entity_path(node, build, recording):
+    # The importer escapes the prefix's slash and space as one entity path part
+    build("robot_description", entity_path="scene/my robot")
+    node.publish(String(data=URDF))
+    node.publish(String(data=URDF.replace('<box size="0.2 0.2 0.2"/>', '<sphere radius="0.1"/>', 1)))
+    base = BASE.replace("/robot/", "/scene\\/my\\ robot/")
+    assert arrival(recording, base, "Boxes3D:half_sizes")[-1] == []

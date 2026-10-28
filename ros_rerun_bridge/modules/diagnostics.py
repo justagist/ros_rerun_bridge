@@ -63,11 +63,11 @@ class DiagnosticsModule(TopicToComponentModule):
                 labels, colours, _ = zip(*_LEVELS.values())
                 rr.log(path, rr.StateConfiguration(values=labels, colors=colours), static=True)
             label, _, log_level = _LEVELS.get(level, (str(level), None, "WARN"))
-            # Earlier than the latest status, e.g. after a bag is replayed: logged as it is, as it is not a change from
-            # the latest
+            # Every status, rather than only changes: Rerun joins repeated states into one, and a status arriving late,
+            # e.g. from a replayed bag, would otherwise hide the later statuses deduplicated against it
+            rr.log(path, rr.StateChange(state=label))
+            # Messages are log entries: only changes, and late ones, as they are
             earlier = latest is not None and stamp < latest[2]
-            if earlier or latest is None or latest[0] != level:
-                rr.log(path, rr.StateChange(state=label))
             if earlier or latest is None or latest[:2] != (level, status.message):
                 rr.log(path, rr.TextLog(status.message, level=log_level))
             if not earlier:

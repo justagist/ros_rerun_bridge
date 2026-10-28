@@ -48,12 +48,7 @@ class RobotDescriptionModule(TopicToComponentModule):
         return String
 
     def handle(self, msg: String) -> None:
-        # A new model's static data only replaces the components it logs again: clear the old model's geometry. Its
-        # frames are kept, as an entity without one would have no path to the scene's frames, which Rerun reports.
-        for path, archetypes in self._geometry.items():
-            rr.log(path, *(getattr(rr, archetype).cleared() for archetype in archetypes), static=True)
-        # Logged data is batched, while chunks are sent as they are: the clears must arrive first
-        rr.get_global_data_recording().flush()
+        # Loaded in full before the old model is touched, so a URDF that fails to load leaves it in place.
         # The importer only reads files. package:// mesh paths are resolved through the ROS environment.
         with tempfile.NamedTemporaryFile("w", suffix=".urdf") as urdf_file:
             urdf_file.write(msg.data)
@@ -62,15 +57,23 @@ class RobotDescriptionModule(TopicToComponentModule):
             links = [tree.root_link(), *(tree.get_joint_child(joint) for joint in tree.joints())]
             collision_paths = {path for link in links for path in tree.get_collision_geometry_paths(link)}
             chunks = [chunk for chunk in tree.stream().to_chunks() if chunk.entity_path not in collision_paths]
-            rr.send_chunks(chunks)
+        visual_paths = {path for link in links for path in tree.get_visual_geometry_paths(link)}
+
+        # A new model's static data only replaces the components it logs again: clear the old model's geometry. Its
+        # frames are kept, as an entity without one would have no path to the scene's frames, which Rerun reports.
+        for path, archetypes in self._geometry.items():
+            rr.log(path, *(getattr(rr, archetype).cleared() for archetype in archetypes), static=True)
+        # Logged data is batched, while chunks are sent as they are: the clears must arrive first
+        rr.get_global_data_recording().flush()
+        rr.send_chunks(chunks)
 
         self._geometry = {}
         for chunk in chunks:
-            # Columns are named <archetype>:<component>
-            archetypes = {name.split(":")[0] for name in chunk.to_record_batch().schema.names if ":" in name}
-            # The joints, on their own entity, are replaced by the new model's
-            if chunk.entity_path.startswith(f"/{self.entity_path.strip('/')}/") and archetypes - {"CoordinateFrame"}:
-                self._geometry.setdefault(chunk.entity_path, set()).update(archetypes - {"CoordinateFrame"})
+            if chunk.entity_path in visual_paths:
+                # Columns are named <archetype>:<component>
+                names = chunk.to_record_batch().schema.names
+                archetypes = {name.split(":")[0] for name in names if ":" in name} - {"CoordinateFrame"}
+                self._geometry.setdefault(chunk.entity_path, set()).update(archetypes)
 
         self.context.urdf_tree = tree
         self._apply_collada_units(msg.data, tree)

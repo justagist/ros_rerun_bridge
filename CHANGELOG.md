@@ -16,7 +16,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - A new robot model replaces the old one's geometry, instead of being drawn over it.
 - Organised point clouds with padded rows keep every point, and a cloud without colours no longer keeps an earlier cloud's.
 - An empty particle cloud clears the particles, and weight fading starts from the configured colour's alpha.
-- `states` and `diagnostics` log messages older than the latest, e.g. from a bag replayed from its start, which were left out as unchanged.
+- `states` and `diagnostics` show messages arriving late, e.g. from a replayed bag, in their place, which were left out as unchanged.
 - A compressed image with an empty `format` is read as JPEG, as `sensor_msgs/CompressedImage` defines.
 - A line strip marker keeps its per-point colours.
 - `params` given to a module that takes none are an error.
