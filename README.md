@@ -36,7 +36,7 @@ You need ROS 2 and [uv](https://docs.astral.sh/uv/). The bridge runs in its own 
 git clone https://github.com/justagist/ros_rerun_bridge.git && cd ros_rerun_bridge
 source /opt/ros/jazzy/setup.bash
 uv run ros-rerun-bridge --config examples/robot_arm/config.yaml
-# In a second terminal, with ROS sourced: publish a small arm's URDF and joint states
+# In a second terminal, from the repo root with ROS sourced: publish a small arm's URDF and joint states
 python3 examples/robot_arm/publisher.py
 ```
 

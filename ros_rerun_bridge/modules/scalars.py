@@ -14,7 +14,7 @@ import rerun as rr
 from ..base import ModuleConfig, TopicToComponentModule
 from ..context import BridgeContext
 from ..registry import REGISTRY
-from ..types import StrictParamsModel
+from ..types import Rgba, StrictParamsModel
 
 # Not octet (`byte`): its values are `bytes` objects, and numeric bytes are uint8 by convention
 _NUMERIC = {
@@ -43,7 +43,7 @@ class ScalarsParams(StrictParamsModel):
     """Draw each series as a line or as points."""
     names: list[str] | None = None
     """Series names, one per array element, for every field. Rerun's default is the entity path and element index."""
-    colours: list[tuple[int, int, int, int]] | None = None
+    colours: list[Rgba] | None = None
     """RGBA colour per series, as uint8. The last one applies to any remaining series."""
     width: float | None = None
     """Line width, in UI points. Lines only."""

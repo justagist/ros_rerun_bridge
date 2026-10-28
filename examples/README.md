@@ -6,7 +6,7 @@ Each folder holds what an example needs:
 * `layout.rbl` (optional): the viewer layout and camera angle the config opens with. Without it, Rerun picks a layout itself.
 * `publisher.py`: publishes made-up data for the demo, so it runs without a robot or simulator. On a real robot, your own nodes publish the data instead. The robot arm's `robot.urdf` is part of its demo data.
 
-From the repo root, with ROS sourced, run the bridge and the publisher in two terminals:
+Some examples use modules that need extra ROS packages, e.g. `mobile_robot` and `point_cloud` ([INSTALLATION.md](../docs/INSTALLATION.md#ros-packages-for-some-modules)). From the repo root, with ROS sourced, run the bridge and the publisher in two terminals:
 
 ```bash
 uv run ros-rerun-bridge --config examples/<name>/config.yaml

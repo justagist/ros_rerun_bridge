@@ -138,6 +138,8 @@ def test_without_style_params_rerun_default_lines_are_kept(node, build, recordin
         ({"marker": "square"}, "marker cannot be used with style 'lines'"),
         ({"style": "points", "width": 2.0, "interpolation": "step_mid"}, "width, interpolation cannot be used"),
         ({"interpolation": "steps"}, "interpolation"),
+        ({"colours": [[256, 0, 0, 255]]}, "less than or equal to 255"),
+        ({"colours": [[-1, 0, 0, 255]]}, "greater than or equal to 0"),
     ],
 )
 def test_invalid_style_is_an_error(build, params, error):

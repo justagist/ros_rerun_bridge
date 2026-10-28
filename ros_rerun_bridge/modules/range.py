@@ -10,13 +10,13 @@ import rerun as rr
 
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
-from ..types import StrictParamsModel
+from ..types import Rgba, StrictParamsModel
 
 
 class RangeParams(StrictParamsModel):
     """Parameters for the RangeModule."""
 
-    colour: tuple[int, int, int, int] = (255, 255, 255, 255)
+    colour: Rgba = (255, 255, 255, 255)
     """RGBA colour as 4-tuple of uint8."""
     radius: float = 0.001
     """Line radius in metres."""

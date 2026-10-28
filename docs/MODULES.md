@@ -76,7 +76,7 @@ Logs the camera's intrinsics as a pinhole projection from the camera frame to th
 
 ## `pointcloud2`
 
-Logs points with their colours. Points with a NaN coordinate are dropped.
+Logs points with their colours. Points with a NaN coordinate are dropped. Needs `sensor_msgs_py`.
 
 | Param | Default | |
 | --- | --- | --- |
@@ -85,7 +85,7 @@ Logs points with their colours. Points with a NaN coordinate are dropped.
 
 ## `laserscan`
 
-Logs a scan as rays from the scanner, or as points.
+Logs a scan as rays from the scanner, or as points. Needs `laser_geometry` and `sensor_msgs_py`.
 
 | Param | Default | |
 | --- | --- | --- |
