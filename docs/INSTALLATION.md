@@ -17,7 +17,7 @@ Rerun needs NumPy 2, while ROS distros ship NumPy 1. The bridge therefore runs i
 ```bash
 source /opt/ros/jazzy/setup.bash
 # From the repo root: creates .venv on first run, then runs the bridge
-uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml
+uv run ros-rerun-bridge --config examples/robot_arm/config.yaml
 ```
 
 ## As a command available everywhere

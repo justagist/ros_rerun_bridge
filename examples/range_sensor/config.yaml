@@ -1,0 +1,28 @@
+# A range sensor from publisher.py, drawn as a cone in 3D and plotted over time. Two modules subscribe to the same topic.
+global_frame: map
+
+modules:
+  # Places the sensor's frame in the map
+  - name: tf_static
+    module: tf
+    topic: /tf_static
+    entity_path: tf_static
+    qos: { depth: 10, durability: transient_local }
+    params:
+      static: true
+
+  - name: range_cone
+    module: range
+    topic: /range
+    entity_path: sensor/cone
+    params:
+      colour: [0, 200, 255, 255]
+
+  # Readings with no detection (+inf) leave a gap in the plot
+  - name: range_plot
+    module: scalars
+    topic: /range
+    msg_type: sensor_msgs.msg.Range
+    entity_path: plots/range
+    params:
+      fields: [range, max_range]

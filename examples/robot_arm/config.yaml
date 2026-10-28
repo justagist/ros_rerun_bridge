@@ -1,0 +1,25 @@
+# The robot arm from publisher.py, from its URDF and joint states. No TF needed: joint_states moves the model.
+global_frame: base_link
+
+modules:
+  # The URDF, published once on a latched topic
+  - name: robot_description
+    module: robot_description
+    topic: /robot_description
+    entity_path: robot
+    qos: { depth: 1, durability: transient_local }
+
+  # The right finger is not in the joint states: it follows the left one, as its URDF mimic tag says
+  - name: joints
+    module: joint_states
+    topic: /joint_states
+    entity_path: tf
+
+  - name: joint_plot
+    module: scalars
+    topic: /joint_states
+    msg_type: sensor_msgs.msg.JointState
+    entity_path: plots/joints
+    params:
+      fields: [position]
+      names: [turntable, elbow, finger_left_joint]

@@ -12,11 +12,11 @@ Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rv
 
 ## Demos
 
-**Nav2:** the [Nav2 getting started demo](https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/) with [turtlebot3_nav2.config.yaml](example_configs/turtlebot3_nav2.config.yaml).
+**Nav2:** the [Nav2 getting started demo](https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/) with [this config](examples/nav2_turtlebot3/config.yaml).
 
 [![ros_rerun_tb3_sim.mp4](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_tb3_sim.gif)](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_tb3_sim.mp4)
 
-**MoveIt:** `ros2 launch moveit_resources_panda_moveit_config demo.launch.py` with [robot_joint_states.config.yaml](example_configs/robot_joint_states.config.yaml).
+**MoveIt:** `ros2 launch moveit_resources_panda_moveit_config demo.launch.py` with [this config](examples/moveit_panda/config.yaml).
 
 [![ros_rerun_franka_moveit.mp4](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.gif)](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.mp4)
 
@@ -35,10 +35,14 @@ You need ROS 2 and [uv](https://docs.astral.sh/uv/). The bridge runs in its own 
 ```bash
 git clone https://github.com/justagist/ros_rerun_bridge.git && cd ros_rerun_bridge
 source /opt/ros/jazzy/setup.bash
-uv run ros-rerun-bridge --config example_configs/robot_joint_states.config.yaml
+uv run ros-rerun-bridge --config examples/robot_arm/config.yaml
+# In a second terminal, with ROS sourced: publish a small arm's URDF and joint states
+python3 examples/robot_arm/publisher.py
 ```
 
-This opens the Rerun viewer and shows any robot publishing `/robot_description` and `/joint_states`, such as the MoveIt demo above.
+This opens the Rerun viewer, showing the arm moving and its joint positions plotted. [examples](examples) has more, each runnable the same way.
+
+![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif?v=2)
 
 See [INSTALLATION.md](docs/INSTALLATION.md) to make the `ros-rerun-bridge` command available everywhere, for other ways to install, and for why the bridge needs its own environment.
 
@@ -76,10 +80,7 @@ modules:
     params: { mode: points }
 ```
 
-[CONFIGURATION.md](docs/CONFIGURATION.md) describes every field, and covers frames, QoS and saving a viewer layout. Two example configs are in [example_configs](example_configs):
-
-* [robot_joint_states.config.yaml](example_configs/robot_joint_states.config.yaml): a robot from its URDF and joint states. Works as is with the MoveIt demos.
-* [turtlebot3_nav2.config.yaml](example_configs/turtlebot3_nav2.config.yaml): TF, robot, camera, point cloud, laser scan, map, costmap, particles and odometry from the Nav2 demo.
+[CONFIGURATION.md](docs/CONFIGURATION.md) describes every field, and covers frames, QoS and saving a viewer layout. The [examples](examples) each pair a config with a publisher of made-up data, and are a good starting point.
 
 ## Modules
 

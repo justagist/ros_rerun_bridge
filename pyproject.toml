@@ -41,7 +41,7 @@ python-preference = "only-system"
 
 [tool.ruff]
 line-length = 120
-include = ["ros_rerun_bridge/**/*.py", "tests/**/*.py"]
+include = ["ros_rerun_bridge/**/*.py", "tests/**/*.py", "examples/**/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W"]

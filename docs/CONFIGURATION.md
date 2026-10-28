@@ -20,7 +20,7 @@ modules:
       mode: lines
 ```
 
-The [example configs](../example_configs) are a good starting point.
+The [examples](../examples) are a good starting point.
 
 ## Modules
 
