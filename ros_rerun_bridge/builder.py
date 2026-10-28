@@ -34,11 +34,19 @@ class BridgeBuilder:
             context: Shared context for all modules.
         Returns:
             A list of instantiated TopicToComponentModule objects.
+        Raises:
+            ValueError: If a module's config is invalid, named in the message.
+            ImportError: If a module, or a package it needs, cannot be imported, named in the message.
         """
         instances: List[TopicToComponentModule] = []
         for module_spec in cfg.modules:
-            cls = self._resolve_class(module_spec.module)
-            inst = cls(self.node, module_spec, context=context)
+            try:
+                cls = self._resolve_class(module_spec.module)
+                inst = cls(self.node, module_spec, context=context)
+            except (ValueError, ImportError) as e:
+                # Name the module: a config often has several of one kind
+                error = ImportError if isinstance(e, ImportError) else ValueError
+                raise error(f"[{module_spec.name}] {e}") from e
             instances.append(inst)
         return instances
 

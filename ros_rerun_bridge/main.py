@@ -12,6 +12,7 @@ from urllib.parse import quote
 
 import rclpy
 import yaml
+from pydantic import ValidationError
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
@@ -72,6 +73,25 @@ def load_config(path: str | Path) -> BridgeConfig:
     return cfg
 
 
+def open_sink(args: argparse.Namespace) -> None:
+    """Send the recording where the Rerun options say, as `rr.script_setup` does, without making a new recording.
+
+    Args:
+        args: The parsed command line arguments.
+    """
+    rec = rr.get_global_data_recording()
+    if args.stdout:
+        rec.stdout()
+    elif args.serve:
+        serve(args.allow_origin, open_browser=not args.headless)
+    elif args.connect:
+        rec.connect_grpc(args.url)
+    elif args.save is not None:
+        rec.save(args.save)
+    elif not args.headless:
+        rec.spawn()
+
+
 def serve(allowed_origins: list[str] | None, open_browser: bool) -> None:
     """Host a gRPC server and a web viewer, as `rr.script_setup` does for --serve, and print how to connect.
 
@@ -79,7 +99,6 @@ def serve(allowed_origins: list[str] | None, open_browser: bool) -> None:
         allowed_origins: Extra origins whose web viewers may connect to the gRPC server.
         open_browser: Open the web viewer in a browser on this machine.
     """
-    rr.init(application_id="ros_rerun_bridge", default_enabled=True, strict=True)
     grpc_url = rr.get_global_data_recording().serve_grpc(cors_allow_origin=allowed_origins)
     rr.serve_web_viewer(open_browser=open_browser, connect_to=grpc_url)
     # The web viewer only connects when given the server in its `url` parameter
@@ -126,19 +145,25 @@ def run(argv: list[str] | None = None) -> None:
     # Parse known so leftover go to rclpy, without the `--` separating them
     args, unknownargs = parser.parse_known_args(argv)
     unknownargs = [arg for arg in unknownargs if arg != "--"]
-    # Before any viewer opens, so a config error is not hidden behind its window
-    cfg = load_config(args.config)
+    try:
+        cfg = load_config(args.config)
+    except (ValidationError, FileNotFoundError) as e:
+        parser.exit(2, f"{parser.prog}: error: {e}\n")
+
+    # What the modules log while they are built is kept until the viewer is opened, so a config error stops the bridge
+    # before a viewer window opens
+    rr.init(application_id="ros_rerun_bridge", default_enabled=True, strict=True)
+    rclpy.init(args=unknownargs)
+    try:
+        node = BridgeNode(cfg)
+    except (ValueError, ImportError) as e:
+        rclpy.try_shutdown()
+        parser.exit(2, f"{parser.prog}: error: {e}\n")
 
     # Spawning the viewer looks `rerun` up on PATH. Use the one installed with this package, which matches the SDK
     # version, also when its environment is not on PATH (e.g. after `uv tool install`).
     os.environ["PATH"] = os.pathsep.join([os.path.dirname(sys.executable), os.environ.get("PATH", "")])
-    if args.serve and not args.stdout:
-        serve(args.allow_origin, open_browser=not args.headless)
-    else:
-        rr.script_setup(args, "ros_rerun_bridge")
-
-    rclpy.init(args=unknownargs)
-    node = BridgeNode(cfg)
+    open_sink(args)
 
     try:
         rclpy.spin(node, executor=rclpy.executors.MultiThreadedExecutor())

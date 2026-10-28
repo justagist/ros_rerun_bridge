@@ -99,7 +99,7 @@ class StatesModule(TopicToComponentModule):
             context: Shared context for all modules.
         """
         if not config.msg_type:
-            raise ValueError(f"[{config.name}] the states module needs `msg_type` set")
+            raise ValueError("the states module needs `msg_type` set")
         super().__init__(node, config, context)
         self._ros_type = field_type(self._resolve_msg_type(), self.params.field)
         if not is_single_value(self._ros_type):

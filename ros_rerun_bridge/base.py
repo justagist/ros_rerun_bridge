@@ -90,7 +90,7 @@ class TopicToComponentModule:
             try:
                 self.params = self.PARAMS.model_validate(self.params)
             except ValidationError as e:
-                raise ValueError(f"[{config.name}] invalid 'params' config for {self.__class__.__name__}: {e}") from e
+                raise ValueError(f"invalid 'params' config for {self.__class__.__name__}: {e}") from e
 
         self._sub = None
 

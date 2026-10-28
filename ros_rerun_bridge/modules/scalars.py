@@ -84,7 +84,7 @@ class ScalarsModule(TopicToComponentModule):
             context: Shared context for all modules.
         """
         if not config.msg_type:
-            raise ValueError(f"[{config.name}] the scalars module needs `msg_type` set")
+            raise ValueError("the scalars module needs `msg_type` set")
         super().__init__(node, config, context)
         msg_type = self._resolve_msg_type()
         for field in self.params.fields:
