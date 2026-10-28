@@ -13,6 +13,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - The example configs moved from `example_configs/` to `examples/nav2_turtlebot3/` and `examples/moveit_panda/`.
 
+### Fixed
+
+- Colour params (`scalars`, `range`, `particle_cloud`) reject channels outside 0-255, which Rerun would otherwise wrap round.
+
 ## [0.3.0] - 2026-10-27
 
 ### Removed
