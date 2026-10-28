@@ -47,7 +47,7 @@ Use two `tf` modules, one for `/tf` and one for `/tf_static`, each with its own 
 | Param | Default | |
 | --- | --- | --- |
 | `static` | `false` | Log transforms as valid at all times. Set for `/tf_static`. |
-| `axis_length` | none | Draw each frame's x (red), y (green) and z (blue) axes, this long in metres, as rviz's TF display does. Rerun draws none otherwise. |
+| `axis_length` | none | Draw each frame's x (red), y (green) and z (blue) axes, this long in metres (above 0), as rviz's TF display does. Rerun draws none otherwise. |
 | `frame_names` | `false` | Label each frame's axes with its name. Needs `axis_length`. |
 
 Each frame's axes are drawn on an entity of their own, `frames/<frame>`, whichever module's `entity_path` the transform is on. A frame that several modules see, e.g. one from `/tf_static` and `/joint_states`, is drawn once, with the settings of the module that drew it last: give modules the same settings, or set them on one only. In the viewer, hide one frame's axes with the eye next to it under `frames`, or select it and override *Show frame* to show or hide its name alone.
@@ -72,7 +72,7 @@ Not needed if `robot_state_publisher` already publishes the joints on `/tf`. Giv
 
 | Param | Default | |
 | --- | --- | --- |
-| `axis_length` | none | Draw each link's frame as axes, this long in metres, each on its own entity under `frames`, as for [`tf`](#tf). |
+| `axis_length` | none | Draw every link's frame in the robot model as axes, fixed links included, this long in metres, as for [`tf`](#tf). |
 | `frame_names` | `false` | Label each frame's axes with its name. Needs `axis_length`. |
 
 ## `image`

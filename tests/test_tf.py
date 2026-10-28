@@ -59,12 +59,19 @@ def test_each_frame_gets_its_own_axes_entity_once(node, build, recording):
 def test_without_axis_length_no_axes_are_drawn(node, build, recording):
     build("tf", entity_path="tf")
     node.publish(TFMessage(transforms=[transform("map", "odom", 1.0)]))
-    assert not [entity for entity in recording.entities() if entity.startswith("/frames")]
+    rows = [row for entity in recording.entities() for row in recording.rows(entity)]
+    assert not [row for row in rows if any(key.startswith("TransformAxes3D:") for key in row)]
 
 
 def test_frame_names_need_axes(build):
     with pytest.raises(ValueError, match="frame_names needs axis_length"):
         build("tf", params={"frame_names": True})
+
+
+@pytest.mark.parametrize("axis_length", [0.0, -0.1, float("inf"), float("nan")])
+def test_axis_length_must_be_finite_and_positive(build, axis_length):
+    with pytest.raises(ValueError, match="axis_length"):
+        build("tf", params={"axis_length": axis_length})
 
 
 def test_a_frame_seen_by_two_modules_is_drawn_once(node, build, recording):
