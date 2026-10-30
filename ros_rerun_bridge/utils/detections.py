@@ -7,7 +7,7 @@ import zlib
 from collections.abc import Sequence
 from typing import Any
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 import rerun as rr
 
@@ -31,7 +31,8 @@ class DetectionClass(StrictParamsModel):
 class DetectionParams(StrictParamsModel):
     """Parameters for the modules that draw detections."""
 
-    classes: list[DetectionClass] = []
+    # Leaves one of Rerun's 16-bit class ids for classes not listed
+    classes: list[DetectionClass] = Field(default=[], max_length=_CLASS_IDS - 1)
     """Label and colour per class. Classes not listed are shown with their id, in a colour Rerun picks for each."""
 
     @model_validator(mode="after")

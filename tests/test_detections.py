@@ -16,9 +16,10 @@ def hypothesis(class_id: str, score: float) -> ObjectHypothesisWithPose:
 
 def box_2d(x: float, y: float, width: float, height: float, theta: float = 0.0, **fields) -> Detection2D:
     detection = Detection2D(**fields)
-    detection.bbox.center.position.x, detection.bbox.center.position.y = x, y
-    detection.bbox.center.theta = theta
-    detection.bbox.size_x, detection.bbox.size_y = width, height
+    # float64 fields only take floats when ROS checks message fields (ROS_PYTHON_CHECK_FIELDS)
+    detection.bbox.center.position.x, detection.bbox.center.position.y = float(x), float(y)
+    detection.bbox.center.theta = float(theta)
+    detection.bbox.size_x, detection.bbox.size_y = float(width), float(height)
     return detection
 
 
@@ -115,6 +116,12 @@ def test_no_3d_detections_clear_the_boxes(node, build, recording):
     node.publish(msg)
     node.publish(Detection3DArray())
     assert recording.latest("/detections", "Boxes3D:half_sizes") == []
+
+
+def test_listing_every_class_id_is_an_error(build):
+    # Unlisted classes need a class id of their own
+    with pytest.raises(ValueError, match="at most 65535 items"):
+        build("detections_2d", params={"classes": [{"id": str(i)} for i in range(65536)]})
 
 
 def test_a_class_listed_twice_is_an_error(build):
