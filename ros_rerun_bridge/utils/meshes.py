@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
@@ -22,7 +24,11 @@ def mesh_path(filename: str) -> Path | None:
             return Path(get_package_share_directory(package)) / relative
         except PackageNotFoundError:
             return None
-    return Path(filename.removeprefix("file://"))
+    if filename.startswith("file://"):
+        # A URI, e.g. from Path.as_uri(): percent-encoded, and possibly naming localhost
+        uri = urlparse(filename)
+        return Path(url2pathname(("" if uri.netloc == "localhost" else uri.netloc) + uri.path))
+    return Path(filename)
 
 
 def collada_unit(filename: str) -> float:

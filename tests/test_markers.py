@@ -329,7 +329,15 @@ def test_mesh_markers_with_embedded_materials_keep_their_colours(node, build, re
     build("marker_array", entity_path="markers")
     mesh = marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh), mesh_use_embedded_materials=True)
     node.publish(MarkerArray(markers=[mesh]))
-    assert recording.rows("/markers/ns/0")[0].get("Asset3D:albedo_factor") is None
+    assert recording.rows("/markers/ns/0")[0]["Asset3D:albedo_factor"] == []
+
+
+def test_mesh_markers_switching_to_embedded_materials_drop_their_colour(node, build, recording, obj_mesh):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
+    mesh = marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh), mesh_use_embedded_materials=True)
+    node.publish(MarkerArray(markers=[mesh]))
+    assert recording.latest("/markers/ns/0", "Asset3D:albedo_factor") == []
 
 
 def test_unchanged_meshes_are_logged_once(node, build, recording, obj_mesh):
@@ -391,3 +399,80 @@ def test_a_deleted_mesh_marker_re_added_unchanged_is_drawn_again(node, build, re
     node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, action=Marker.DELETE)]))
     node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
     assert bytes(recording.latest("/markers/ns/0", "Asset3D:blob")[0]) == obj_mesh.read_bytes()
+
+
+def mesh_at(resource: Path, seconds: int, colour: ColorRGBA) -> MarkerArray:
+    mesh = marker(Marker.MESH_RESOURCE, mesh_resource=str(resource))
+    mesh.header.stamp = TimeMsg(sec=seconds)
+    mesh.color = colour
+    return MarkerArray(markers=[mesh])
+
+
+def test_late_mesh_markers_are_drawn_in_their_place(node, build, recording, obj_mesh):
+    red, green = ColorRGBA(r=1.0, a=1.0), ColorRGBA(g=1.0, a=1.0)
+    build("marker_array", entity_path="markers")
+    node.publish(mesh_at(obj_mesh, 10, red))
+    node.publish(mesh_at(obj_mesh, 20, red))
+    # Received last, e.g. from a replayed bag
+    node.publish(mesh_at(obj_mesh, 15, green))
+
+    colours = sorted(
+        (row["ros_time"], row["Asset3D:albedo_factor"][0])
+        for row in recording.rows("/markers/ns/0")
+        if "Asset3D:albedo_factor" in row
+    )
+    # Red from 10 s, green from 15 s, and red again from 20 s, as the meshes were published
+    assert colours == [(10_000_000_000, 0xFF0000FF), (15_000_000_000, 0x00FF00FF), (20_000_000_000, 0xFF0000FF)]
+
+
+def test_files_that_are_not_meshes_warn(node, build, tmp_path):
+    build("marker_array", entity_path="markers")
+    image = tmp_path / "part.png"
+    image.write_bytes(b"")
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(image))]))
+    assert "is not in a format Rerun loads" in node.log_messages[-1][1]
+
+
+def test_gltf_meshes_referring_to_other_files_warn(node, build, recording, tmp_path):
+    build("marker_array", entity_path="markers")
+    mesh = tmp_path / "part.gltf"
+    mesh.write_text('{"buffers": [{"uri": "part.bin", "byteLength": 36}]}')
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(mesh))]))
+    assert (
+        node.log_messages[-1][1]
+        == f"[marker_array] mesh '{mesh}' refers to other files, which Rerun cannot load: use a .glb file"
+    )
+
+
+def test_gltf_meshes_with_embedded_buffers_are_drawn(node, build, recording, tmp_path):
+    build("marker_array", entity_path="markers")
+    mesh = tmp_path / "part.gltf"
+    mesh.write_text('{"buffers": [{"uri": "data:application/octet-stream;base64,AAAA", "byteLength": 3}]}')
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(mesh))]))
+    assert recording.rows("/markers/ns/0")[0]["Asset3D:media_type"] == ["model/gltf+json"]
+
+
+def test_file_uris_are_decoded(node, build, recording, tmp_path):
+    build("marker_array", entity_path="markers")
+    mesh = tmp_path / "my parts" / "triangle.obj"
+    mesh.parent.mkdir()
+    mesh.write_text("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")
+    uris = [mesh.as_uri(), f"file://localhost{mesh.as_uri().removeprefix('file://')}"]
+    meshes = [marker(Marker.MESH_RESOURCE, marker_id=i, mesh_resource=uri) for i, uri in enumerate(uris)]
+    node.publish(MarkerArray(markers=meshes))
+    for i in range(len(uris)):
+        assert bytes(recording.latest(f"/markers/ns/{i}", "Asset3D:blob")[0]) == mesh.read_bytes()
+
+
+def test_meshes_that_cannot_be_read_warn_and_clear_the_marker(node, build, recording, obj_mesh, monkeypatch):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.CUBE)]))
+
+    # A file found but not readable, which a permission check would not show when the tests run as root, e.g. in CI
+    def unreadable(path: Path) -> bytes:
+        raise PermissionError(13, "Permission denied", str(path))
+
+    monkeypatch.setattr(Path, "read_bytes", unreadable)
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
+    assert "Permission denied" in node.log_messages[-1][1]
+    assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []

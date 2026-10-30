@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from functools import lru_cache
 
@@ -16,8 +17,15 @@ from ..types import StrictParamsModel
 from ..utils.meshes import collada_unit, mesh_path
 from ..utils.utils import set_rr_time_from_ros, stamp_or_now
 
-# Rerun's SDK guesses the media type of every mesh format its viewer loads but Collada
-_COLLADA = "model/vnd.collada+xml"
+# The mesh formats Rerun's viewer loads. Its SDK guesses the media type of each but Collada.
+_MESH_MEDIA_TYPES = {
+    ".dae": "model/vnd.collada+xml",
+    ".glb": rr.components.MediaType.GLB,
+    ".gltf": rr.components.MediaType.GLTF,
+    ".obj": rr.components.MediaType.OBJ,
+    ".ply": rr.components.MediaType.PLY,
+    ".stl": rr.components.MediaType.STL,
+}
 _COLLADA_VERSION = re.compile(rb"""<COLLADA\b[^>]*\bversion\s*=\s*["']([^"']+)""")
 
 
@@ -115,7 +123,8 @@ def mesh_from_marker(marker: Marker) -> tuple[rr.Asset3D, list[float]]:
     colour = None if marker.mesh_use_embedded_materials else _rgba(marker.color)
     s = marker.scale
     scale = [s.x * unit, s.y * unit, s.z * unit]
-    return rr.Asset3D(contents=contents, media_type=media_type, albedo_factor=colour), scale
+    # clear_unset: a marker switching to embedded materials must not keep its old colour
+    return rr.Asset3D.from_fields(clear_unset=True, blob=contents, media_type=media_type, albedo_factor=colour), scale
 
 
 @lru_cache(maxsize=64)
@@ -129,25 +138,33 @@ def _load_mesh(resource: str) -> tuple[bytes, str, float]:
         The mesh file's contents, its media type, and the metres per unit it declares.
 
     Raises:
-        ValueError: If the mesh cannot be found, or is in a format or Collada version Rerun does not load.
+        ValueError: If the mesh cannot be found, is in a format or Collada version Rerun does not load, or is a glTF
+            file that refers to other files.
+        OSError: If the mesh cannot be read.
     """
     if "://" in resource and not resource.startswith(("package://", "file://")):
         raise ValueError(f"mesh '{resource}' is not a package:// or file:// path")
     path = mesh_path(resource)
     if path is None or not path.is_file():
         raise ValueError(f"mesh '{resource}' not found")
-    if path.suffix.lower() == ".dae":
-        contents = path.read_bytes()
-        # Rerun's viewer only reports this itself, where it may not be seen, e.g. on another machine
+    suffix = path.suffix.lower()
+    if suffix not in _MESH_MEDIA_TYPES:
+        raise ValueError(f"mesh '{resource}' is not in a format Rerun loads (Collada, glTF, OBJ, PLY or STL)")
+    contents = path.read_bytes()
+    # Rerun's viewer only reports these itself, where it may not be seen, e.g. on another machine
+    if suffix == ".dae":
         version = _COLLADA_VERSION.search(contents[:16384])
         if version and version.group(1) != b"1.4.1":
             raise ValueError(f"mesh '{resource}' is Collada {version.group(1).decode()}, and Rerun only loads 1.4.1")
         # Rerun's Collada importer ignores the unit, which rviz applies
-        return contents, _COLLADA, collada_unit(resource)
-    media_type = rr.components.MediaType.guess_from_path(path)
-    if media_type is None:
-        raise ValueError(f"mesh '{resource}' is not in a format Rerun loads (Collada, glTF, OBJ, PLY or STL)")
-    return path.read_bytes(), media_type, 1.0
+        return contents, _MESH_MEDIA_TYPES[suffix], collada_unit(resource)
+    if suffix == ".gltf":
+        # Rerun is sent the file alone, so it cannot load the buffers and images it refers to
+        gltf = json.loads(contents)
+        uris = [item.get("uri") for item in gltf.get("buffers", []) + gltf.get("images", [])]
+        if any(uri and not uri.startswith("data:") for uri in uris):
+            raise ValueError(f"mesh '{resource}' refers to other files, which Rerun cannot load: use a .glb file")
+    return contents, _MESH_MEDIA_TYPES[suffix], 1.0
 
 
 def _ns_part(ns: str) -> str:
@@ -174,8 +191,9 @@ class MarkerArrayModule(TopicToComponentModule):
         """Type and archetype class last logged per marker (ns, id), to clear its shape on a type change or deletion."""
         self._expiries: dict[tuple[str, int], tuple[int, int]] = {}
         """Per marker with a lifetime: when to clear it (node time, ns), and the time to log the clear at (ns)."""
-        self._meshes: dict[tuple[str, int], tuple] = {}
-        """The mesh last logged per MESH_RESOURCE marker (ns, id), so a mesh is only logged again when it changes."""
+        self._meshes: dict[tuple[str, int], tuple[tuple, int, rr.Asset3D]] = {}
+        """Per MESH_RESOURCE marker (ns, id), its latest stamped mesh, the stamp (ns) and asset, so a mesh is only
+        logged again when it changes."""
         self.node.create_timer(0.1, self._expire, callback_group=self.callback_group)
 
     @classmethod
@@ -204,7 +222,7 @@ class MarkerArrayModule(TopicToComponentModule):
             try:
                 archetype, scale = mesh_from_marker(marker)
                 error = None
-            except ValueError as e:
+            except (ValueError, OSError) as e:
                 archetype, error = None, str(e)
         else:
             archetype = archetype_from_marker(marker)
@@ -219,13 +237,19 @@ class MarkerArrayModule(TopicToComponentModule):
         if previous is not None and previous[0] != marker.type:
             self._clear([key])
         self._shapes[key] = (marker.type, type(archetype))
+        archetypes, relog = (archetype,), None
         if marker.type == Marker.MESH_RESOURCE:
-            # A mesh can be large, and markers are often republished unchanged: log it only when it changes
             mesh = (marker.mesh_resource, marker.mesh_use_embedded_materials, tuple(_rgba(marker.color)))
-            archetypes = () if self._meshes.get(key) == mesh else (archetype,)
-            self._meshes[key] = mesh
-        else:
-            archetypes = (archetype,)
+            latest = self._meshes.get(key)
+            if latest is None or stamp.nanoseconds >= latest[1]:
+                # A mesh can be large, and markers are often republished unchanged: log it only when it changes
+                if latest is not None and latest[0] == mesh:
+                    archetypes = ()
+                self._meshes[key] = (mesh, stamp.nanoseconds, archetype)
+            else:
+                # A late message, e.g. from a replayed bag, is logged at its stamp, where its mesh would also stand for
+                # the unchanged meshes not logged after it: the latest one is logged again at its stamp
+                relog = latest
         # The marker's pose places its own frame in the header frame
         p, q = marker.pose.position, marker.pose.orientation
         # rviz treats an all-zero orientation, common in hand-written publishers, as identity
@@ -245,6 +269,9 @@ class MarkerArrayModule(TopicToComponentModule):
             rr.CoordinateFrame(frame=marker_frame),
             *archetypes,
         )
+        if relog is not None:
+            set_rr_time_from_ros(Time(nanoseconds=relog[1]))
+            rr.log(path, relog[2])
         lifetime = Duration.from_msg(marker.lifetime).nanoseconds
         if lifetime > 0:
             # As rviz, the lifetime runs from when the marker is received; the clear is logged relative to its stamp
