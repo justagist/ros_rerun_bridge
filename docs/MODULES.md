@@ -13,6 +13,7 @@ For messages with a header, spatial modules draw the data in the header's TF fra
 | [`compressed_image`](#compressed_image) | `sensor_msgs/CompressedImage` | JPEG and PNG camera images |
 | [`depth_image`](#depth_image) | `sensor_msgs/Image` | Depth images, also as point clouds |
 | [`compressed_depth_image`](#compressed_depth_image) | `sensor_msgs/CompressedImage` | `compressedDepth` images, also as point clouds |
+| [`segmentation_image`](#segmentation_image) | `sensor_msgs/Image` | Segmentation masks, with class names and colours |
 | [`camera_info`](#camera_info) | `sensor_msgs/CameraInfo` | Camera intrinsics, to show images in 3D |
 | [`pointcloud2`](#pointcloud2) | `sensor_msgs/PointCloud2` | Point clouds |
 | [`laserscan`](#laserscan) | `sensor_msgs/LaserScan` | Laser scans |
@@ -109,6 +110,27 @@ Logs depth images as `compressed_depth_image_transport` publishes them (e.g. on 
 * `RVL`: `16UC1` and `32FC1`.
 
 This uses Rerun's encoded depth images, which Rerun marks as unstable in 0.40.
+
+## `segmentation_image`
+
+Logs segmentation masks, images whose pixels are class ids, in `mono8`, `8UC1`, `mono16` or `16UC1`. They are logged on the image plane like [`image`](#image), so they are drawn over the camera image in 3D, half transparent. Hovering over a pixel shows its class.
+
+To draw a mask over its camera image in 2D too, put the mask under the image's `entity_path`, e.g. `camera/image/segmentation` for an image on `camera/image`, or add it to the 2D view's contents in your layout.
+
+| Param | Default | |
+| --- | --- | --- |
+| `classes` | none | Label and colour per class: `id`, and optionally `label` and `colour` (RGBA). Ids not listed, and listed ones without a colour, are shown in a colour Rerun picks for each id, class 0 included. Give a class a transparent colour, e.g. `[0, 0, 0, 0]`, to leave its pixels uncoloured. |
+
+```yaml
+- name: segmentation
+  module: segmentation_image
+  topic: /camera/segmentation
+  entity_path: camera/image/segmentation
+  params:
+    classes:
+      - { id: 0, label: background, colour: [0, 0, 0, 0] }
+      - { id: 1, label: person, colour: [220, 40, 40, 255] }
+```
 
 ## `camera_info`
 
