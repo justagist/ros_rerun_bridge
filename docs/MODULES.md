@@ -14,6 +14,8 @@ For messages with a header, spatial modules draw the data in the header's TF fra
 | [`depth_image`](#depth_image) | `sensor_msgs/Image` | Depth images, also as point clouds |
 | [`compressed_depth_image`](#compressed_depth_image) | `sensor_msgs/CompressedImage` | `compressedDepth` images, also as point clouds |
 | [`segmentation_image`](#segmentation_image) | `sensor_msgs/Image` | Segmentation masks, with class names and colours |
+| [`detections_2d`](#detections_2d) | `vision_msgs/Detection2DArray` | Detection boxes over camera images |
+| [`detections_3d`](#detections_3d) | `vision_msgs/Detection3DArray` | 3D detection boxes |
 | [`camera_info`](#camera_info) | `sensor_msgs/CameraInfo` | Camera intrinsics, to show images in 3D |
 | [`pointcloud2`](#pointcloud2) | `sensor_msgs/PointCloud2` | Point clouds |
 | [`laserscan`](#laserscan) | `sensor_msgs/LaserScan` | Laser scans |
@@ -130,6 +132,38 @@ To draw a mask over its camera image in 2D too, put the mask under the image's `
     classes:
       - { id: 0, label: background, colour: [0, 0, 0, 0] }
       - { id: 1, label: person, colour: [220, 40, 40, 255] }
+```
+
+## `detections_2d`
+
+Draws each detection's box, in pixels, on the image plane like [`image`](#image), so the boxes are drawn over the camera image in 2D and in 3D. Boxes are drawn as outlines, rotated by their `theta`. Each is labelled with its best-scoring hypothesis's class, its tracking `id` if set, and the hypothesis's score, e.g. `person #7 0.92`, and coloured by that class. Needs `vision_msgs`.
+
+To draw the boxes over their camera image in 2D too, put them under the image's `entity_path`, e.g. `camera/image/detections` for an image on `camera/image`, or add them to the 2D view's contents in your layout.
+
+| Param | Default | |
+| --- | --- | --- |
+| `classes` | none | Label and colour per class: `id`, the hypotheses' `class_id`, and optionally `label` and `colour` (RGBA). Classes not listed, and listed ones without a colour, are shown in a colour Rerun picks for each class, the same in every run. Unlisted classes are labelled with their `class_id`. |
+
+```yaml
+- name: detections
+  module: detections_2d
+  topic: /camera/detections
+  entity_path: camera/image/detections
+  params:
+    classes:
+      - { id: "1", label: person, colour: [220, 40, 40, 255] }
+      - { id: "2", label: car }
+```
+
+## `detections_3d`
+
+Draws each detection's box in the header's frame, labelled and coloured as [`detections_2d`](#detections_2d) does, with the same `classes` param. Needs `vision_msgs`.
+
+```yaml
+- name: detections_3d
+  module: detections_3d
+  topic: /detections_3d
+  entity_path: detections
 ```
 
 ## `camera_info`

@@ -26,7 +26,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            ros-jazzy-laser-geometry ros-jazzy-sensor-msgs-py ros-jazzy-nav2-msgs
+            ros-jazzy-laser-geometry ros-jazzy-sensor-msgs-py ros-jazzy-nav2-msgs ros-jazzy-vision-msgs
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Test
         shell: bash
