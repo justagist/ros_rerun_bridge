@@ -13,8 +13,8 @@ import rerun as rr
 from ..base import ModuleConfig, TopicToComponentModule
 from ..context import BridgeContext
 from ..registry import REGISTRY
-from ..types import Rgba, StrictParamsModel
-from ..utils.fields import check_field, is_array
+from ..types import StrictParamsModel
+from ..utils.fields import check_field, field_type, is_array, is_string_array
 
 
 class ScalarsParams(StrictParamsModel):
@@ -26,8 +26,10 @@ class ScalarsParams(StrictParamsModel):
     """Draw each series as a line or as points."""
     names: list[str] | None = None
     """Series names, one per array element, for every field. Rerun's default is the entity path and element index."""
-    colours: list[Rgba] | None = None
-    """RGBA colour per series, as uint8. The last one applies to any remaining series."""
+    names_field: str | None = None
+    """Dotted path to an array of strings naming the elements of the array fields, e.g. `name` on a JointState. Each
+    element is then plotted as a series of its own, found by its name rather than its position in the array. Cannot
+    be used with `names`: setting both is an error."""
     width: float | None = None
     """Line width, in UI points. Lines only."""
     interpolation: Literal["linear", "step_after", "step_before", "step_mid"] | None = None
@@ -56,6 +58,8 @@ class ScalarsParams(StrictParamsModel):
             raise ValueError("variance and unit are drawn as lines, and cannot be used with style 'points'")
         if self.variance is not None and len(self.fields) != 1:
             raise ValueError("variance needs exactly one field")
+        if self.names is not None and self.names_field is not None:
+            raise ValueError("names and names_field cannot both be set: names_field names the series")
         other = ("marker", "marker_size") if self.style == "lines" else ("width", "interpolation")
         if given := [name for name in other if getattr(self, name) is not None]:
             raise ValueError(f"{', '.join(given)} cannot be used with style '{self.style}'")
@@ -67,9 +71,10 @@ class ScalarsModule(TopicToComponentModule):
     """Module for plotting numeric fields of any message type as time series.
 
     Each field is logged on `<entity_path>/<field>`, with the field's dots as slashes. An array is plotted as one series
-    per element, with a gap in a series while an array is too short to have it. Non-finite values, such as a Range's
-    +inf, break the line. With a `variance` or a `unit`, values are logged as Rerun measurements instead of scalars. The
-    config must set `msg_type`.
+    per element, with a gap in a series while an array is too short to have it. With `names_field`, each element is
+    instead logged on `<entity_path>/<field>/<name>`, so it keeps its series whatever its position. Non-finite values,
+    such as a Range's +inf, break the line. With a `variance` or a `unit`, values are logged as Rerun measurements
+    instead of scalars. The config must set `msg_type`.
     """
 
     PARAMS = ScalarsParams
@@ -87,8 +92,14 @@ class ScalarsModule(TopicToComponentModule):
             raise ValueError("the scalars module needs `msg_type` set")
         super().__init__(node, config, context)
         msg_type = self._resolve_msg_type()
-        for field in self.params.fields:
-            check_field(msg_type, field)
+        field_types = {field: check_field(msg_type, field) for field in self.params.fields}
+        self._names = None
+        if (names_field := self.params.names_field) is not None:
+            if not is_string_array(names_type := field_type(msg_type, names_field)):
+                raise ValueError(f"names_field '{names_field}' is {names_type}, not an array of strings")
+            if single := [field for field, ros_type in field_types.items() if not is_array(ros_type)]:
+                raise ValueError(f"names_field names array elements, and {', '.join(single)} is not an array")
+            self._names = attrgetter(names_field)
         if self.params.variance is not None:
             # One variance, applied to every element: arrays of variances could mismatch the values on every message
             if is_array(variance_type := check_field(msg_type, self.params.variance)):
@@ -97,48 +108,93 @@ class ScalarsModule(TopicToComponentModule):
         self._fields = {
             f"{self.entity_path}/{field.replace('.', '/')}": attrgetter(field) for field in self.params.fields
         }
+        self._field_names = dict(zip(self._fields, self.params.fields))
         self._sizes: dict[str, int] = {}
         """Most values logged at once per entity path."""
-        if (style := self._series_style()) is not None:
+        self._named_paths: set[str] = set()
+        """The entity paths of the named elements seen so far, each with its series style logged."""
+        if self._names is None and (style := self._series_style(self.params.names)) is not None:
             for path in self._fields:
                 rr.log(path, style, static=True)
 
-    def _series_style(self) -> rr.SeriesLines | rr.SeriesPoints | rr.Measurements | None:
-        """The series style from the params, or None to keep Rerun's default lines."""
+    def _series_style(self, names: list[str] | None) -> rr.SeriesLines | rr.SeriesPoints | rr.Measurements | None:
+        """The series style from the params, or None to keep Rerun's default lines.
+
+        Args:
+            names: The series names, one per array element.
+        """
         p = self.params
         if p.style == "points":
             # Logging any SeriesPoints component is what makes Rerun draw points
-            return rr.SeriesPoints(
-                names=p.names, colors=p.colours, markers=p.marker or "circle", marker_sizes=p.marker_size
-            )
+            return rr.SeriesPoints(names=names, markers=p.marker or "circle", marker_sizes=p.marker_size)
         interpolation = "".join(word.capitalize() for word in p.interpolation.split("_")) if p.interpolation else None
         if p.measurements:
             # Measurements carry their own style, and the unit with it
             units = [p.unit] if p.unit is not None else None
             return rr.Measurements.from_fields(
-                names=p.names, colors=p.colours, widths=p.width, interpolation_mode=interpolation, units=units
+                names=names, widths=p.width, interpolation_mode=interpolation, units=units
             )
-        if all(value is None for value in (p.names, p.colours, p.width, p.interpolation)):
+        if all(value is None for value in (names, p.width, p.interpolation)):
             return None
-        return rr.SeriesLines(names=p.names, colors=p.colours, widths=p.width, interpolation_mode=interpolation)
+        return rr.SeriesLines(names=names, widths=p.width, interpolation_mode=interpolation)
 
     def _extract_time(self, msg: Any) -> Time | None:
         header = getattr(msg, "header", None)
         return Time.from_msg(header.stamp) if header is not None else None
 
     def handle(self, msg: Any) -> None:
+        if self._names is not None:
+            self._log_named(msg)
+            return
         for path, get in self._fields.items():
             values = np.atleast_1d(np.asarray(get(msg), dtype=np.float64))
             # Rerun expects as many values on an entity every time: a shorter array is padded with NaN, which leaves a
             # gap in the series it lacks
             size = self._sizes[path] = max(self._sizes.get(path, 0), values.size)
             padded = np.pad(values, (0, size - values.size), constant_values=np.nan)
-            if not self.params.measurements:
-                rr.log(path, rr.Scalars(padded))
-            elif self._variance is None:
-                rr.log(path, rr.Measurements.from_fields(values=padded))
-            else:
+            variances = None
+            if self._variance is not None:
                 # One variance applies to every element of an array
                 variances = np.broadcast_to(np.asarray(self._variance(msg), dtype=np.float64), values.shape)
                 variances = np.pad(variances, (0, size - values.size), constant_values=np.nan)
-                rr.log(path, rr.Measurements.from_fields(values=padded, variances=variances))
+            self._log(path, padded, variances)
+
+    def _log_named(self, msg: Any) -> None:
+        """Log each element of the array fields on its own entity, named by `names_field`.
+
+        Args:
+            msg: The message.
+        """
+        names = list(self._names(msg))
+        variance = None if self._variance is None else [float(self._variance(msg))]
+        for path, get in self._fields.items():
+            values = np.asarray(get(msg), dtype=np.float64)
+            # e.g. a JointState's velocity and effort, left empty by publishers that do not measure them
+            if values.size == 0:
+                continue
+            if values.size != len(names):
+                raise ValueError(
+                    f"'{self._field_names[path]}' has {values.size} values for the {len(names)} names in "
+                    f"'{self.params.names_field}'"
+                )
+            for name, value in zip(names, values):
+                element = f"{path}/{rr.escape_entity_path_part(name)}"
+                if element not in self._named_paths:
+                    rr.log(element, self._series_style([name]), static=True)
+                    self._named_paths.add(element)
+                self._log(element, [value], variance)
+
+    def _log(self, path: str, values: Any, variances: Any | None) -> None:
+        """Log values as scalars, or as measurements when the params give a variance or a unit.
+
+        Args:
+            path: The entity path.
+            values: The values, one per series.
+            variances: Their variances, or None if the params give no variance.
+        """
+        if not self.params.measurements:
+            rr.log(path, rr.Scalars(values))
+        elif variances is None:
+            rr.log(path, rr.Measurements.from_fields(values=values))
+        else:
+            rr.log(path, rr.Measurements.from_fields(values=values, variances=variances))

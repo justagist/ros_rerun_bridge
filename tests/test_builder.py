@@ -94,13 +94,12 @@ def test_invalid_qos_is_an_error(build, qos, error):
     [
         ("range", {"colour": [0, 300, 0, 255]}),
         ("particle_cloud", {"colour": [-1, 0, 0, 255]}),
-        ("scalars", {"fields": ["range"], "colours": [[0, 0, 256, 255]]}),
         ("bar_chart", {"field": "effort", "colour": [0, 0, 0, 300]}),
     ],
 )
 def test_colour_channels_outside_0_to_255_are_an_error(build, module, params):
     # Rerun would wrap them round instead of rejecting them
-    msg_type = {"scalars": "sensor_msgs.msg.Range", "bar_chart": "sensor_msgs.msg.JointState"}.get(module)
+    msg_type = {"bar_chart": "sensor_msgs.msg.JointState"}.get(module)
     with pytest.raises(ValueError, match="(less|greater) than or equal to"):
         build(module, msg_type=msg_type, params=params)
 

@@ -74,6 +74,12 @@ def is_string(field_type: str) -> bool:
     return _STRING.fullmatch(field_type) is not None
 
 
+def is_string_array(field_type: str) -> bool:
+    """Whether a ROS field type is an array or sequence of strings."""
+    array = _ARRAY.fullmatch(field_type)
+    return array is not None and is_string(array.group(1) or array.group(2))
+
+
 def is_array(field_type: str) -> bool:
     """Whether a ROS field type, as `check_field` returns it, is an array or sequence."""
     return _ARRAY.fullmatch(field_type) is not None

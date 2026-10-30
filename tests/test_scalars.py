@@ -16,7 +16,7 @@ def build_scalars(build, msg_type: str, *fields: str):
 
 
 def scalars(recording, entity: str) -> list:
-    return [row["Scalars:scalars"] for row in recording.rows(entity)]
+    return [row["Scalars:scalars"] for row in recording.rows(entity) if not row["static"]]
 
 
 def test_each_field_is_plotted_on_its_own_entity(node, build, recording):
@@ -97,7 +97,6 @@ def test_line_style_is_logged_once_as_static(node, build, recording):
         params={
             "fields": ["position"],
             "names": ["shoulder", "elbow"],
-            "colours": [[255, 0, 0, 255]],
             "width": 2.0,
             "interpolation": "step_after",
         },
@@ -107,7 +106,6 @@ def test_line_style_is_logged_once_as_static(node, build, recording):
 
     [style] = static_rows(recording, "/plots/position")
     assert style["SeriesLines:names"] == ["shoulder", "elbow"]
-    assert style["SeriesLines:colors"] == [0xFF0000FF]
     assert style["SeriesLines:widths"] == [2.0]
     assert style["SeriesLines:interpolation_mode"] == [rr.components.InterpolationMode.StepAfter.value]
 
@@ -179,13 +177,12 @@ def test_measurement_unit_and_style_are_logged_once_as_static(node, build, recor
         "scalars",
         entity_path="plots",
         msg_type="sensor_msgs.msg.Range",
-        params={"fields": ["range"], "unit": "m", "names": ["distance"], "colours": [[0, 200, 255, 255]]},
+        params={"fields": ["range"], "unit": "m", "names": ["distance"]},
     )
     node.publish(Range(range=1.5))
     [style] = static_rows(recording, "/plots/range")
     assert style["Measurements:units"] == ["m"]
     assert style["Measurements:names"] == ["distance"]
-    assert style["Measurements:colors"] == [0x00C8FFFF]
     # A unit alone also makes the values measurements
     [row] = [row for row in recording.rows("/plots/range") if not row["static"]]
     assert row["Measurements:values"] == [1.5]
@@ -208,3 +205,76 @@ def test_an_array_of_variances_is_an_error(build):
     # Its length could differ from the values' on any message
     with pytest.raises(ValueError, match="variance 'd' is sequence<double>, not a single number"):
         build("scalars", msg_type="sensor_msgs.msg.CameraInfo", params={"fields": ["k"], "variance": "d"})
+
+
+def build_named(build, *fields: str, **params):
+    return build(
+        "scalars",
+        entity_path="plots",
+        msg_type="sensor_msgs.msg.JointState",
+        params={"fields": list(fields), "names_field": "name", **params},
+    )
+
+
+def test_named_elements_keep_their_series_whichever_publisher_sends_them(node, build, recording):
+    build_named(build, "position")
+    # As on /joint_states, with an arm and a gate published by different nodes
+    node.publish(JointState(name=["shoulder", "elbow"], position=[0.1, 0.2]))
+    node.publish(JointState(name=["gate"], position=[0.9]))
+    node.publish(JointState(name=["elbow", "shoulder"], position=[0.4, 0.3]))
+
+    assert scalars(recording, "/plots/position/shoulder") == [[0.1], [0.3]]
+    assert scalars(recording, "/plots/position/elbow") == [[0.2], [0.4]]
+    assert scalars(recording, "/plots/position/gate") == [[0.9]]
+
+
+def test_named_series_are_named_after_their_element(node, build, recording):
+    build_named(build, "position", width=2.0)
+    node.publish(JointState(name=["shoulder"], position=[0.1]))
+    node.publish(JointState(name=["shoulder"], position=[0.2]))
+    [style] = static_rows(recording, "/plots/position/shoulder")
+    assert style["SeriesLines:names"] == ["shoulder"]
+    assert style["SeriesLines:widths"] == [2.0]
+
+
+def test_empty_named_fields_are_skipped(node, build, recording):
+    build_named(build, "position", "velocity")
+    node.publish(JointState(name=["shoulder"], position=[0.1]))
+    assert scalars(recording, "/plots/position/shoulder") == [[0.1]]
+    assert not any(entity.startswith("/plots/velocity") for entity in recording.entities())
+    # Not an error, as the JointState spec allows it
+    assert not [message for level, message in node.log_messages if level == "error"]
+
+
+def test_named_fields_with_as_many_values_as_names_are_required(node, build):
+    build_named(build, "position")
+    node.publish(JointState(name=["shoulder", "elbow"], position=[0.1]))
+    assert "'position' has 1 values for the 2 names in 'name'" in node.log_messages[-2][1]
+
+
+def test_named_elements_can_be_measurements(node, build, recording):
+    build_named(build, "position", unit="rad")
+    node.publish(JointState(name=["shoulder"], position=[0.1]))
+    [row] = [row for row in recording.rows("/plots/position/shoulder") if not row["static"]]
+    assert row["Measurements:values"] == [0.1]
+    [style] = static_rows(recording, "/plots/position/shoulder")
+    assert style["Measurements:units"] == ["rad"]
+
+
+@pytest.mark.parametrize(
+    ("msg_type", "params", "error"),
+    [
+        ("sensor_msgs.msg.JointState", {"fields": ["position"], "names_field": "velocity"}, "not an array of strings"),
+        ("sensor_msgs.msg.JointState", {"fields": ["position"], "names_field": "header"}, "not an array of strings"),
+        ("sensor_msgs.msg.JointState", {"fields": ["position"], "names_field": "name", "names": ["a"]}, "cannot both"),
+        ("sensor_msgs.msg.Range", {"fields": ["range"], "names_field": "header.frame_id"}, "not an array of strings"),
+        (
+            "sensor_msgs.msg.JointState",
+            {"fields": ["position", "header.stamp.sec"], "names_field": "name"},
+            "header.stamp.sec is not an array",
+        ),
+    ],
+)
+def test_invalid_names_field_is_an_error(build, msg_type, params, error):
+    with pytest.raises(ValueError, match=error):
+        build("scalars", msg_type=msg_type, params=params)

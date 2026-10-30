@@ -79,7 +79,7 @@ An arm and a planner node logging through a pick-and-place cycle, and the arm's 
 
 ## [series_styles](series_styles)
 
-The same values as lines and as named points, and a mode drawn in red steps. Modules: `scalars`.
+The same values as lines and as named points, and a mode drawn in steps. Modules: `scalars`.
 
 ![series_styles](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/series_styles.gif)
 
