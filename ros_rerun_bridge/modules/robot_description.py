@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import re
 import tempfile
 import xml.etree.ElementTree as ET
-from pathlib import Path
 
-from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from rclpy.node import Node
 from std_msgs.msg import String
 
@@ -15,8 +12,7 @@ from ..base import ModuleConfig, TopicToComponentModule
 from ..context import BridgeContext
 from ..registry import REGISTRY
 from ..types import StrictParamsModel
-
-_COLLADA_UNIT = re.compile(rb"""<unit\b[^>]*\bmeter\s*=\s*(?:"([^"]+)"|'([^']+)')""")
+from ..utils.meshes import collada_unit
 
 
 @REGISTRY.register("robot_description")
@@ -96,31 +92,8 @@ class RobotDescriptionModule(TopicToComponentModule):
                 mesh = visual.find("geometry/mesh")
                 if mesh is None or not mesh.get("filename", "").lower().endswith(".dae"):
                     continue
-                unit = _collada_unit(mesh.get("filename"))
+                unit = collada_unit(mesh.get("filename"))
                 if unit == 1.0:
                     continue
                 scale = [float(s) * unit for s in mesh.get("scale", "1 1 1").split()]
                 rr.log(path, rr.InstancePoses3D.from_fields(scales=[scale]), static=True)
-
-
-def _collada_unit(filename: str) -> float:
-    """Return the metres per unit a Collada file declares, or 1.0 if it declares none or cannot be found.
-
-    Args:
-        filename: Mesh path from the URDF: `package://`, `file://` or absolute.
-    """
-    try:
-        if filename.startswith("package://"):
-            package, _, relative = filename[len("package://") :].partition("/")
-            path = Path(get_package_share_directory(package)) / relative
-        else:
-            path = Path(filename.removeprefix("file://"))
-    except PackageNotFoundError:
-        # The importer reports the missing mesh
-        return 1.0
-    if not path.is_file():
-        return 1.0
-    # <unit> is in the <asset> block at the top of the file
-    with path.open("rb") as f:
-        match = _COLLADA_UNIT.search(f.read(16384))
-    return float(match.group(1) or match.group(2)) if match else 1.0
