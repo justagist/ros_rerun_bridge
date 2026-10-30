@@ -128,6 +128,14 @@ def test_camera_info_links_the_camera_frame_to_its_image_plane(node, build, reco
     )
 
 
+@pytest.mark.parametrize(("params", "distance"), [({}, None), ({"image_plane_distance": 1.5}, [1.5])])
+def test_camera_info_draws_the_image_plane_at_its_distance(node, build, recording, params, distance):
+    build("camera_info", entity_path="camera/info", params=params)
+    node.publish(CameraInfo(width=640, height=480, k=[500.0, 0.0, 320.0, 0.0, 510.0, 240.0, 0.0, 0.0, 1.0]))
+    # Unset, Rerun picks a distance from the scene's size
+    assert recording.rows("/camera/info")[0].get("Pinhole:image_plane_distance") == distance
+
+
 def test_camera_info_is_adjusted_for_binning_and_region_of_interest(node, build, recording):
     build("camera_info", entity_path="camera/info")
     msg = CameraInfo(width=640, height=480, k=[500.0, 0.0, 320.0, 0.0, 510.0, 240.0, 0.0, 0.0, 1.0])
