@@ -4,7 +4,7 @@ Each folder holds what an example needs:
 
 * `config.yaml`: the bridge config. This is the only file the bridge needs, and the part to copy for your own robot: point its topics at yours.
 * `layout.rbl` (optional): the viewer layout and camera angle the config opens with. Without it, Rerun picks a layout itself.
-* `publisher.py`: publishes made-up data for the demo, so it runs without a robot or simulator. On a real robot, your own nodes publish the data instead. The robot arm's `robot.urdf` is part of its demo data.
+* `publisher.py`: publishes made-up data for the demo, so it runs without a robot or simulator. On a real robot, your own nodes publish the data instead. The robot arm's `robot.urdf` and the markers' `pyramid.dae` are part of their demo data.
 
 Some examples use modules that need extra ROS packages, e.g. `mobile_robot` and `point_cloud` ([INSTALLATION.md](../docs/INSTALLATION.md#ros-packages-for-some-modules)). From the repo root, with ROS sourced, run the bridge and the publisher in two terminals:
 
@@ -55,7 +55,7 @@ A tilted range sensor's cone, and its readings plotted with a band showing their
 
 ## [markers](markers)
 
-A marker changing type every 2 s, beside a fixed cube. Modules: `marker_array`.
+A marker changing type every 2 s, beside a fixed cube, ending with a Collada mesh in its own colours, [pyramid.dae](markers/pyramid.dae). Modules: `marker_array`.
 
 ![markers](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/markers.gif)
 

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import re
+from functools import lru_cache
+
 import numpy as np
 from rclpy.duration import Duration
 from rclpy.time import Time
@@ -10,7 +14,19 @@ import rerun as rr
 from ..base import TopicToComponentModule
 from ..registry import REGISTRY
 from ..types import StrictParamsModel
+from ..utils.meshes import collada_unit, mesh_path
 from ..utils.utils import set_rr_time_from_ros, stamp_or_now
+
+# The mesh formats Rerun's viewer loads. Its SDK guesses the media type of each but Collada.
+_MESH_MEDIA_TYPES = {
+    ".dae": "model/vnd.collada+xml",
+    ".glb": rr.components.MediaType.GLB,
+    ".gltf": rr.components.MediaType.GLTF,
+    ".obj": rr.components.MediaType.OBJ,
+    ".ply": rr.components.MediaType.PLY,
+    ".stl": rr.components.MediaType.STL,
+}
+_COLLADA_VERSION = re.compile(rb"""<COLLADA\b[^>]*\bversion\s*=\s*["']([^"']+)""")
 
 
 def _rgba(colour) -> np.ndarray:
@@ -25,8 +41,8 @@ def archetype_from_marker(marker: Marker):
         marker: An ADD marker.
 
     Returns:
-        The archetype, or None for marker types not supported (MESH_RESOURCE, and ARROW_STRIP, which rviz does not
-        draw either).
+        The archetype, or None for marker types not supported here: MESH_RESOURCE, which `mesh_from_marker` converts,
+        and ARROW_STRIP, which rviz does not draw either.
     """
     s = marker.scale
     points = np.array([[p.x, p.y, p.z] for p in marker.points], dtype=np.float32).reshape(-1, 3)
@@ -87,6 +103,70 @@ def archetype_from_marker(marker: Marker):
     return None
 
 
+def mesh_from_marker(marker: Marker) -> tuple[rr.Asset3D, list[float]]:
+    """Convert a MESH_RESOURCE marker to a Rerun asset, in the marker's own frame, and the scale to draw it at.
+
+    As in rviz, the marker's colour replaces the mesh's own colours unless `mesh_use_embedded_materials` is set. Rerun
+    multiplies them instead, which is the same for meshes without colours of their own, e.g. most STL files. Embedded
+    materials are not tinted by a non-zero colour, as rviz does.
+
+    Args:
+        marker: An ADD MESH_RESOURCE marker.
+
+    Returns:
+        The asset, and the marker's scale, including the unit a Collada mesh declares.
+
+    Raises:
+        ValueError: If the mesh cannot be loaded.
+    """
+    contents, media_type, unit = _load_mesh(marker.mesh_resource)
+    colour = None if marker.mesh_use_embedded_materials else _rgba(marker.color)
+    s = marker.scale
+    scale = [s.x * unit, s.y * unit, s.z * unit]
+    # clear_unset: a marker switching to embedded materials must not keep its old colour
+    return rr.Asset3D.from_fields(clear_unset=True, blob=contents, media_type=media_type, albedo_factor=colour), scale
+
+
+@lru_cache(maxsize=64)
+def _load_mesh(resource: str) -> tuple[bytes, str, float]:
+    """Read a mesh once, however many markers or messages use it.
+
+    Args:
+        resource: The marker's `mesh_resource`: `package://`, `file://` or absolute.
+
+    Returns:
+        The mesh file's contents, its media type, and the metres per unit it declares.
+
+    Raises:
+        ValueError: If the mesh cannot be found, is in a format or Collada version Rerun does not load, or is a glTF
+            file that refers to other files.
+        OSError: If the mesh cannot be read.
+    """
+    if "://" in resource and not resource.startswith(("package://", "file://")):
+        raise ValueError(f"mesh '{resource}' is not a package:// or file:// path")
+    path = mesh_path(resource)
+    if path is None or not path.is_file():
+        raise ValueError(f"mesh '{resource}' not found")
+    suffix = path.suffix.lower()
+    if suffix not in _MESH_MEDIA_TYPES:
+        raise ValueError(f"mesh '{resource}' is not in a format Rerun loads (Collada, glTF, OBJ, PLY or STL)")
+    contents = path.read_bytes()
+    # Rerun's viewer only reports these itself, where it may not be seen, e.g. on another machine
+    if suffix == ".dae":
+        version = _COLLADA_VERSION.search(contents[:16384])
+        if version and version.group(1) != b"1.4.1":
+            raise ValueError(f"mesh '{resource}' is Collada {version.group(1).decode()}, and Rerun only loads 1.4.1")
+        # Rerun's Collada importer ignores the unit, which rviz applies
+        return contents, _MESH_MEDIA_TYPES[suffix], collada_unit(resource)
+    if suffix == ".gltf":
+        # Rerun is sent the file alone, so it cannot load the buffers and images it refers to
+        gltf = json.loads(contents)
+        uris = [item.get("uri") for item in gltf.get("buffers", []) + gltf.get("images", [])]
+        if any(uri and not uri.startswith("data:") for uri in uris):
+            raise ValueError(f"mesh '{resource}' refers to other files, which Rerun cannot load: use a .glb file")
+    return contents, _MESH_MEDIA_TYPES[suffix], 1.0
+
+
 def _ns_part(ns: str) -> str:
     """Return the entity path part for a marker namespace: distinct for every namespace, including "" and "_"."""
     return rr.escape_entity_path_part(f"_{ns}" if not ns or ns.startswith("_") else ns)
@@ -97,8 +177,8 @@ class MarkerArrayModule(TopicToComponentModule):
     """Module for logging visualization_msgs/MarkerArray (or Marker, via `msg_type`) to Rerun, as rviz shows them.
 
     Each marker is logged on `<entity_path>/<ns>/<id>`, posed in its header frame. Supports every marker type except
-    MESH_RESOURCE and ARROW_STRIP, the ADD, DELETE and DELETEALL actions, and marker lifetimes. Markers always move
-    with their frame, as if `frame_locked` were set.
+    ARROW_STRIP, which rviz does not draw either, the ADD, DELETE and DELETEALL actions, and marker lifetimes. Markers
+    always move with their frame, as if `frame_locked` were set.
     """
 
     # No params, so any given are an error
@@ -111,6 +191,9 @@ class MarkerArrayModule(TopicToComponentModule):
         """Type and archetype class last logged per marker (ns, id), to clear its shape on a type change or deletion."""
         self._expiries: dict[tuple[str, int], tuple[int, int]] = {}
         """Per marker with a lifetime: when to clear it (node time, ns), and the time to log the clear at (ns)."""
+        self._meshes: dict[tuple[str, int], tuple[tuple, int, rr.Asset3D]] = {}
+        """Per MESH_RESOURCE marker (ns, id), its latest stamped mesh, the stamp (ns) and asset, so a mesh is only
+        logged again when it changes."""
         self.node.create_timer(0.1, self._expire, callback_group=self.callback_group)
 
     @classmethod
@@ -134,12 +217,19 @@ class MarkerArrayModule(TopicToComponentModule):
         return f"{self.entity_path}/{_ns_part(key[0])}/{key[1]}"
 
     def _add(self, key: tuple[str, int], marker: Marker, stamp: Time) -> None:
-        archetype = archetype_from_marker(marker)
+        scale = None
+        if marker.type == Marker.MESH_RESOURCE:
+            try:
+                archetype, scale = mesh_from_marker(marker)
+                error = None
+            except (ValueError, OSError) as e:
+                archetype, error = None, str(e)
+        else:
+            archetype = archetype_from_marker(marker)
+            error = f"marker type {marker.type} is not supported"
         if archetype is None:
-            self.node.get_logger().warn(
-                f"[{self.name}] marker type {marker.type} is not supported", throttle_duration_sec=5.0
-            )
-            # A marker changing to an unsupported type must not keep showing its old shape
+            self.node.get_logger().warn(f"[{self.name}] {error}", throttle_duration_sec=5.0)
+            # A marker that cannot be drawn must not keep showing its old shape
             self._clear([key])
             return
         path = self._path(key)
@@ -147,6 +237,19 @@ class MarkerArrayModule(TopicToComponentModule):
         if previous is not None and previous[0] != marker.type:
             self._clear([key])
         self._shapes[key] = (marker.type, type(archetype))
+        archetypes, relog = (archetype,), None
+        if marker.type == Marker.MESH_RESOURCE:
+            mesh = (marker.mesh_resource, marker.mesh_use_embedded_materials, tuple(_rgba(marker.color)))
+            latest = self._meshes.get(key)
+            if latest is None or stamp.nanoseconds >= latest[1]:
+                # A mesh can be large, and markers are often republished unchanged: log it only when it changes
+                if latest is not None and latest[0] == mesh:
+                    archetypes = ()
+                self._meshes[key] = (mesh, stamp.nanoseconds, archetype)
+            else:
+                # A late message, e.g. from a replayed bag, is logged at its stamp, where its mesh would also stand for
+                # the unchanged meshes not logged after it: the latest one is logged again at its stamp
+                relog = latest
         # The marker's pose places its own frame in the header frame
         p, q = marker.pose.position, marker.pose.orientation
         # rviz treats an all-zero orientation, common in hand-written publishers, as identity
@@ -154,15 +257,21 @@ class MarkerArrayModule(TopicToComponentModule):
         marker_frame = f"marker:{path}"
         rr.log(
             path,
-            rr.Transform3D(
+            # clear_unset: a mesh's scale must not stay on a marker that changes type
+            rr.Transform3D.from_fields(
+                clear_unset=True,
                 translation=[p.x, p.y, p.z],
                 quaternion=quaternion,
+                scale=scale,
                 parent_frame=marker.header.frame_id or None,
                 child_frame=marker_frame,
             ),
             rr.CoordinateFrame(frame=marker_frame),
-            archetype,
+            *archetypes,
         )
+        if relog is not None:
+            set_rr_time_from_ros(Time(nanoseconds=relog[1]))
+            rr.log(path, relog[2])
         lifetime = Duration.from_msg(marker.lifetime).nanoseconds
         if lifetime > 0:
             # As rviz, the lifetime runs from when the marker is received; the clear is logged relative to its stamp
@@ -181,6 +290,7 @@ class MarkerArrayModule(TopicToComponentModule):
             if shape is not None:
                 rr.log(self._path(key), shape[1].cleared())
             self._expiries.pop(key, None)
+            self._meshes.pop(key, None)
 
     def _expire(self) -> None:
         """Clear markers whose lifetime has run out, logged at their stamp plus lifetime."""

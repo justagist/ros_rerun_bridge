@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <asset>
+    <created>2026-10-30T00:00:00</created>
+    <modified>2026-10-30T00:00:00</modified>
+    <unit name="meter" meter="1"/>
+    <up_axis>Z_UP</up_axis>
+  </asset>
+  <library_effects>
+    <effect id="orange-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert><diffuse><color>1.0 0.55 0.1 1.0</color></diffuse></lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+    <effect id="teal-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert><diffuse><color>0.1 0.7 0.7 1.0</color></diffuse></lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+  </library_effects>
+  <library_materials>
+    <material id="orange" name="orange"><instance_effect url="#orange-effect"/></material>
+    <material id="teal" name="teal"><instance_effect url="#teal-effect"/></material>
+  </library_materials>
+  <library_geometries>
+    <geometry id="pyramid" name="pyramid">
+      <mesh>
+        <source id="positions">
+          <float_array id="positions-array" count="15">-0.5 -0.5 0 0.5 -0.5 0 0.5 0.5 0 -0.5 0.5 0 0 0 1</float_array>
+          <technique_common>
+            <accessor source="#positions-array" count="5" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <vertices id="vertices">
+          <input semantic="POSITION" source="#positions"/>
+        </vertices>
+        <triangles material="orange" count="2">
+          <input semantic="VERTEX" source="#vertices" offset="0"/>
+          <p>0 1 4 2 3 4</p>
+        </triangles>
+        <triangles material="teal" count="4">
+          <input semantic="VERTEX" source="#vertices" offset="0"/>
+          <p>1 2 4 3 0 4 0 3 2 0 2 1</p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+  <library_visual_scenes>
+    <visual_scene id="scene" name="scene">
+      <node id="pyramid-node" name="pyramid">
+        <instance_geometry url="#pyramid">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="orange" target="#orange"/>
+              <instance_material symbol="teal" target="#teal"/>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+  <scene>
+    <instance_visual_scene url="#scene"/>
+  </scene>
+</COLLADA>

@@ -9,7 +9,7 @@ from builtin_interfaces.msg import Time as TimeMsg
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 
-from ros_rerun_bridge.modules.robot_description import _collada_unit
+from ros_rerun_bridge.utils.meshes import collada_unit
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -94,14 +94,14 @@ def test_other_geometry_is_not_rescaled(robot, recording):
     ["package://not_a_package/meshes/x.dae", "file:///does/not/exist.dae", "/does/not/exist.dae"],
 )
 def test_collada_meshes_that_cannot_be_found_are_not_rescaled(filename):
-    assert _collada_unit(filename) == 1.0
+    assert collada_unit(filename) == 1.0
 
 
 @pytest.mark.parametrize("declaration", ["<unit meter='0.0254'/>", '<unit meter = "0.0254" name="inch"/>'])
 def test_collada_units_are_read_with_either_quotes_and_spacing(tmp_path, declaration):
     mesh = tmp_path / "part.dae"
     mesh.write_text(f"<COLLADA><asset>{declaration}</asset></COLLADA>")
-    assert _collada_unit(str(mesh)) == pytest.approx(0.0254)
+    assert collada_unit(str(mesh)) == pytest.approx(0.0254)
 
 
 def test_collada_units_are_read_from_package_paths(tmp_path, monkeypatch):
@@ -111,7 +111,7 @@ def test_collada_units_are_read_from_package_paths(tmp_path, monkeypatch):
     (tmp_path / "share" / "ament_index" / "resource_index" / "packages").mkdir(parents=True)
     (tmp_path / "share" / "ament_index" / "resource_index" / "packages" / "test_meshes").write_text("")
     monkeypatch.setenv("AMENT_PREFIX_PATH", str(tmp_path))
-    assert _collada_unit("package://test_meshes/meshes/part.dae") == pytest.approx(0.0254)
+    assert collada_unit("package://test_meshes/meshes/part.dae") == pytest.approx(0.0254)
 
 
 def z_rotation(angle: float) -> list:
