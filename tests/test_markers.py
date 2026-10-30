@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 from builtin_interfaces.msg import Duration as DurationMsg
@@ -9,6 +11,8 @@ from visualization_msgs.msg import Marker, MarkerArray
 import rerun as rr
 
 from ros_rerun_bridge.modules.marker_array import archetype_from_marker
+
+DATA_DIR = Path(__file__).parent / "data"
 
 POINTS = [
     Point(x=0.0, y=0.0, z=0.0),
@@ -211,15 +215,15 @@ def test_markers_expire_at_the_end_of_their_lifetime(node, build, recording):
 
 def test_unsupported_marker_types_warn(node, build, recording):
     build("marker_array", entity_path="markers")
-    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE)]))
-    assert node.log_messages[-1] == ("warn", f"[marker_array] marker type {Marker.MESH_RESOURCE} is not supported")
+    node.publish(MarkerArray(markers=[marker(Marker.ARROW_STRIP)]))
+    assert node.log_messages[-1] == ("warn", f"[marker_array] marker type {Marker.ARROW_STRIP} is not supported")
     assert "/markers/ns/0" not in recording.entities()
 
 
 def test_a_marker_changing_to_an_unsupported_type_loses_its_old_shape(node, build, recording):
     build("marker_array", entity_path="markers")
     node.publish(MarkerArray(markers=[marker(Marker.CUBE)]))
-    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE)]))
+    node.publish(MarkerArray(markers=[marker(Marker.ARROW_STRIP)]))
     assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []
 
 
@@ -290,3 +294,100 @@ def test_triangle_lists_switching_to_one_colour_drop_their_vertex_colours(node, 
     last = recording.rows("/markers/ns/0")[-1]
     assert not last["Mesh3D:vertex_colors"]
     assert last["Mesh3D:albedo_factor"] == [0xFF8000FF]
+
+
+@pytest.fixture
+def obj_mesh(tmp_path) -> Path:
+    mesh = tmp_path / "triangle.obj"
+    mesh.write_text("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")
+    return mesh
+
+
+def test_mesh_markers_are_drawn_from_their_file_scaled_and_in_the_marker_colour(node, build, recording, obj_mesh):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
+
+    row = recording.rows("/markers/ns/0")[0]
+    assert bytes(row["Asset3D:blob"][0]) == obj_mesh.read_bytes()
+    assert row["Asset3D:media_type"] == ["model/obj"]
+    assert row["Asset3D:albedo_factor"] == [0xFF8000FF]
+    assert row["Transform3D:scale"] == [pytest.approx([0.2, 0.4, 0.6])]
+
+
+def test_collada_mesh_markers_are_scaled_by_their_unit(node, build, recording):
+    build("marker_array", entity_path="markers")
+    mesh = DATA_DIR / "triangle_inches.dae"
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=f"file://{mesh}")]))
+
+    row = recording.rows("/markers/ns/0")[0]
+    # Rerun's SDK does not guess Collada's media type, but its viewer loads it
+    assert row["Asset3D:media_type"] == ["model/vnd.collada+xml"]
+    assert row["Transform3D:scale"] == [pytest.approx([0.2 * 0.0254, 0.4 * 0.0254, 0.6 * 0.0254])]
+
+
+def test_mesh_markers_with_embedded_materials_keep_their_colours(node, build, recording, obj_mesh):
+    build("marker_array", entity_path="markers")
+    mesh = marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh), mesh_use_embedded_materials=True)
+    node.publish(MarkerArray(markers=[mesh]))
+    assert recording.rows("/markers/ns/0")[0].get("Asset3D:albedo_factor") is None
+
+
+def test_unchanged_meshes_are_logged_once(node, build, recording, obj_mesh):
+    build("marker_array", entity_path="markers")
+    for colour in (ColorRGBA(r=1.0, a=1.0), ColorRGBA(r=1.0, a=1.0), ColorRGBA(g=1.0, a=1.0)):
+        mesh = marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))
+        mesh.color = colour
+        node.publish(MarkerArray(markers=[mesh]))
+
+    rows = recording.rows("/markers/ns/0")
+    assert sum("Transform3D:translation" in row for row in rows) == 3
+    # Logged again only when its colour changed
+    assert [row["Asset3D:albedo_factor"] for row in rows if "Asset3D:blob" in row] == [[0xFF0000FF], [0x00FF00FF]]
+
+
+@pytest.mark.parametrize(
+    ("resource", "error"),
+    [
+        ("/does/not/exist.stl", "mesh '/does/not/exist.stl' not found"),
+        ("package://not_a_package/meshes/x.stl", "mesh 'package://not_a_package/meshes/x.stl' not found"),
+        ("http://example.com/x.stl", "mesh 'http://example.com/x.stl' is not a package:// or file:// path"),
+    ],
+)
+def test_meshes_that_cannot_be_found_warn_and_clear_the_marker(node, build, recording, resource, error):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.CUBE)]))
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=resource)]))
+    assert node.log_messages[-1] == ("warn", f"[marker_array] {error}")
+    assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []
+
+
+def test_meshes_in_formats_rerun_does_not_load_warn(node, build, tmp_path):
+    build("marker_array", entity_path="markers")
+    mesh = tmp_path / "part.3ds"
+    mesh.write_bytes(b"")
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(mesh))]))
+    assert "is not in a format Rerun loads" in node.log_messages[-1][1]
+
+
+def test_collada_versions_rerun_does_not_load_warn(node, build, tmp_path):
+    build("marker_array", entity_path="markers")
+    mesh = tmp_path / "part.dae"
+    mesh.write_text('<?xml version="1.0"?>\n<COLLADA version="1.4.0"><asset/></COLLADA>')
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(mesh))]))
+    assert node.log_messages[-1][1] == f"[marker_array] mesh '{mesh}' is Collada 1.4.0, and Rerun only loads 1.4.1"
+
+
+def test_a_mesh_marker_changing_type_loses_its_mesh_and_scale(node, build, recording, obj_mesh):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
+    node.publish(MarkerArray(markers=[marker(Marker.CUBE)]))
+    assert recording.latest("/markers/ns/0", "Asset3D:blob") == []
+    assert recording.latest("/markers/ns/0", "Transform3D:scale") == []
+
+
+def test_a_deleted_mesh_marker_re_added_unchanged_is_drawn_again(node, build, recording, obj_mesh):
+    build("marker_array", entity_path="markers")
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, action=Marker.DELETE)]))
+    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
+    assert bytes(recording.latest("/markers/ns/0", "Asset3D:blob")[0]) == obj_mesh.read_bytes()
