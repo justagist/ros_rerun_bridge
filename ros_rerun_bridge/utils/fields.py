@@ -18,8 +18,9 @@ _NUMERIC = {
     "int64",
     "uint64",
 }
-# Element type of an unbounded or bounded sequence, e.g. "sequence<double, 3>", or of a fixed array, e.g. "double[9]"
-_ARRAY = re.compile(r"sequence<(\w+)(?:, \d+)?>|(\w+)\[\d+\]")
+# Element type of an unbounded or bounded sequence, e.g. "sequence<double, 3>", or of a fixed array, e.g. "double[9]".
+# The element type keeps a bounded string's bound, e.g. "sequence<string<22>>".
+_ARRAY = re.compile(r"sequence<(\w+(?:<=?\d+>)?)(?:, \d+)?>|(\w+(?:<=?\d+>)?)\[\d+\]")
 # A string or wide string, unbounded or bounded, e.g. "string<10>"
 _STRING = re.compile(r"w?string(?:<=?\d+>?)?")
 

@@ -10,6 +10,8 @@ from std_msgs.msg import Float64
 
 import rerun as rr
 
+from ros_rerun_bridge.utils.fields import is_string_array
+
 
 def build_scalars(build, msg_type: str, *fields: str):
     return build("scalars", entity_path="plots", msg_type=msg_type, params={"fields": list(fields)})
@@ -278,3 +280,20 @@ def test_named_elements_can_be_measurements(node, build, recording):
 def test_invalid_names_field_is_an_error(build, msg_type, params, error):
     with pytest.raises(ValueError, match=error):
         build("scalars", msg_type=msg_type, params=params)
+
+
+@pytest.mark.parametrize(
+    ("ros_type", "expected"),
+    [
+        ("sequence<string>", True),
+        ("string[3]", True),
+        # As ROS spells arrays of bounded and wide strings, e.g. test_msgs/Strings.bounded_string_value is string<22>
+        ("sequence<string<22>>", True),
+        ("sequence<string<22>, 5>", True),
+        ("wstring<5>[3]", True),
+        ("string<22>", False),
+        ("sequence<double>", False),
+    ],
+)
+def test_names_field_can_be_any_array_of_strings(ros_type, expected):
+    assert is_string_array(ros_type) == expected
