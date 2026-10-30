@@ -21,6 +21,9 @@ modules:
     module: camera_info
     topic: /camera/camera_info
     entity_path: camera/info
+    params:
+      # As far as the publisher places the 3D detections, so the image is drawn through them
+      image_plane_distance: 1.0
 
   - name: image
     module: image

@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [0.15.0] - 2026-10-30
+
+### Added
+
+- `camera_info` takes an `image_plane_distance`, setting how far in front of the camera images are drawn in 3D.
+
+### Changed
+
+- The perception example draws its image plane through its 3D detections.
+
 ## [0.14.0] - 2026-10-30
 
 ### Added
@@ -201,6 +211,7 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 
 First version: a config-driven bridge with `image`, `camera_info`, `laserscan`, `pointcloud2`, `particle_cloud`, `odometry`, `robot_description` and `joint_states` modules.
 
+[0.15.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.11.1...v0.12.0
