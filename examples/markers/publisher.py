@@ -1,6 +1,7 @@
 """Publish one marker that changes type every 2 s, and a fixed marker beside it, on /viewer_check/markers."""
 
 import itertools
+from pathlib import Path
 
 import rclpy
 from geometry_msgs.msg import Point
@@ -16,7 +17,10 @@ CYCLE = [
     ("LINE_STRIP", (1.0, 0.2, 1.0)),
     ("TRIANGLE_LIST", (0.2, 1.0, 1.0)),
     ("TEXT_VIEW_FACING", (1.0, 1.0, 1.0)),
+    ("MESH_RESOURCE", (1.0, 1.0, 1.0)),
 ]
+# A Collada mesh with colours of its own
+MESH = Path(__file__).resolve().with_name("pyramid.dae")
 
 
 class MarkerCycler(Node):
@@ -48,6 +52,9 @@ class MarkerCycler(Node):
             m.points = [Point(x=0.0, y=0.0, z=0.0), Point(x=0.5, y=0.0, z=0.0), Point(x=0.0, y=0.5, z=0.0)]
         elif type_name == "TEXT_VIEW_FACING":
             m.text = "TEXT"
+        elif type_name == "MESH_RESOURCE":
+            m.mesh_resource = f"file://{MESH}"
+            m.mesh_use_embedded_materials = True
         return m
 
     def tick(self):
