@@ -1,0 +1,39 @@
+# A camera from publisher.py, looking at a ball and a box moving over a floor, and a segmentation model's mask of them.
+# The mask is drawn over the image, in 2D and in 3D on the image plane in front of the camera, showing where the model
+# is wrong. Hover over it to see a pixel's class.
+global_frame: map
+# Viewer layout and camera angle, written by ../layouts.py
+blueprint: layout.rbl
+
+modules:
+  # Places the camera's optical frame in the map
+  - name: tf_static
+    module: tf
+    topic: /tf_static
+    entity_path: tf_static
+    qos: { depth: 10, durability: transient_local }
+    params:
+      static: true
+
+  # The pinhole from the camera frame to its image plane, where the image and mask are drawn in 3D
+  - name: camera_info
+    module: camera_info
+    topic: /camera/camera_info
+    entity_path: camera/info
+
+  - name: image
+    module: image
+    topic: /camera/image_raw
+    entity_path: camera/image
+
+  - name: segmentation
+    module: segmentation_image
+    topic: /camera/segmentation
+    # Under the image's entity path, so the image's 2D view draws the mask over it
+    entity_path: camera/image/segmentation
+    params:
+      classes:
+        # Transparent, so only the ball and the box are coloured
+        - { id: 0, label: floor, colour: [0, 0, 0, 0] }
+        - { id: 1, label: ball, colour: [255, 60, 60, 255] }
+        - { id: 2, label: box, colour: [60, 120, 255, 255] }

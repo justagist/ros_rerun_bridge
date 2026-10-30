@@ -42,6 +42,14 @@ LAYOUTS = {
         rrb.Vertical(rrb.Spatial2DView(origin="/camera/image"), rrb.Spatial2DView(origin="/camera/depth")),
         column_shares=[2, 1],
     ),
+    "segmentation": rrb.Horizontal(
+        scene([-0.5, -0.7, 1.4], [0.3, 0.0, 0.95]),
+        rrb.Vertical(
+            rrb.Spatial2DView(origin="/camera/image", name="Image and mask"),
+            rrb.Spatial2DView(origin="/camera/image/segmentation", name="Mask"),
+        ),
+        column_shares=[3, 2],
+    ),
     "point_cloud": scene([2.4, -2.4, 2.2], [0.0, 0.0, 1.0]),
     "range_sensor": rrb.Horizontal(scene([0.9, -1.6, 1.0], [0.6, 0.0, 0.25]), plots("/plots/range", (0.0, 2.0))),
     "markers": scene([1.0, -2.6, 1.5], [1.0, 0.0, 0.2]),

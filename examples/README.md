@@ -35,6 +35,12 @@ An RGB-D camera looking at a rippling surface: its colour image in 2D and on the
 
 ![camera](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/camera.gif)
 
+## [segmentation](segmentation)
+
+A camera looking at a ball and a box moving over a floor, and a segmentation model's mask of them, drawn over the image in 2D and on the camera's image plane in 3D. The overlay shows where the model is wrong: its blocky edges, and the ball's shadowed side it misses. Hover over the mask to see a pixel's class. Modules: `tf`, `camera_info`, `image`, `segmentation_image`.
+
+![segmentation](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/segmentation.gif)
+
 ## [point_cloud](point_cloud)
 
 A rotating rainbow helix, coloured from the cloud's `rgb` field. Modules: `pointcloud2`.
