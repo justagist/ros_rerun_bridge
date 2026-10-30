@@ -43,7 +43,7 @@ LAYOUTS = {
         column_shares=[2, 1],
     ),
     "perception": rrb.Horizontal(
-        scene([-0.45, -0.3, 1.25], [1.0, 0.0, 0.95]),
+        scene([-0.9, -1.8, 1.7], [0.8, 0.0, 0.95]),
         rrb.Vertical(
             rrb.Spatial2DView(origin="/camera/image", name="Image, mask and detections"),
             rrb.Spatial2DView(origin="/camera/image/segmentation", name="Mask"),

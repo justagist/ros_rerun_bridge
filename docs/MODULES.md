@@ -173,6 +173,7 @@ Logs the camera's intrinsics as a pinhole projection from the camera frame to th
 | Param | Default | |
 | --- | --- | --- |
 | `intrinsics` | `k` | Which intrinsics match the images shown: `k` for raw images (e.g. `image_raw`), `p` (its left 3x3) for rectified ones (e.g. `image_rect`). |
+| `image_plane_distance` | none | How far in front of the camera the image plane, and the images on it, are drawn in 3D, in metres. Without it, Rerun picks a distance from the size of the scene, which can leave the image plane small in a large scene. |
 
 ## `pointcloud2`
 

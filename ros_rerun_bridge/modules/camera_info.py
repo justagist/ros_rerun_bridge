@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 import numpy as np
+from pydantic import Field
 from rclpy.time import Time
 from sensor_msgs.msg import CameraInfo
 
@@ -19,6 +20,8 @@ class CameraInfoParams(StrictParamsModel):
 
     intrinsics: Literal["k", "p"] = "k"
     """Which intrinsics match the images shown: "k" for raw images, "p" (its left 3x3) for rectified ones."""
+    image_plane_distance: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    """How far in front of the camera the image plane is drawn in 3D, in metres. One from the scene's size if unset."""
 
 
 @REGISTRY.register("camera_info")
@@ -60,5 +63,6 @@ class CameraInfoModule(TopicToComponentModule):
                 image_from_camera=k,
                 parent_frame=frame or None,
                 child_frame=f"{frame}{IMAGE_PLANE_SUFFIX}" if frame else None,
+                image_plane_distance=self.params.image_plane_distance,
             ),
         )
