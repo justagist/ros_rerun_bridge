@@ -1,4 +1,8 @@
+<div align="center">
+
 # ros-rerun-bridge
+
+**Your ROS 2 topics in Rerun, from one YAML file. No code.**
 
 [![CI](https://github.com/justagist/ros_rerun_bridge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/justagist/ros_rerun_bridge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -6,7 +10,26 @@
 [![Rerun 0.40](https://img.shields.io/badge/Rerun-0.40-0B8CE9.svg)](https://rerun.io)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
-Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rviz. List the topics you want to see in a YAML config file: the bridge subscribes to them and sends each message to Rerun, drawing spatial data in its TF frame.
+</div>
+
+Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rviz. All you write is a config file listing the topics you want to see: the bridge subscribes to them and sends each message to Rerun, drawing spatial data in its TF frame. The [built-in modules](#modules) need no code.
+
+```yaml
+global_frame: map
+modules:
+  - name: camera
+    module: image
+    topic: /camera/image_raw
+    entity_path: camera/image
+  - name: scan
+    module: laserscan
+    topic: /scan
+    entity_path: scan
+```
+
+```bash
+ros-rerun-bridge --config my_robot.yaml
+```
 
 > **Status:** I created this repository mainly to get familiar with Rerun and to use it in my own ROS projects. It is under active development, so features, interfaces and behaviour may change. Tested with Rerun 0.40.0 and ROS 2 Jazzy.
 
@@ -22,7 +45,7 @@ Show live ROS 2 data in the [Rerun](https://rerun.io) viewer, as you would in rv
 
 ## Features
 
-* **Config-driven:** one YAML file says which topics to show and how, and is checked when the bridge starts.
+* **Config, not code:** one YAML file says which topics to show and how, and is checked when the bridge starts.
 * **TF and URDF aware:** data is drawn in its TF frame. The robot model is loaded from its URDF and moves with TF or joint states.
 * **rviz's common displays:** robot model, images, point clouds, laser scans, range sensors, markers, maps and costmaps, and more (see [Modules](#modules)).
 * **Remote viewing:** any number of native or browser viewers can connect to a bridge running on a robot.
@@ -99,7 +122,7 @@ modules:
 
 ## Modules
 
-Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `depth_image`, `compressed_depth_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `pose`, `pose_array`, `wrench`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, `bar_chart` draws an array field as bars, and `states` shows a field as states over time. `rosout` shows ROS log entries, and `diagnostics` each component's diagnostic status over time. `segmentation_image` draws segmentation masks with their class names and colours. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
+Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `depth_image`, `compressed_depth_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `pose`, `pose_array`, `wrench`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, `bar_chart` draws an array field as bars, and `states` shows a field as states over time. `rosout` shows ROS log entries, and `diagnostics` each component's diagnostic status over time. `segmentation_image` draws segmentation masks with their class names and colours, and `detections_2d` and `detections_3d` draw detection boxes labelled with their class, tracking id and score. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
 
 ## Development
 

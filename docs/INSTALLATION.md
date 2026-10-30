@@ -21,6 +21,7 @@ A few modules need ROS packages that a minimal ROS install (`ros-base`) leaves o
 | `pointcloud2` | `ros-jazzy-sensor-msgs-py` |
 | `laserscan` | `ros-jazzy-laser-geometry`, `ros-jazzy-sensor-msgs-py` |
 | `particle_cloud` | `ros-jazzy-nav2-msgs` |
+| `detections_2d`, `detections_3d` | `ros-jazzy-vision-msgs` |
 
 ## From a clone, with `uv run`
 

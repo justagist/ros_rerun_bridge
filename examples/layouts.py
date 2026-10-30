@@ -42,10 +42,10 @@ LAYOUTS = {
         rrb.Vertical(rrb.Spatial2DView(origin="/camera/image"), rrb.Spatial2DView(origin="/camera/depth")),
         column_shares=[2, 1],
     ),
-    "segmentation": rrb.Horizontal(
-        scene([-0.5, -0.7, 1.4], [0.3, 0.0, 0.95]),
+    "perception": rrb.Horizontal(
+        scene([-0.45, -0.3, 1.25], [1.0, 0.0, 0.95]),
         rrb.Vertical(
-            rrb.Spatial2DView(origin="/camera/image", name="Image and mask"),
+            rrb.Spatial2DView(origin="/camera/image", name="Image, mask and detections"),
             rrb.Spatial2DView(origin="/camera/image/segmentation", name="Mask"),
         ),
         column_shares=[3, 2],

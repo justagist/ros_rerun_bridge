@@ -1,6 +1,7 @@
-# A camera from publisher.py, looking at a ball and a box moving over a floor, and a segmentation model's mask of them.
-# The mask is drawn over the image, in 2D and in 3D on the image plane in front of the camera, showing where the model
-# is wrong. Hover over it to see a pixel's class.
+# A camera from publisher.py, looking at a ball and a box moving over a floor, and what a perception model makes of
+# them: a segmentation mask, and 2D and 3D detections. The mask and 2D boxes are drawn over the image, in 2D and in 3D
+# on the image plane in front of the camera, showing where the model is wrong. Hover over the mask to see a pixel's
+# class.
 global_frame: map
 # Viewer layout and camera angle, written by ../layouts.py
 blueprint: layout.rbl
@@ -37,3 +38,22 @@ modules:
         - { id: 0, label: floor, colour: [0, 0, 0, 0] }
         - { id: 1, label: ball, colour: [255, 60, 60, 255] }
         - { id: 2, label: box, colour: [60, 120, 255, 255] }
+
+  - name: detections
+    module: detections_2d
+    topic: /camera/detections
+    # Under the image's entity path too, so the image's 2D view draws the boxes over it
+    entity_path: camera/image/detections
+    params:
+      classes:
+        - { id: "1", label: ball, colour: [255, 60, 60, 255] }
+        - { id: "2", label: box, colour: [60, 120, 255, 255] }
+
+  - name: detections_3d
+    module: detections_3d
+    topic: /camera/detections_3d
+    entity_path: detections
+    params:
+      classes:
+        - { id: "1", label: ball, colour: [255, 60, 60, 255] }
+        - { id: "2", label: box, colour: [60, 120, 255, 255] }
