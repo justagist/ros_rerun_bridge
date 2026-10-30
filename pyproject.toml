@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ros-rerun-bridge"
-version = "0.15.0"
+version = "0.16.0"
 description = "Config-driven, pluggable ROS2 -> Rerun bridge"
 authors = [{ name = "Saif Sidhik", email = "mail@saifsidhik.page" }]
 requires-python = ">=3.12"

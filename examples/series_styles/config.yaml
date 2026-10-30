@@ -26,7 +26,7 @@ modules:
       marker: diamond
       marker_size: 4.0
 
-  # A mode that jumps between 0, 1 and 2, drawn as thick red steps
+  # A mode that jumps between 0, 1 and 2, drawn as thick steps
   - name: mode_steps
     module: scalars
     topic: /viewer_check/mode
@@ -35,6 +35,5 @@ modules:
     params:
       fields: [data]
       names: [mode]
-      colours: [[255, 0, 0, 255]]
       width: 3.0
       interpolation: step_after

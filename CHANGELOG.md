@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [0.16.0] - 2026-10-30
+
+### Added
+
+- `scalars` takes a `names_field`, naming an array's elements from a string array in the message, e.g. a `JointState`'s `name`. Each element is plotted as a series of its own, found by its name, so several publishers on one topic, such as `/joint_states`, no longer mix their values in one series.
+
+### Removed
+
+- `scalars`'s `colours` param: Rerun gives each series a colour of its own.
+
 ## [0.15.0] - 2026-10-30
 
 ### Added
@@ -211,6 +221,7 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 
 First version: a config-driven bridge with `image`, `camera_info`, `laserscan`, `pointcloud2`, `particle_cloud`, `odometry`, `robot_description` and `joint_states` modules.
 
+[0.16.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.12.0...v0.13.0

@@ -18,8 +18,9 @@ _NUMERIC = {
     "int64",
     "uint64",
 }
-# Element type of an unbounded or bounded sequence, e.g. "sequence<double, 3>", or of a fixed array, e.g. "double[9]"
-_ARRAY = re.compile(r"sequence<(\w+)(?:, \d+)?>|(\w+)\[\d+\]")
+# Element type of an unbounded or bounded sequence, e.g. "sequence<double, 3>", or of a fixed array, e.g. "double[9]".
+# The element type keeps a bounded string's bound, e.g. "sequence<string<22>>".
+_ARRAY = re.compile(r"sequence<(\w+(?:<=?\d+>)?)(?:, \d+)?>|(\w+(?:<=?\d+>)?)\[\d+\]")
 # A string or wide string, unbounded or bounded, e.g. "string<10>"
 _STRING = re.compile(r"w?string(?:<=?\d+>?)?")
 
@@ -72,6 +73,12 @@ def is_single_value(field_type: str) -> bool:
 def is_string(field_type: str) -> bool:
     """Whether a ROS field type is a string or wide string."""
     return _STRING.fullmatch(field_type) is not None
+
+
+def is_string_array(field_type: str) -> bool:
+    """Whether a ROS field type is an array or sequence of strings."""
+    array = _ARRAY.fullmatch(field_type)
+    return array is not None and is_string(array.group(1) or array.group(2))
 
 
 def is_array(field_type: str) -> bool:

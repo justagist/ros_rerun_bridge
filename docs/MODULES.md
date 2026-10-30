@@ -286,7 +286,7 @@ Plots numeric fields of any message type as time series. Set the message type wi
 
 * Fields are checked against the message type on start. A field that does not exist, or is not a number or an array of numbers, is an error.
 * An array is plotted as one series per element. When a message's array is shorter than earlier ones, the series for the missing elements have a gap.
-* Each series follows its element's position in the array. If elements change meaning between messages, as on `/joint_states` with several publishers covering different joints, a series mixes values from different joints.
+* Each series follows its element's position in the array. If elements change meaning between messages, as on `/joint_states` with several publishers covering different joints, a series mixes values from different joints: set `names_field` to follow each element by its name instead.
 * Values are plotted as they are. Non-finite values, such as a `Range`'s `+inf` "no detection" readings, leave a gap.
 * Messages are plotted at their header's stamp, or at the time they are received if they have no header or a zero stamp.
 * To both draw a topic and plot it, give it two modules, e.g. `range` for the cone and `scalars` for the plot. Each subscribes to the topic on its own.
@@ -296,7 +296,7 @@ Plots numeric fields of any message type as time series. Set the message type wi
 | `fields` | required | Dotted paths to the fields to plot, e.g. `range` or `twist.twist.linear.x`. |
 | `style` | `lines` | `lines` or `points`. |
 | `names` | entity path and element index | Series names, one per array element. |
-| `colours` | Rerun's palette | RGBA per series. The last one applies to any remaining series. |
+| `names_field` | none | Dotted path to an array of strings naming the array fields' elements, e.g. `name` on a `JointState`. Each element is then plotted on `<entity_path>/<field>/<name>`, as a series named after it, whatever its position in the array or whichever publisher sent it. An empty array field is skipped, as a `JointState`'s `velocity` and `effort` may be; otherwise each array field must have a value per name. Cannot be used with `names`. |
 | `width` | Rerun's default | Line width, in UI points. Lines only. |
 | `interpolation` | `linear` | `linear`, or `step_after`, `step_before` or `step_mid` for values that jump, such as modes or flags. Lines only. |
 | `marker` | `circle` | `circle`, `diamond`, `square`, `cross`, `plus`, `up`, `down`, `left`, `right` or `asterisk`. Points only. |
@@ -330,6 +330,8 @@ With `variance` or `unit`, values are logged as Rerun measurements, drawn as lin
 
 The style params apply to every field of the module. To style fields differently, plot them with separate modules. The same settings can also be changed in the viewer, and kept with a [saved layout](CONFIGURATION.md#viewer-layout).
 
+Rerun gives each series a colour of its own.
+
 ```yaml
 - name: joint_positions
   module: scalars
@@ -337,8 +339,8 @@ The style params apply to every field of the module. To style fields differently
   msg_type: sensor_msgs.msg.JointState
   entity_path: plots/joints
   params:
-    fields: [position]
-    names: [shoulder, elbow, wrist]
+    fields: [position, velocity]
+    names_field: name   # a series per joint, plotted on plots/joints/position/<joint name>
     style: points
     marker: diamond
 ```
