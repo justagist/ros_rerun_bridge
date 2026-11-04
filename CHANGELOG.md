@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - ROS 2 Lyrical support. CI tests on Jazzy and Lyrical.
 
+### Changed
+
+- Depends on `empy` and `lark`: from Lyrical, every ROS message class imports them.
+
 ## [0.16.0] - 2026-10-30
 
 ### Added

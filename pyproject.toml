@@ -16,6 +16,9 @@ dependencies = [
     # ROS2 deps are system-provided; python-only extras below
     "scipy",
     "pydantic>=2.0",
+    # From Lyrical, every ROS message class imports these through rosidl_pycommon
+    "empy",
+    "lark",
 ]
 
 [project.scripts]
