@@ -7,6 +7,7 @@
 [![CI](https://github.com/justagist/ros_rerun_bridge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/justagist/ros_rerun_bridge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202-Jazzy-22314E.svg)](https://docs.ros.org/en/jazzy/)
+[![ROS 2 Lyrical](https://img.shields.io/badge/ROS%202-Lyrical-22314E.svg)](https://docs.ros.org/en/lyrical/)
 [![Rerun 0.40](https://img.shields.io/badge/Rerun-0.40-0B8CE9.svg)](https://rerun.io)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
@@ -31,7 +32,7 @@ modules:
 ros-rerun-bridge --config my_robot.yaml
 ```
 
-> **Status:** I created this repository mainly to get familiar with Rerun and to use it in my own ROS projects. It is under active development, so features, interfaces and behaviour may change. Tested with Rerun 0.40.0 and ROS 2 Jazzy.
+> **Status:** I created this repository mainly to get familiar with Rerun and to use it in my own ROS projects. It is under active development, so features, interfaces and behaviour may change. Tested with Rerun 0.40.0 and ROS 2 Jazzy and Lyrical.
 
 ## Demos
 
@@ -53,11 +54,11 @@ ros-rerun-bridge --config my_robot.yaml
 
 ## Quick start
 
-You need ROS 2 and [uv](https://docs.astral.sh/uv/). The bridge runs in its own Python environment, because Rerun needs NumPy 2 and ROS ships NumPy 1. uv creates that environment for you.
+You need ROS 2 and [uv](https://docs.astral.sh/uv/). The bridge runs in its own Python environment, because Rerun needs NumPy 2 and Jazzy ships NumPy 1. uv creates that environment for you.
 
 ```bash
 git clone https://github.com/justagist/ros_rerun_bridge.git && cd ros_rerun_bridge
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/jazzy/setup.bash  # or lyrical
 uv run ros-rerun-bridge --config examples/robot_arm/config.yaml
 # In a second terminal, from the repo root with ROS sourced: publish a small arm's URDF and joint states
 python3 examples/robot_arm/publisher.py
@@ -127,13 +128,13 @@ Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint
 ## Development
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/jazzy/setup.bash  # or lyrical
 uv run pytest            # tests (no running ROS nodes needed)
 uv run ruff check        # lint
 uv run ruff format       # format
 ```
 
-Tests drive each module with real ROS messages and check what it logs to an in-memory Rerun recording. CI runs them in the `ros:jazzy-ros-base` image.
+Tests drive each module with real ROS messages and check what it logs to an in-memory Rerun recording. CI runs them in the `ros:jazzy-ros-base` and `ros:lyrical-ros-base` images.
 
 ## License
 

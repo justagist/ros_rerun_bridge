@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ros-rerun-bridge"
-version = "0.16.0"
+version = "0.16.1"
 description = "Config-driven, pluggable ROS2 -> Rerun bridge"
 authors = [{ name = "Saif Sidhik", email = "mail@saifsidhik.page" }]
 requires-python = ">=3.12"
@@ -16,6 +16,9 @@ dependencies = [
     # ROS2 deps are system-provided; python-only extras below
     "scipy",
     "pydantic>=2.0",
+    # From Lyrical, every ROS message class imports these through rosidl_pycommon
+    "empy",
+    "lark",
 ]
 
 [project.scripts]

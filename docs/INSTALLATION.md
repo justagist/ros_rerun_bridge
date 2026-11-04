@@ -1,14 +1,16 @@
 # Installation
 
-The bridge needs a sourced ROS 2 environment (tested with Jazzy) and its own Python environment.
+The bridge needs a sourced ROS 2 environment (tested with Jazzy and Lyrical) and its own Python environment.
 
 ## Why its own environment
 
-Rerun needs NumPy 2, while ROS distros ship NumPy 1. The bridge therefore runs in its own virtual environment and takes ROS's Python packages (`rclpy`, message types) from the sourced ROS environment through `PYTHONPATH`. The bridge's environment:
+Rerun needs NumPy 2, while Jazzy ships NumPy 1. The bridge therefore runs in its own virtual environment and takes ROS's Python packages (`rclpy`, message types) from the sourced ROS environment through `PYTHONPATH`. The bridge's environment:
 
-* must not be the system Python: upgrading NumPy there breaks other ROS nodes (e.g. OpenCV, `cv_bridge`);
-* must not include system site-packages: the distro's NumPy 1 builds of packages such as pandas then break Rerun;
-* must use the Python your ROS distro is built for (3.12 on Jazzy), as `rclpy` is compiled for it.
+* must not be the system Python: on Jazzy, upgrading NumPy there breaks other ROS nodes (e.g. OpenCV, `cv_bridge`);
+* must not include system site-packages: on Jazzy, the distro's NumPy 1 builds of packages such as pandas then break Rerun;
+* must use the Python your ROS distro is built for (3.12 on Jazzy, 3.14 on Lyrical), as `rclpy` is compiled for it.
+
+Lyrical ships NumPy 2, but the same environment still keeps Rerun's pinned dependencies apart from the system's.
 
 [uv](https://docs.astral.sh/uv/) handles all of this. The repo tells uv to use a Python installed on the system, never one it downloads.
 
@@ -16,17 +18,17 @@ Rerun needs NumPy 2, while ROS distros ship NumPy 1. The bridge therefore runs i
 
 A few modules need ROS packages that a minimal ROS install (`ros-base`) leaves out. Install them only for the modules you use:
 
-| Module | Packages (Jazzy) |
+| Module | Packages (`$ROS_DISTRO` is set once ROS is sourced) |
 | --- | --- |
-| `pointcloud2` | `ros-jazzy-sensor-msgs-py` |
-| `laserscan` | `ros-jazzy-laser-geometry`, `ros-jazzy-sensor-msgs-py` |
-| `particle_cloud` | `ros-jazzy-nav2-msgs` |
-| `detections_2d`, `detections_3d` | `ros-jazzy-vision-msgs` |
+| `pointcloud2` | `ros-${ROS_DISTRO}-sensor-msgs-py` |
+| `laserscan` | `ros-${ROS_DISTRO}-laser-geometry`, `ros-${ROS_DISTRO}-sensor-msgs-py` |
+| `particle_cloud` | `ros-${ROS_DISTRO}-nav2-msgs` |
+| `detections_2d`, `detections_3d` | `ros-${ROS_DISTRO}-vision-msgs` |
 
 ## From a clone, with `uv run`
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/jazzy/setup.bash  # or lyrical
 # From the repo root: creates .venv on first run, then runs the bridge
 uv run ros-rerun-bridge --config examples/robot_arm/config.yaml
 ```
@@ -41,7 +43,7 @@ uv tool install --python-preference only-system -e .
 # Or from GitHub
 uv tool install --python-preference only-system git+https://github.com/justagist/ros_rerun_bridge
 
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/jazzy/setup.bash  # or lyrical
 ros-rerun-bridge --config <config.yaml>
 
 # To remove it
