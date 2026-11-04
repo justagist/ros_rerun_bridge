@@ -18,18 +18,23 @@ jobs:
         run: uv run --only-group dev ruff format --check
 
   test:
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [jazzy, lyrical]
     runs-on: ubuntu-24.04
-    container: ros:jazzy-ros-base
+    container: ros:${{ matrix.distro }}-ros-base
     steps:
       - uses: actions/checkout@v7
       - name: Install ROS packages the modules use
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            ros-jazzy-laser-geometry ros-jazzy-sensor-msgs-py ros-jazzy-nav2-msgs ros-jazzy-vision-msgs
+            ros-${{ matrix.distro }}-laser-geometry ros-${{ matrix.distro }}-sensor-msgs-py \
+            ros-${{ matrix.distro }}-nav2-msgs ros-${{ matrix.distro }}-vision-msgs
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Test
         shell: bash
         run: |
-          source /opt/ros/jazzy/setup.bash
+          source /opt/ros/${{ matrix.distro }}/setup.bash
           uv run pytest
