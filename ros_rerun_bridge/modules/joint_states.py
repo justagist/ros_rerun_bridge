@@ -36,6 +36,8 @@ class JointStatesModule(TopicToComponentModule):
         self._frame_axes = FrameAxes(self.params)
         self._axes_tree: rr.urdf.UrdfTree | None = None
         """The robot model whose link frames were drawn, so a new model gets its frames drawn too."""
+        self._warned_no_model = False
+        """Whether the missing robot model was reported: once, as with automatic discovery there may never be one."""
 
     @classmethod
     def ros_msg_type(cls):
@@ -47,10 +49,12 @@ class JointStatesModule(TopicToComponentModule):
     def handle(self, msg: JointState) -> None:
         tree = self.context.urdf_tree
         if tree is None:
-            self.node.get_logger().warn(
-                "[joint_states] Robot model not received yet, skipping joint states. Is robot_description configured?",
-                throttle_duration_sec=5.0,
-            )
+            if not self._warned_no_model:
+                self.node.get_logger().warn(
+                    "[joint_states] Robot model not received yet, skipping joint states until it is. Is "
+                    "robot_description configured?"
+                )
+                self._warned_no_model = True
             return
         if tree is not self._axes_tree and self.params.axis_length is not None:
             # Every link, fixed ones included: messages only carry the joints that move
@@ -73,3 +77,6 @@ class JointStatesModule(TopicToComponentModule):
             if joint is not None:
                 # Show what the robot reports, even outside its URDF limits
                 rr.log(self.entity_path, joint.compute_transform(position, clamp=False))
+
+    def clear(self) -> None:
+        """Keep the joints: they are logged on the `tf` module's entity, which other frame relations share."""

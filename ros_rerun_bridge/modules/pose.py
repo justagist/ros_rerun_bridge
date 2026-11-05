@@ -112,3 +112,8 @@ class PoseModule(TopicToComponentModule):
             # In the header frame, like the pose's position
             archetypes = [ellipsoid, rr.CoordinateFrame(frame=frame)] if frame else [ellipsoid]
             rr.log(f"{self.entity_path}/covariance", *archetypes)
+
+    def clear(self) -> None:
+        """Clear the pose's axes and, beneath its entity, its covariance ellipsoid."""
+        super().clear()
+        rr.log(f"{self.entity_path}/covariance", rr.Clear(recursive=False))

@@ -149,11 +149,13 @@ def test_mimic_joints_given_in_the_message_keep_their_own_position(robot, node, 
     assert joints_by_child(recording)["finger"]["Transform3D:quaternion"] == z_rotation(0.7)
 
 
-def test_joint_states_wait_for_the_robot_model(node, build, recording):
+def test_joint_states_wait_for_the_robot_model_warning_once(node, build, recording):
+    # Once: with automatic discovery, there may never be a robot model
     build("joint_states", entity_path="tf")
     node.publish(JointState(name=["shoulder"], position=[0.5]))
+    node.publish(JointState(name=["shoulder"], position=[0.6]))
     assert "/tf" not in recording.entities()
-    assert node.log_messages[-1][0] == "warn"
+    assert [level for level, _ in node.log_messages].count("warn") == 1
 
 
 def test_joint_states_draw_each_link_frame_on_its_own_entity(robot, node, build, recording):

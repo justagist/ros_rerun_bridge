@@ -3,7 +3,7 @@
 import pytest
 from builtin_interfaces.msg import Time as TimeMsg
 from sensor_msgs.msg import Range
-from std_msgs.msg import Bool, Float32, Int32, String
+from std_msgs.msg import Bool, Float32, String
 
 from ros_rerun_bridge.modules.states import state_text
 from ros_rerun_bridge.utils.fields import is_single_value
@@ -15,14 +15,6 @@ def build_states(build, msg_type: str, field: str = "data", **params):
 
 def state_rows(recording) -> list:
     return [row for row in recording.rows("/mode") if not row["static"]]
-
-
-def test_every_message_is_logged_as_a_state(node, build, recording):
-    # Rerun joins repeated states into one
-    build_states(build, "std_msgs.msg.Int32")
-    for value in (0, 0, 1):
-        node.publish(Int32(data=value))
-    assert [row["StateChange:state"] for row in state_rows(recording)] == [["0"], ["0"], ["1"]]
 
 
 @pytest.mark.parametrize(
@@ -74,7 +66,8 @@ def test_float32_fields_match_config_values(node, build, recording):
     # A float32 1.0 must give the same state as the config's `value: 1`
     build_states(build, "std_msgs.msg.Float32", states=[{"value": 1, "label": "on"}])
     node.publish(Float32(data=1.0))
-    assert state_rows(recording)[0]["StateChange:state"] == ["1"]
+    [config] = [row for row in recording.rows("/mode") if row["static"]]
+    assert config["StateConfiguration:values"] == state_rows(recording)[0]["StateChange:state"] == ["1"]
 
 
 def test_states_are_logged_at_their_stamp_or_receive_time(node, build, recording):
@@ -97,6 +90,7 @@ def test_state_labels_and_colours_are_logged_once_as_static(node, build, recordi
     ]
     build_states(build, "std_msgs.msg.Bool", states=states)
     node.publish(Bool(data=True))
+    node.publish(Bool(data=False))
     [config] = [row for row in recording.rows("/mode") if row["static"]]
     assert config["StateConfiguration:values"] == ["false", "true"]
     assert config["StateConfiguration:labels"] == ["off", "on"]

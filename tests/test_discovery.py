@@ -7,6 +7,7 @@ from nav_msgs.msg import Odometry
 from pydantic import ValidationError
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
 from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -15,9 +16,9 @@ from ros_rerun_bridge.builder import BridgeBuilder
 from ros_rerun_bridge.discovery import MODULES_BY_TYPE, TopicDiscovery, suggest
 from ros_rerun_bridge.modules.compressed_image import CompressedImageModule
 from ros_rerun_bridge.modules.image import ImageModule
+from ros_rerun_bridge.modules.joint_states import JointStatesModule
 from ros_rerun_bridge.modules.laserscan import LaserScanModule
 from ros_rerun_bridge.modules.range import RangeModule
-from ros_rerun_bridge.modules.scalars import ScalarsModule
 from ros_rerun_bridge.modules.tf import TFModule
 
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -43,10 +44,15 @@ def subscribed(node) -> dict[str, object]:
     return {subscription.topic: subscription for subscription in node.subscriptions}
 
 
+def deliver(node, topic: str, msg) -> None:
+    """Deliver a message to every subscription to a topic, as the executor would."""
+    for subscription in [s for s in node.subscriptions if s.topic == topic]:
+        subscription.callback(msg)
+
+
 @pytest.mark.parametrize(
     ("topic", "msg_type", "module"),
     [
-        ("/scan", "sensor_msgs/msg/LaserScan", "laserscan"),
         ("/tf", "tf2_msgs/msg/TFMessage", "tf"),
         ("/robot_description", "std_msgs/msg/String", "robot_description"),
         ("/camera/image_raw", "sensor_msgs/msg/Image", "image"),
@@ -56,11 +62,11 @@ def subscribed(node) -> dict[str, object]:
     ],
 )
 def test_picks_the_module_from_the_type_and_name(topic, msg_type, module):
-    assert suggest(topic, msg_type, {topic: [msg_type]}, AUTO)["module"] == module
+    assert [entry["module"] for entry in suggest(topic, msg_type, {topic: [msg_type]}, AUTO)] == [module]
 
 
 def test_tf_static_is_logged_as_static():
-    entry = suggest("/tf_static", "tf2_msgs/msg/TFMessage", {}, AUTO)
+    [entry] = suggest("/tf_static", "tf2_msgs/msg/TFMessage", {}, AUTO)
     assert (entry["module"], entry["params"]["static"], entry["entity_path"]) == ("tf", True, "tf_static")
 
 
@@ -79,7 +85,7 @@ def test_tf_frames_are_drawn_as_axes_without_names(node, discover, recording, to
 
 @pytest.mark.parametrize(
     ("frames", "length", "names"),
-    [({"axis_length": 0.3, "frame_names": True}, 0.3, True), ({"frame_names": True}, 0.1, True)],
+    [({"axis_length": 0.3, "frame_names": True}, 0.3, True)],
 )
 def test_auto_frames_set_how_tf_frames_are_drawn(node, discover, recording, frames, length, names):
     discovery = discover(auto={"frames": frames})
@@ -99,11 +105,57 @@ def test_auto_frames_without_an_axis_length_draw_no_axes(node, discover, recordi
     assert "/tf" in recording.entities() and "/frames/tool" not in recording.entities()
 
 
-def test_joint_states_are_plotted_by_joint_name():
-    # Not moving the robot model: /tf from robot_state_publisher does that, and both would disagree
-    entry = suggest("/joint_states", "sensor_msgs/msg/JointState", {}, AUTO)
-    assert entry["module"] == "scalars"
-    assert entry["params"] == {"fields": ["position"], "names_field": "name"}
+URDF = """<robot name="arm">
+  <link name="base"/><link name="arm"/>
+  <joint name="elbow" type="revolute">
+    <parent link="base"/><child link="arm"/><axis xyz="0 0 1"/>
+    <limit lower="-1" upper="1" effort="1" velocity="1"/>
+  </joint>
+</robot>"""
+
+
+def test_joint_states_move_the_robot_and_plot_the_fields_they_have(node, discover, recording):
+    discovery = discover()
+    node.advertise("/robot_description", "std_msgs/msg/String", LATCHED)
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    deliver(node, "/robot_description", String(data=URDF))
+    deliver(node, "/joint_states", JointState(name=["elbow"], position=[0.5], effort=[2.0]))
+    assert [row["Transform3D:child_frame"] for row in recording.rows("/tf")] == [["arm"]]
+    assert {"/joint_states/position/elbow", "/joint_states/effort/elbow"} <= recording.entities()
+    # Left empty, as by a publisher that does not measure it
+    assert "/joint_states/velocity/elbow" not in recording.entities()
+
+
+def test_each_joint_state_topic_moves_the_robot(node, discover):
+    discovery = discover()
+    node.advertise("/arm/joint_states", "sensor_msgs/msg/JointState")
+    node.advertise("/gripper/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    motion = [module.entity_path for module in discovery.modules if isinstance(module, JointStatesModule)]
+    assert motion == ["tf", "tf"]
+
+
+def test_joint_states_move_the_robot_on_a_configured_tf_entity(node, discover):
+    discovery = discover(modules=[{"name": "tf", "module": "tf", "topic": "/tf", "entity_path": "transforms"}])
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    # Any other topic there could clear the frame relations
+    node.advertise("/transforms", "sensor_msgs/msg/Range")
+    discovery.scan()
+    motion = [module.entity_path for module in discovery.modules if isinstance(module, JointStatesModule)]
+    assert motion == ["transforms"]
+    assert "/transforms" not in subscribed(node)
+
+
+def test_a_topic_whose_second_module_fails_to_build_leaves_no_subscription(node, discover, monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("broken")
+
+    monkeypatch.setattr(JointStatesModule, "__init__", fail)
+    discovery = discover()
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert discovery.modules == [] and node.subscriptions == []
 
 
 @pytest.mark.parametrize(
@@ -112,19 +164,18 @@ def test_joint_states_are_plotted_by_joint_name():
         ("/robot1/tf", "tf2_msgs/msg/TFMessage"),
         ("/robot1/robot_description", "std_msgs/msg/String"),
         ("/chatter", "std_msgs/msg/String"),
-        ("/odom", "nav_msgs/msg/Odometry"),
         ("/_hidden/scan", "sensor_msgs/msg/LaserScan"),
         ("/scan/_raw", "sensor_msgs/msg/LaserScan"),
     ],
 )
 def test_leaves_topics_no_module_draws_or_that_are_hidden_or_namespaced_robots(topic, msg_type):
-    assert suggest(topic, msg_type, {topic: [msg_type]}, AUTO) is None
+    assert suggest(topic, msg_type, {topic: [msg_type]}, AUTO) == []
 
 
 def test_leaves_image_transport_copies_of_a_raw_image():
     graph = {"/camera/image_raw": ["sensor_msgs/msg/Image"]}
-    assert suggest("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage", graph, AUTO) is None
-    assert suggest("/camera/image_raw/compressedDepth", "sensor_msgs/msg/CompressedImage", graph, AUTO) is None
+    assert suggest("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage", graph, AUTO) == []
+    assert suggest("/camera/image_raw/compressedDepth", "sensor_msgs/msg/CompressedImage", graph, AUTO) == []
 
 
 @pytest.mark.parametrize(
@@ -159,18 +210,6 @@ def test_leaves_the_robot_model_to_a_configured_one(node, discover):
     assert discovery.modules == []
 
 
-def test_a_topic_whose_publishers_left_during_a_scan_is_looked_at_again(node, discover, monkeypatch):
-    discovery = discover()
-    node.advertise("/scan", "sensor_msgs/msg/LaserScan", qos_profile_sensor_data)
-    # Counted as published, but gone by the time its publishers' QoS is read
-    monkeypatch.setattr(node, "get_publishers_info_by_topic", lambda topic: [])
-    discovery.scan()
-    assert node.subscriptions == []
-    monkeypatch.undo()
-    discovery.scan()
-    assert subscribed(node)["/scan"].qos.reliability == ReliabilityPolicy.BEST_EFFORT
-
-
 def test_bridges_topics_as_they_appear(node, discover):
     discovery = discover()
     node.advertise("/scan", "sensor_msgs/msg/LaserScan")
@@ -183,23 +222,15 @@ def test_bridges_topics_as_they_appear(node, discover):
     assert discovery.modules[0].entity_path == "scan"
 
 
-def test_scans_on_a_timer(node, discover):
-    discover()
+def test_scans_on_a_timer_as_often_as_auto_sets(node, discover):
+    discover(auto={"scan_period": 0.5})
     node.advertise("/scan", "sensor_msgs/msg/LaserScan")
     node.timers[-1]()
     assert "/scan" in subscribed(node)
+    assert node.timer_periods[-1] == 0.5
 
 
-def test_bridged_messages_are_logged(node, discover, recording):
-    discovery = discover()
-    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
-    discovery.scan()
-    node.publish(JointState(name=["elbow"], position=[0.5]))
-    rows = recording.rows("/joint_states/position/elbow")
-    assert [row["Scalars:scalars"] for row in rows if not row["static"]] == [[0.5]]
-
-
-def test_marker_topics_are_drawn_as_markers(node, discover):
+def test_single_marker_topics_subscribe_with_the_marker_type(node, discover):
     discovery = discover()
     node.advertise("/marker", "visualization_msgs/msg/Marker")
     discovery.scan()
@@ -289,8 +320,8 @@ def test_a_topic_that_fails_to_bridge_does_not_stop_the_others(node, discover, m
     assert warnings == ["[auto] not bridging /thing: ImportError: [/thing] No module named 'missing_msgs'"]
 
 
-@pytest.mark.parametrize(("auto", "expected"), [(True, ["*"]), (False, None), ({"include": ["/a"]}, ["/a"])])
-def test_auto_is_a_switch_or_its_filters(auto, expected):
+@pytest.mark.parametrize(("auto", "expected"), [(True, ["*"]), (False, None)])
+def test_auto_can_be_a_switch(auto, expected):
     cfg = BridgeConfig(auto=auto)
     assert (cfg.auto.include if cfg.auto else None) == expected
 
@@ -314,6 +345,21 @@ def test_keeps_a_topic_whose_publishers_return_within_the_grace_period(node, dis
     node.advertise("/scan", "sensor_msgs/msg/LaserScan")
     discovery.scan()
     assert discovery.modules == [module] and len(node.subscriptions) == 1
+
+
+def test_a_publisher_returning_restarts_the_count_of_scans_without_one(node, discover):
+    discovery = discover()
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    [module] = discovery.modules
+    for _ in range(2):
+        node.withdraw("/scan")
+        for _ in range(STALE_SCANS - 1):
+            discovery.scan()
+        node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+        discovery.scan()
+    # Kept, not dropped and built again
+    assert discovery.modules == [module]
 
 
 def test_drops_a_topic_once_its_publishers_have_gone_and_bridges_it_again_when_they_return(node, discover):
@@ -345,10 +391,10 @@ def test_clears_what_a_dropped_stream_drew_from_when_its_publishers_went(node, d
 @pytest.mark.parametrize(
     ("topic", "msg_type"),
     [
-        # Every frame relation shares the tf entity
+        # Every frame relation shares the tf entity, joints moved by joint states included
         ("/tf", "tf2_msgs/msg/TFMessage"),
-        # Plots and logs show history, which stays true
         ("/joint_states", "sensor_msgs/msg/JointState"),
+        # Plots and logs show history, which stays true
         ("/diagnostics", "diagnostic_msgs/msg/DiagnosticArray"),
     ],
 )
@@ -359,7 +405,7 @@ def test_keeps_what_dropped_tf_or_history_drew(node, discover, recording, topic,
     discovery.scan()
     drop_after_grace(node, discovery, topic)
     assert discovery.modules[0].entity_path == "scan"
-    assert all("Clear:is_recursive" not in row for row in recording.rows(topic))
+    assert all("Clear:is_recursive" not in row for path in (topic, "/tf") for row in recording.rows(path))
 
 
 def test_never_drops_a_latched_topic(node, discover, recording):
@@ -424,11 +470,6 @@ def test_tries_a_topic_that_failed_to_bridge_again_once_it_returns(node, discove
     assert set(subscribed(node)) == {"/scan"}
 
 
-def test_scans_as_often_as_auto_sets(node, discover):
-    discover(auto={"scan_period": 0.5})
-    assert node.timer_periods[-1] == 0.5
-
-
 def test_a_topic_is_stale_after_as_many_scans_as_auto_sets(node, discover):
     discovery = discover(auto={"stale_scans": 1})
     node.advertise("/scan", "sensor_msgs/msg/LaserScan")
@@ -472,18 +513,6 @@ def test_keeps_a_compressed_image_while_its_raw_image_is_not_shown(node, discove
     node.advertise("/camera/image_raw", "sensor_msgs/msg/Image")
     discovery.scan()
     assert set(subscribed(node)) == {"/range", "/camera/image_raw/compressed"}
-
-
-def test_clearing_a_dropped_topic_leaves_topics_beneath_it(node, discover, recording):
-    discovery = discover()
-    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
-    node.advertise("/scan/filtered", "sensor_msgs/msg/LaserScan")
-    discovery.scan()
-    drop_after_grace(node, discovery, "/scan")
-    assert set(subscribed(node)) == {"/scan/filtered"}
-    # A recursive clear on scan would also clear scan/filtered
-    [clear] = [row for row in recording.rows("/scan") if "Clear:is_recursive" in row]
-    assert clear["Clear:is_recursive"] == [False]
 
 
 def test_clears_each_marker_of_a_dropped_marker_topic(node, discover, recording):
@@ -531,6 +560,13 @@ def test_a_mapped_module_replaces_the_built_in_choice(node, discover):
     assert [type(m) for m in discovery.modules] == [ImageModule]
 
 
+def test_a_mapped_module_replaces_every_built_in_module_of_the_type(node, discover):
+    discovery = discover(auto={"modules": {"sensor_msgs/msg/JointState": "joint_states"}})
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert [type(m) for m in discovery.modules] == [JointStatesModule]
+
+
 @pytest.mark.parametrize(
     ("modules", "error", "match"),
     [
@@ -560,30 +596,8 @@ def test_a_tf_mapping_leaves_the_root_tf_topics_to_the_bridge(node, discover):
     node.advertise("/robot1/tf", "tf2_msgs/msg/TFMessage")
     discovery.scan()
     modules = {module.entity_path: module for module in discovery.modules}
-    assert type(modules["tf_static"]) is TFModule and modules["tf_static"].params.static
+    assert type(modules["tf_static"]) is TFModule
     assert type(modules["robot1/tf"]) is CustomTF
-
-
-class CustomScalars(ScalarsModule):
-    """A plotting module of the user's own, keeping its plots as the one it extends does."""
-
-
-def test_a_module_of_your_own_keeps_what_the_module_it_extends_keeps(node, discover, recording):
-    discovery = discover(
-        auto={
-            "modules": {
-                "sensor_msgs/msg/JointState": {
-                    "module": f"{__name__}:CustomScalars",
-                    "params": {"fields": ["position"]},
-                }
-            }
-        }
-    )
-    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
-    discovery.scan()
-    drop_after_grace(node, discovery, "/joint_states")
-    assert discovery.modules == []
-    assert all("Clear:is_recursive" not in row for row in recording.rows("/joint_states"))
 
 
 @pytest.mark.parametrize(

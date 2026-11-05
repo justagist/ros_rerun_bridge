@@ -73,7 +73,7 @@ Loads the URDF from `/robot_description` with Rerun's URDF importer and logs eac
 
 ## `joint_states`
 
-Moves the robot model's joints from `/joint_states`. Needs the [`robot_description`](#robot_description) module. Joint positions are shown as reported, even outside the URDF's limits. Mimic joints follow the joint they mimic, as with `robot_state_publisher`, unless the message gives their position.
+Moves the robot model's joints from `/joint_states`. Needs the [`robot_description`](#robot_description) module. Joint positions are shown as reported, even outside the URDF's limits. Mimic joints follow the joint they mimic, as with `robot_state_publisher`, unless the message gives their position. Joints the model does not have are skipped. Until the model arrives, joint states are skipped, with one warning.
 
 It only moves the robot model: it does not plot the joint states. To plot positions, velocities or efforts over time, use [`scalars`](#scalars) on `/joint_states`, e.g. `fields: [position]` with the joint names as `names`; to show them as bars at the time cursor, use [`bar_chart`](#bar_chart).
 

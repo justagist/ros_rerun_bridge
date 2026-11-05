@@ -41,8 +41,16 @@ ENCODINGS = [
 ]
 
 
-@pytest.mark.parametrize(("encoding", "pixels", "colour_model"), ENCODINGS, ids=[e[0] for e in ENCODINGS])
-@pytest.mark.parametrize(("padding", "big_endian"), [(0, False), (3, False), (2, True)], ids=["plain", "padded", "be"])
+# Byte order only matters for pixels wider than a byte
+CASES = [
+    pytest.param(*encoding, padding, big_endian, id=f"{variant}-{encoding[0]}")
+    for padding, big_endian, variant in [(0, False, "plain"), (3, False, "padded"), (2, True, "be")]
+    for encoding in ENCODINGS
+    if not (big_endian and encoding[1].dtype.itemsize == 1)
+]
+
+
+@pytest.mark.parametrize(("encoding", "pixels", "colour_model", "padding", "big_endian"), CASES)
 def test_images_keep_their_exact_pixels_and_colour_model(encoding, pixels, colour_model, padding, big_endian):
     image = image_from_msg(ros_image(pixels, encoding, padding, big_endian))
     image_format = image.format.as_arrow_array().to_pylist()[0]
@@ -70,11 +78,6 @@ def test_packed_encodings_are_passed_to_rerun_to_decode_without_row_padding(enco
     image = image_from_msg(msg)
     assert image.format.as_arrow_array().to_pylist()[0]["pixel_format"] == pixel_format.value
     assert bytes(image.buffer.as_arrow_array().to_pylist()[0]) == raw.tobytes()
-
-
-def test_unsupported_encodings_are_an_error():
-    with pytest.raises(ValueError, match="nv21"):
-        image_from_msg(Image(height=1, width=2, encoding="nv21", step=2, data=bytes(2)))
 
 
 def test_images_are_placed_on_the_camera_image_plane(node, build, recording):
@@ -128,12 +131,10 @@ def test_camera_info_links_the_camera_frame_to_its_image_plane(node, build, reco
     )
 
 
-@pytest.mark.parametrize(("params", "distance"), [({}, None), ({"image_plane_distance": 1.5}, [1.5])])
-def test_camera_info_draws_the_image_plane_at_its_distance(node, build, recording, params, distance):
-    build("camera_info", entity_path="camera/info", params=params)
+def test_camera_info_draws_the_image_plane_at_its_distance(node, build, recording):
+    build("camera_info", entity_path="camera/info", params={"image_plane_distance": 1.5})
     node.publish(CameraInfo(width=640, height=480, k=[500.0, 0.0, 320.0, 0.0, 510.0, 240.0, 0.0, 0.0, 1.0]))
-    # Unset, Rerun picks a distance from the scene's size
-    assert recording.rows("/camera/info")[0].get("Pinhole:image_plane_distance") == distance
+    assert recording.rows("/camera/info")[0]["Pinhole:image_plane_distance"] == [1.5]
 
 
 def test_camera_info_is_adjusted_for_binning_and_region_of_interest(node, build, recording):

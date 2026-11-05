@@ -35,7 +35,7 @@ ros-rerun-bridge --config my_robot.yaml
 Or skip the config, and let the bridge find the topics it can show:
 
 ```bash
-ros-rerun-bridge --auto --global-frame world
+ros-rerun-bridge --auto --global-frame world  # use the global frame you would set in rviz
 ```
 
 > **Status:** I created this repository mainly to get familiar with Rerun and to use it in my own ROS projects. It is under active development, so features, interfaces and behaviour may change. Tested with Rerun 0.40.0 and ROS 2 Jazzy and Lyrical.
@@ -133,6 +133,10 @@ modules:
 ## Modules
 
 Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `depth_image`, `compressed_depth_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `pose`, `pose_array`, `wrench`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, `bar_chart` draws an array field as bars, and `states` shows a field as states over time. `rosout` shows ROS log entries, and `diagnostics` each component's diagnostic status over time. `segmentation_image` draws segmentation masks with their class names and colours, and `detections_2d` and `detections_3d` draw detection boxes labelled with their class, tracking id and score. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
+
+## Known limitations
+
+The bridge shows one robot, and some message types have no module yet. Automatic discovery infers what it can from topic names and types, so a few topics need configuring by hand. [LIMITATIONS.md](docs/LIMITATIONS.md) lists them, with what to do instead.
 
 ## Development
 
