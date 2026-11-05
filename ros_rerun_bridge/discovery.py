@@ -243,12 +243,14 @@ class TopicDiscovery:
                 # Gone since the graph was read: with none to match QoS to, look again on a later scan
                 continue
             # Two modules on one entity path would mix their data, except on the TF entities, where frame relations
-            # from several sources belong together
+            # from several sources belong together. A configured /tf's own entity is shared with joint states only: any
+            # other topic there could clear its frame relations.
             in_use = self._configured_paths | {module.entity_path for module in self.modules}
             if taken := [
                 entry["entity_path"]
                 for entry in entries
-                if entry["entity_path"] in in_use - SHARED_ENTITY_PATHS - {self._tf_entity}
+                if entry["entity_path"] in in_use - SHARED_ENTITY_PATHS
+                and not (entry["module"] == "joint_states" and entry["entity_path"] == self._tf_entity)
             ]:
                 self._rejected.add(topic)
                 self._node.get_logger().warn(f"[auto] not bridging {topic}: entity path '{taken[0]}' is already in use")

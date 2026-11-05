@@ -139,9 +139,12 @@ def test_each_joint_state_topic_moves_the_robot(node, discover):
 def test_joint_states_move_the_robot_on_a_configured_tf_entity(node, discover):
     discovery = discover(modules=[{"name": "tf", "module": "tf", "topic": "/tf", "entity_path": "transforms"}])
     node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    # Any other topic there could clear the frame relations
+    node.advertise("/transforms", "sensor_msgs/msg/Range")
     discovery.scan()
     motion = [module.entity_path for module in discovery.modules if isinstance(module, JointStatesModule)]
     assert motion == ["transforms"]
+    assert "/transforms" not in subscribed(node)
 
 
 def test_a_topic_whose_second_module_fails_to_build_leaves_no_subscription(node, discover, monkeypatch):
