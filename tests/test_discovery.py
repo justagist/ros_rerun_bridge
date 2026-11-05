@@ -2,17 +2,20 @@
 topics and entity paths alone."""
 
 import pytest
+from geometry_msgs.msg import TransformStamped
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import JointState
+from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import Marker
 
-from ros_rerun_bridge.base import BridgeConfig
+from ros_rerun_bridge.base import AutoFrameAxesParams, BridgeConfig
 from ros_rerun_bridge.builder import BridgeBuilder
 from ros_rerun_bridge.discovery import MODULES_BY_TYPE, TopicDiscovery, suggest
 from ros_rerun_bridge.modules.compressed_image import CompressedImageModule
 from ros_rerun_bridge.modules.laserscan import LaserScanModule
 
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+FRAMES = AutoFrameAxesParams()
 
 
 @pytest.fixture
@@ -46,17 +49,52 @@ def subscribed(node) -> dict[str, object]:
     ],
 )
 def test_picks_the_module_from_the_type_and_name(topic, msg_type, module):
-    assert suggest(topic, msg_type, {topic: [msg_type]})["module"] == module
+    assert suggest(topic, msg_type, {topic: [msg_type]}, FRAMES)["module"] == module
 
 
 def test_tf_static_is_logged_as_static():
-    entry = suggest("/tf_static", "tf2_msgs/msg/TFMessage", {})
-    assert (entry["module"], entry["params"], entry["entity_path"]) == ("tf", {"static": True}, "tf_static")
+    entry = suggest("/tf_static", "tf2_msgs/msg/TFMessage", {}, FRAMES)
+    assert (entry["module"], entry["params"]["static"], entry["entity_path"]) == ("tf", True, "tf_static")
+
+
+@pytest.mark.parametrize("topic", ["/tf", "/tf_static"])
+def test_tf_frames_are_drawn_as_axes_without_names(node, discover, recording, topic):
+    discovery = discover()
+    node.advertise(topic, "tf2_msgs/msg/TFMessage")
+    discovery.scan()
+    transform = TransformStamped(child_frame_id="tool")
+    transform.header.frame_id = "world"
+    node.publish(TFMessage(transforms=[transform]))
+    [axes] = recording.rows("/frames/tool")
+    assert axes["TransformAxes3D:axis_length"] == [pytest.approx(0.1)]
+    assert axes["TransformAxes3D:show_frame"] == [False]
+
+
+@pytest.mark.parametrize(
+    ("frames", "length", "names"),
+    [({"axis_length": 0.3, "frame_names": True}, 0.3, True), ({"frame_names": True}, 0.1, True)],
+)
+def test_auto_frames_set_how_tf_frames_are_drawn(node, discover, recording, frames, length, names):
+    discovery = discover(auto={"frames": frames})
+    node.advertise("/tf", "tf2_msgs/msg/TFMessage")
+    discovery.scan()
+    node.publish(TFMessage(transforms=[TransformStamped(child_frame_id="tool")]))
+    [axes] = recording.rows("/frames/tool")
+    assert axes["TransformAxes3D:axis_length"] == [pytest.approx(length)]
+    assert axes["TransformAxes3D:show_frame"] == [names]
+
+
+def test_auto_frames_without_an_axis_length_draw_no_axes(node, discover, recording):
+    discovery = discover(auto={"frames": {"axis_length": None}})
+    node.advertise("/tf", "tf2_msgs/msg/TFMessage")
+    discovery.scan()
+    node.publish(TFMessage(transforms=[TransformStamped(child_frame_id="tool")]))
+    assert "/tf" in recording.entities() and "/frames/tool" not in recording.entities()
 
 
 def test_joint_states_are_plotted_by_joint_name():
     # Not moving the robot model: /tf from robot_state_publisher does that, and both would disagree
-    entry = suggest("/joint_states", "sensor_msgs/msg/JointState", {})
+    entry = suggest("/joint_states", "sensor_msgs/msg/JointState", {}, FRAMES)
     assert entry["module"] == "scalars"
     assert entry["params"] == {"fields": ["position"], "names_field": "name"}
 
@@ -73,13 +111,13 @@ def test_joint_states_are_plotted_by_joint_name():
     ],
 )
 def test_leaves_topics_no_module_draws_or_that_are_hidden_or_namespaced_robots(topic, msg_type):
-    assert suggest(topic, msg_type, {topic: [msg_type]}) is None
+    assert suggest(topic, msg_type, {topic: [msg_type]}, FRAMES) is None
 
 
 def test_leaves_image_transport_copies_of_a_raw_image():
     graph = {"/camera/image_raw": ["sensor_msgs/msg/Image"]}
-    assert suggest("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage", graph) is None
-    assert suggest("/camera/image_raw/compressedDepth", "sensor_msgs/msg/CompressedImage", graph) is None
+    assert suggest("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage", graph, FRAMES) is None
+    assert suggest("/camera/image_raw/compressedDepth", "sensor_msgs/msg/CompressedImage", graph, FRAMES) is None
 
 
 def test_bridges_topics_as_they_appear(node, discover):

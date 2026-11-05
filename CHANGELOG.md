@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-- Automatic discovery, with `--auto` or `auto: true`: also bridges the topics a config does not name, as they appear, each with the built-in module for its message type and QoS its publishers accept. `auto` takes `include` and `exclude` topic patterns.
+- Automatic discovery, with `--auto` or `auto: true`: also bridges the topics a config does not name, as they appear, each with the built-in module for its message type and QoS its publishers accept. `auto` takes `include` and `exclude` topic patterns, and `frames`, setting how TF frames are drawn: as axes, without names, by default.
 - `--global-frame`, overriding the config's `global_frame`.
 
 ### Changed

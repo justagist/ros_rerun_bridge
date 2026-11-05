@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from .base import AutoConfig, BridgeConfig, TopicToComponentModule
     from .builder import BridgeBuilder
     from .context import BridgeContext
+    from .utils.frame_axes import FrameAxesParams
 
 SCAN_PERIOD = 2.0
 """Seconds between looks at the ROS graph for new topics."""
@@ -52,13 +53,14 @@ SHARED_ENTITY_PATHS = {"tf", "tf_static"}
 them, whichever module logs them, e.g. a configured `joint_states` on `tf`."""
 
 
-def suggest(topic: str, msg_type: str, graph: dict[str, list[str]]) -> dict[str, Any] | None:
+def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], frames: FrameAxesParams) -> dict[str, Any] | None:
     """Pick how to bridge a topic, from its message type and name.
 
     Args:
         topic: The topic's full name.
         msg_type: Its message type, e.g. `sensor_msgs/msg/Image`.
         graph: The types of every topic with publishers, by name.
+        frames: How to draw the frames of /tf and /tf_static.
 
     Returns:
         The topic's config entry, without QoS, or None if no module draws it.
@@ -72,9 +74,9 @@ def suggest(topic: str, msg_type: str, graph: dict[str, list[str]]) -> dict[str,
     # Only the root namespace's: Rerun's URDF importer logs the robot's joint defaults on `tf_static`, and the bridge
     # holds one robot model, so several robots' models and frames would mix
     if msg_type == "tf2_msgs/msg/TFMessage" and topic == "/tf":
-        return {**entry, "module": "tf"}
+        return {**entry, "module": "tf", "params": frames.model_dump()}
     if msg_type == "tf2_msgs/msg/TFMessage" and topic == "/tf_static":
-        return {**entry, "module": "tf", "params": {"static": True}}
+        return {**entry, "module": "tf", "params": {"static": True, **frames.model_dump()}}
     if msg_type == "std_msgs/msg/String" and topic == "/robot_description":
         return {**entry, "module": "robot_description"}
     if msg_type == "sensor_msgs/msg/Image":
@@ -121,7 +123,7 @@ class TopicDiscovery:
             context: Shared context for all modules.
         """
         self._node = node
-        self._filters: AutoConfig = cfg.auto
+        self._auto: AutoConfig = cfg.auto
         self._builder = builder
         self._context = context
         self.modules: list[TopicToComponentModule] = []
@@ -139,9 +141,9 @@ class TopicDiscovery:
             if self._node.count_publishers(topic) > 0
         }
         for topic, types in graph.items():
-            if topic in self._handled or len(types) != 1 or not self._filters.matches(topic):
+            if topic in self._handled or len(types) != 1 or not self._auto.matches(topic):
                 continue
-            entry = suggest(topic, types[0], graph)
+            entry = suggest(topic, types[0], graph, self._auto.frames)
             if entry is None:
                 continue
             self._handled.add(topic)

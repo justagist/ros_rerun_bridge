@@ -42,8 +42,8 @@ With `auto: true`, or `--auto` on the command line, the bridge also shows the to
 
 | Topics | Module |
 | --- | --- |
-| `/tf` | `tf`, on `tf` |
-| `/tf_static` | `tf` with `static: true`, on `tf_static` |
+| `/tf` | `tf`, on `tf`, drawing each frame's axes as `auto.frames` sets |
+| `/tf_static` | the same, with `static: true`, on `tf_static` |
 | `/robot_description` | `robot_description` |
 | `Image` | `depth_image` if the topic's name contains `depth`, otherwise `image` |
 | `CompressedImage` | `compressed_depth_image` for `.../compressedDepth`, otherwise `compressed_image`. Not when the raw image topic it was made from is published, as image_transport does. |
@@ -62,13 +62,18 @@ The bridge leaves:
 * Segmentation masks, which are images too: configure [`segmentation_image`](MODULES.md#segmentation_image).
 * Types no module draws alone, e.g. `Odometry`: configure them with [`scalars`](MODULES.md#scalars) or a [module of your own](EXTENDING.md).
 
-A topic that fails to bridge, e.g. as `nav2_msgs` is not installed, is logged as a warning and left. To limit what is bridged, for instance high-bandwidth camera streams, give `auto` the topics it may bridge as [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) patterns, where `*` also matches `/`:
+A topic that fails to bridge, e.g. as `nav2_msgs` is not installed, is logged as a warning and left. To limit what is bridged, for instance high-bandwidth camera streams, give `auto` the topics it may bridge as [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) patterns, where `*` also matches `/`. `frames` sets how TF frames are drawn, with the [`tf`](MODULES.md#tf) module's `axis_length` and `frame_names`:
 
 ```yaml
 auto:
   include: ["*"]             # optional: the default
   exclude: ["/camera/*/compressed*", "/rosout"]
+  frames:                    # optional
+    axis_length: 0.1         # the default; null draws no axes
+    frame_names: false       # the default, as many frames would crowd the view
 ```
+
+With names off, the viewer still shows a frame's name: select its axes under `frames` and override *Show frame*.
 
 `--auto` with no config bridges every topic it can, in the `map` frame unless `--global-frame` names another. With a config, `--auto` uses its `auto` filters if it has them.
 

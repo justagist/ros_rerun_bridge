@@ -11,6 +11,7 @@ from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 import rerun as rr
 
 from .types import StrictParamsModel
+from .utils.frame_axes import FrameAxesParams
 from .utils.utils import _import_module_by_path, make_qos, set_rr_time_from_ros, stamp_or_now
 
 if TYPE_CHECKING:
@@ -47,13 +48,24 @@ class ModuleConfig(StrictParamsModel):
     """Additional parameters for the module."""
 
 
+class AutoFrameAxesParams(FrameAxesParams):
+    """How discovered TF frames are drawn: the `tf` module's frame params, with axes by default."""
+
+    axis_length: float | None = Field(default=0.1, gt=0, allow_inf_nan=False)
+    """Draw each frame's axes, this long in metres, or none if null. Names are off by default, as many frames would
+    crowd the view, and the viewer can show each frame's name."""
+
+
 class AutoConfig(StrictParamsModel):
-    """Which topics automatic discovery may bridge, as `fnmatch` globs on the topic name (`*` also matches `/`)."""
+    """Settings for automatic discovery: which topics it may bridge, as `fnmatch` globs on the topic name (`*` also
+    matches `/`), and how it draws TF frames."""
 
     include: list[str] = Field(default_factory=lambda: ["*"])
     """Topics to bridge, if they have a module for their type."""
     exclude: list[str] = Field(default_factory=list)
     """Topics never to bridge, even if included."""
+    frames: AutoFrameAxesParams = Field(default_factory=AutoFrameAxesParams)
+    """How the frames from /tf and /tf_static are drawn."""
 
     def matches(self, topic: str) -> bool:
         """Whether the topic is included and not excluded."""
