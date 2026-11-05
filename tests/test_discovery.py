@@ -316,6 +316,34 @@ def test_leaves_joint_states_whose_plots_entity_path_the_config_uses(node, disco
     ) in node.log_messages
 
 
+def test_joint_states_without_plots_leave_their_plots_entity_path_free(node, discover):
+    discovery = discover(
+        auto={"joint_states": {"plot": []}},
+        modules=[{"name": "range", "module": "range", "topic": "/range", "entity_path": "joint_states"}],
+    )
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert [type(module) for module in discovery.modules] == [JointStatesModule]
+
+
+def test_leaves_joint_states_whose_plots_a_configured_joint_states_module_plots_on(node, discover):
+    # The configured module plots on the default `joint_states`, as the found topic would
+    joints = {"name": "arm", "module": "joint_states", "topic": "/arm_states", "entity_path": "tf"}
+    discovery = discover(modules=[{**joints, "params": {"plot": ["position"]}}])
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert discovery.modules == []
+
+
+def test_leaves_joint_states_whose_plots_a_found_topic_plots_on(node, discover):
+    mapped = {"module": "joint_states", "params": {"plot": ["position"], "plot_entity_path": "joints"}}
+    discovery = discover(auto={"modules": {"sensor_msgs/msg/JointState": mapped}})
+    node.advertise("/arm/joint_states", "sensor_msgs/msg/JointState")
+    node.advertise("/gripper/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert len(discovery.modules) == 1
+
+
 def test_tf_shares_its_entity_with_a_configured_module(node, discover):
     # As the joint_states module's docs advise, so that a joint on both is one frame relation
     discovery = discover(

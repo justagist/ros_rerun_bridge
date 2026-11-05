@@ -13,6 +13,7 @@ from rclpy.clock import Clock, ClockType
 from rclpy.qos import DurabilityPolicy, ReliabilityPolicy
 
 from .config import ModuleConfig, QoSConfig
+from .modules.joint_states import JointStatesModule, JointStatesParams
 from .utils.utils import _import_module_by_path, set_rr_time_from_ros
 
 if TYPE_CHECKING:
@@ -47,6 +48,20 @@ MODULES_BY_TYPE: dict[str, dict[str, Any]] = {
 SHARED_ENTITY_PATHS = {"tf", "tf_static"}
 """Entity paths a discovered module may share with a configured one: frame relations from /tf and /tf_static belong on
 them, whichever module logs them, e.g. a configured `joint_states` on `tf`."""
+
+
+def entity_paths(entry: dict[str, Any]) -> list[str]:
+    """The entity paths a config entry logs on: its own and, for a `joint_states` module that plots, its plots'.
+
+    Args:
+        entry: The config entry, with its params as in the config.
+    """
+    paths = [entry["entity_path"].strip("/")]
+    if entry["module"] == "joint_states":
+        params = JointStatesParams.model_validate(entry.get("params", {}))
+        if params.plot:
+            paths.append(params.plot_entity_path.strip("/"))
+    return paths
 
 
 def suggest(
@@ -160,7 +175,7 @@ class TopicDiscovery:
         self._builder = builder
         self._context = context
         self._configured = {node.resolve_topic_name(m.topic) for m in cfg.modules}
-        self._configured_paths = {m.entity_path.strip("/") for m in cfg.modules}
+        self._configured_paths = {path for m in cfg.modules for path in entity_paths(m.model_dump())}
         self._tf_entity = next(
             (m.entity_path.strip("/") for m in cfg.modules if node.resolve_topic_name(m.topic) == "/tf"), "tf"
         )
@@ -249,10 +264,15 @@ class TopicDiscovery:
             # from several sources belong together. A configured /tf's own entity is shared with joint states only: any
             # other topic there could clear its frame relations. Joint states' plots have an entity path of their own.
             in_use = self._configured_paths | {module.entity_path for module in self.modules}
+            in_use |= {
+                module.params.plot_entity_path.strip("/")
+                for module in self.modules
+                if isinstance(module, JointStatesModule) and module.params.plot
+            }
             if taken := [
                 path
                 for entry in entries
-                for path in (entry["entity_path"], entry.get("params", {}).get("plot_entity_path"))
+                for path in entity_paths(entry)
                 if path in in_use - SHARED_ENTITY_PATHS
                 and not (entry["module"] == "joint_states" and path == self._tf_entity)
             ]:

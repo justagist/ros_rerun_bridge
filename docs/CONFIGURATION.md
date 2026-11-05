@@ -78,7 +78,7 @@ Joint states move the robot on the same entity as `/tf`, so the bridge shows the
 
 ### What is not shown
 
-* **Topics the config lists.** They keep their config. A topic whose entity path a configured module already uses is skipped too, except `tf` and `tf_static`, which are meant to be shared.
+* **Topics the config lists.** They keep their config. A topic whose entity path a configured module already uses is skipped too, except `tf` and `tf_static`, which are meant to be shared. So is a `JointState` topic whose plots' entity path another module logs or plots on.
 * **Compressed copies of a raw image.** image_transport publishes both. If the raw image is shown, its compressed copy is not. A compressed copy shown before its raw image appeared is removed once the raw image is shown.
 * **A second robot.** The bridge holds one robot model, so `/robot_description` is skipped if the config has a `robot_description` module, and only the root `/tf`, `/tf_static` and `/robot_description` are found, not e.g. `/robot1/tf`.
 * **Hidden topics** (a part of the name starts with `_`), and topics published with more than one message type.
