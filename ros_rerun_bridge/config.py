@@ -122,7 +122,8 @@ class AutoConfig(StrictParamsModel):
         modules and would leave every setting in `joint_states` unused."""
         if "joint_states" in self.model_fields_set and "sensor_msgs/msg/JointState" in self.modules:
             raise ValueError(
-                "'joint_states' does nothing when 'modules' maps sensor_msgs/msg/JointState: set one or the other"
+                "'auto.joint_states' does nothing when 'auto.modules' maps sensor_msgs/msg/JointState: set one or the "
+                "other"
             )
         return self
 

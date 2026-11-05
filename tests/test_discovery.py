@@ -615,7 +615,7 @@ def test_a_mapping_must_name_a_message_type():
 
 
 def test_joint_state_settings_cannot_be_given_with_a_module_mapped_to_joint_states():
-    with pytest.raises(ValidationError, match="'joint_states' does nothing"):
+    with pytest.raises(ValidationError, match="'auto.joint_states' does nothing when 'auto.modules' maps"):
         BridgeConfig(
             auto={"joint_states": {"plot": []}, "modules": {"sensor_msgs/msg/JointState": "scalars"}},
         )
