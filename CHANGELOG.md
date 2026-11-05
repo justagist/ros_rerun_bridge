@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [0.17.1] - 2026-11-05
+
+### Added
+
+- Published on PyPI: install with `uv tool install --python-preference only-system ros-rerun-bridge` or `pipx install ros-rerun-bridge`. A tag `v*` builds and publishes a release once CI passes.
+- `ros-rerun-bridge` warns when it runs in the system Python, where its NumPy 2 can break other ROS nodes, and says what to do when it cannot import `rclpy`: source ROS, or install it for the distro's Python.
+
+### Changed
+
+- The README's links are absolute, so they work on PyPI too.
+
 ## [0.17.0] - 2026-11-05
 
 ### Added
@@ -249,6 +260,7 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 
 First version: a config-driven bridge with `image`, `camera_info`, `laserscan`, `pointcloud2`, `particle_cloud`, `odometry`, `robot_description` and `joint_states` modules.
 
+[0.17.1]: https://github.com/justagist/ros_rerun_bridge/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/justagist/ros_rerun_bridge/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.15.0...v0.16.0

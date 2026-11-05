@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from rclpy.qos import DurabilityPolicy
 from visualization_msgs.msg import Marker
 
+import ros_rerun_bridge
 from ros_rerun_bridge import main
 from ros_rerun_bridge.main import load_config
 from ros_rerun_bridge.modules.tf import TFModule
@@ -179,3 +180,26 @@ def test_a_module_that_cannot_be_built_stops_the_bridge(start, tmp_path, capsys)
     with pytest.raises(SystemExit) as exited:
         start("--auto", node=failing_node)
     assert exited.value.code == 2 and "[scan] invalid 'params'" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("ros_distro", "reason"),
+    [(None, "ROS is not sourced"), ("jazzy", "rclpy is compiled for its distro's Python, not Python")],
+)
+def test_an_rclpy_that_cannot_be_imported_is_explained(monkeypatch, ros_distro, reason):
+    # As when rclpy is missing, or compiled for another Python
+    monkeypatch.setitem(sys.modules, "rclpy", None)
+    if ros_distro is None:
+        monkeypatch.delenv("ROS_DISTRO", raising=False)
+    else:
+        monkeypatch.setenv("ROS_DISTRO", ros_distro)
+    with pytest.raises(SystemExit, match=reason):
+        ros_rerun_bridge._check_environment()
+
+
+def test_only_the_system_python_is_warned_of(monkeypatch, capsys):
+    ros_rerun_bridge._check_environment()
+    assert capsys.readouterr().err == ""
+    monkeypatch.setattr(sys, "base_prefix", sys.prefix)
+    ros_rerun_bridge._check_environment()
+    assert "running in the system Python" in capsys.readouterr().err

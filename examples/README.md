@@ -9,7 +9,7 @@ Each folder holds what an example needs:
 Some examples use modules that need extra ROS packages, e.g. `mobile_robot` and `point_cloud` ([INSTALLATION.md](../docs/INSTALLATION.md#ros-packages-for-some-modules)). From the repo root, with ROS sourced, run the bridge and the publisher in two terminals:
 
 ```bash
-uv run ros-rerun-bridge --config examples/<name>/config.yaml
+ros-rerun-bridge --config examples/<name>/config.yaml  # or, without installing it: uv run ros-rerun-bridge ...
 python3 examples/<name>/publisher.py
 ```
 
