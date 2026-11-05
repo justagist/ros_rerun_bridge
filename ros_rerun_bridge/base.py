@@ -137,7 +137,7 @@ class TopicToComponentModule:
         # Modules add their own timers to it to keep that guarantee.
         self.callback_group = MutuallyExclusiveCallbackGroup()
 
-    def start(self) -> None:
+    def _subscribe(self) -> None:
         """Subscribe to the topic. The builder calls it once the module is fully initialised: with automatic discovery,
         modules are built while the executor runs, and a message could otherwise reach a half-built module."""
         self._sub = self.node.create_subscription(

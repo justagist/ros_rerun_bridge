@@ -120,6 +120,50 @@ def test_leaves_image_transport_copies_of_a_raw_image():
     assert suggest("/camera/image_raw/compressedDepth", "sensor_msgs/msg/CompressedImage", graph, FRAMES) is None
 
 
+@pytest.mark.parametrize(
+    ("config", "expected"),
+    [
+        # The raw image is filtered out, so its compressed copy is the only one shown
+        ({"auto": {"include": ["*/compressed"]}}, {"/camera/image_raw/compressed"}),
+        # The raw image is configured, so it is bridged and its copy is not
+        (
+            {"modules": [{"name": "raw", "module": "image", "topic": "/camera/image_raw", "entity_path": "raw"}]},
+            {"/camera/image_raw"},
+        ),
+    ],
+)
+def test_bridges_a_compressed_image_unless_its_raw_image_is_bridged(node, discover, config, expected):
+    discovery = discover(**config)
+    node.advertise("/camera/image_raw", "sensor_msgs/msg/Image")
+    node.advertise("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage")
+    discovery.scan()
+    assert set(subscribed(node)) == expected
+
+
+def test_leaves_the_robot_model_to_a_configured_one(node, discover):
+    # The bridge holds one robot model: the namespaced robot's must not be replaced
+    discovery = discover(
+        modules=[
+            {"name": "robot", "module": "robot_description", "topic": "/robot1/robot_description", "entity_path": "r"}
+        ]
+    )
+    node.advertise("/robot_description", "std_msgs/msg/String", LATCHED)
+    discovery.scan()
+    assert discovery.modules == []
+
+
+def test_a_topic_whose_publishers_left_during_a_scan_is_looked_at_again(node, discover, monkeypatch):
+    discovery = discover()
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan", qos_profile_sensor_data)
+    # Counted as published, but gone by the time its publishers' QoS is read
+    monkeypatch.setattr(node, "get_publishers_info_by_topic", lambda topic: [])
+    discovery.scan()
+    assert node.subscriptions == []
+    monkeypatch.undo()
+    discovery.scan()
+    assert subscribed(node)["/scan"].qos.reliability == ReliabilityPolicy.BEST_EFFORT
+
+
 def test_bridges_topics_as_they_appear(node, discover):
     discovery = discover()
     node.advertise("/scan", "sensor_msgs/msg/LaserScan")

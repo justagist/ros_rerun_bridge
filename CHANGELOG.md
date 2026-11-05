@@ -12,7 +12,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 
 - `--config` is optional with `--auto`, and a config's `modules` with automatic discovery.
-- Modules subscribe in `start()`, which the builder calls once a module is built, so no message reaches a half-built module. A module constructed without the builder no longer subscribes by itself.
+- The builder subscribes a module once it is built, so no message reaches a half-built module. A module constructed without the builder no longer subscribes by itself.
 
 ## [0.16.1] - 2026-11-04
 

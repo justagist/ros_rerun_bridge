@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.clock import Clock, ClockType
 from rclpy.qos import DurabilityPolicy, ReliabilityPolicy
 
 from .base import ModuleConfig, QoSConfig
@@ -59,7 +60,7 @@ def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], frames: Fram
     Args:
         topic: The topic's full name.
         msg_type: Its message type, e.g. `sensor_msgs/msg/Image`.
-        graph: The types of every topic with publishers, by name.
+        graph: The types of the bridged topics with publishers, configured or discovered, by name.
         frames: How to draw the frames of /tf and /tf_static.
 
     Returns:
@@ -128,10 +129,19 @@ class TopicDiscovery:
         self._context = context
         self.modules: list[TopicToComponentModule] = []
         """Modules built for discovered topics."""
-        self._handled = {node.resolve_topic_name(m.topic) for m in cfg.modules}
+        self._configured = {node.resolve_topic_name(m.topic) for m in cfg.modules}
+        self._handled = set(self._configured)
         """Topics bridged, by the config or by discovery, or that discovery failed to bridge."""
         self._entity_paths = {m.entity_path.strip("/") for m in cfg.modules}
-        node.create_timer(SCAN_PERIOD, self.scan, callback_group=MutuallyExclusiveCallbackGroup())
+        # The bridge holds one robot model: a configured one, e.g. a namespaced robot's, keeps it
+        self._has_robot_model = any(m.module == "robot_description" for m in cfg.modules)
+        # Steady time: on ROS time, with use_sim_time, discovery would stop while a bag is paused or not playing
+        node.create_timer(
+            SCAN_PERIOD,
+            self.scan,
+            callback_group=MutuallyExclusiveCallbackGroup(),
+            clock=Clock(clock_type=ClockType.STEADY_TIME),
+        )
 
     def scan(self) -> None:
         """Bridge each new topic that has publishers, passes the filters and has a module for its type."""
@@ -140,11 +150,19 @@ class TopicDiscovery:
             for topic, types in self._node.get_topic_names_and_types()
             if self._node.count_publishers(topic) > 0
         }
-        for topic, types in graph.items():
-            if topic in self._handled or len(types) != 1 or not self._auto.matches(topic):
+        # Only these, so a compressed image is left for its raw image only if that is bridged
+        bridged = {
+            topic: types for topic, types in graph.items() if topic in self._configured or self._auto.matches(topic)
+        }
+        for topic, types in bridged.items():
+            if topic in self._handled or len(types) != 1:
                 continue
-            entry = suggest(topic, types[0], graph, self._auto.frames)
-            if entry is None:
+            entry = suggest(topic, types[0], bridged, self._auto.frames)
+            if entry is None or (entry["module"] == "robot_description" and self._has_robot_model):
+                continue
+            publishers = self._node.get_publishers_info_by_topic(topic)
+            if not publishers:
+                # Gone since the graph was read: with none to match QoS to, look again on a later scan
                 continue
             self._handled.add(topic)
             if entry["entity_path"] in self._entity_paths - SHARED_ENTITY_PATHS:
@@ -153,7 +171,7 @@ class TopicDiscovery:
                 )
                 continue
             try:
-                qos = qos_from_publishers(self._node.get_publishers_info_by_topic(topic))
+                qos = qos_from_publishers(publishers)
                 module = self._builder.build_module(ModuleConfig(**entry, qos=qos), self._context)
             # Any error: one would stop the executor, and with it the bridge, over a single topic
             except Exception as e:

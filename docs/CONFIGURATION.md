@@ -45,8 +45,8 @@ With `auto: true`, or `--auto` on the command line, the bridge also shows the to
 | `/tf` | `tf`, on `tf`, drawing each frame's axes as `auto.frames` sets |
 | `/tf_static` | the same, with `static: true`, on `tf_static` |
 | `/robot_description` | `robot_description` |
-| `Image` | `depth_image` if the topic's name contains `depth`, otherwise `image` |
-| `CompressedImage` | `compressed_depth_image` for `.../compressedDepth`, otherwise `compressed_image`. Not when the raw image topic it was made from is published, as image_transport does. |
+| `Image` | `depth_image` if the topic's name contains `depth`, otherwise `image`. Segmentation masks are images too, and show as plain ones: configure [`segmentation_image`](MODULES.md#segmentation_image) for their class colours. |
+| `CompressedImage` | `compressed_depth_image` for `.../compressedDepth`, otherwise `compressed_image`. Left out when the raw image it was made from is published and bridged, as image_transport publishes both. |
 | `JointState` | `scalars`, plotting each joint's position by its name |
 | `Marker`, `MarkerArray` | `marker_array` |
 | `CameraInfo`, `PointCloud2`, `LaserScan`, `Range`, `PoseStamped`, `PoseArray`, `WrenchStamped`, `OccupancyGrid`, `ParticleCloud`, `Log`, `DiagnosticArray`, `Detection2DArray`, `Detection3DArray` | the module for the type |
@@ -55,11 +55,11 @@ Each topic is logged on its name as entity path, e.g. `/camera/image_raw` on `ca
 
 The bridge leaves:
 
-* Topics `modules` names, and topics whose entity path a module already uses, except `tf` and `tf_static`, which all frame relations share.
+* Topics `modules` names, and topics whose entity path a module already uses, except `tf` and `tf_static`, which all frame relations share. Modules that log beneath their entity path, e.g. `scalars` on `<entity_path>/<field>`, can still meet a discovered topic there: `exclude` it if they do.
+* `/robot_description` if `modules` has a `robot_description` module: the bridge holds one robot model.
 * Hidden topics (a name part starting with `_`), and topics with several message types.
 * TF and robot descriptions outside the root namespace, e.g. `/robot1/tf`: the bridge holds one robot model.
 * Joint states as robot motion: robot_state_publisher puts the joints on `/tf`, and two sources would disagree. Without it, configure the [`joint_states`](MODULES.md#joint_states) module.
-* Segmentation masks, which are images too: configure [`segmentation_image`](MODULES.md#segmentation_image).
 * Types no module draws alone, e.g. `Odometry`: configure them with [`scalars`](MODULES.md#scalars) or a [module of your own](EXTENDING.md).
 
 A topic that fails to bridge, e.g. as `nav2_msgs` is not installed, is logged as a warning and left. To limit what is bridged, for instance high-bandwidth camera streams, give `auto` the topics it may bridge as [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) patterns, where `*` also matches `/`. `frames` sets how TF frames are drawn, with the [`tf`](MODULES.md#tf) module's `axis_length` and `frame_names`:

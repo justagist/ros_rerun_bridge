@@ -82,7 +82,7 @@ class FakeNode:
         self.subscriptions.append(FakeSubscription(msg_type, topic, callback, qos))
         return self.subscriptions[-1]
 
-    def create_timer(self, period_s, callback, callback_group=None):
+    def create_timer(self, period_s, callback, callback_group=None, clock=None):
         self.timers.append(callback)
 
     def get_logger(self) -> FakeLogger:

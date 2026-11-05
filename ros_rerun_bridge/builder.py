@@ -59,7 +59,7 @@ class BridgeBuilder:
             # Name the module: a config often has several of one kind
             error = ImportError if isinstance(e, ImportError) else ValueError
             raise error(f"[{module_spec.name}] {e}") from e
-        inst.start()
+        inst._subscribe()
         return inst
 
     def _resolve_class(self, module_id: str):

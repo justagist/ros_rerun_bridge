@@ -96,6 +96,18 @@ def test_subscribes_only_once_the_module_is_built(node, build):
     assert len(node.subscriptions) == 1
 
 
+class WithItsOwnStart(TFModule):
+    """Has a method of a name a module may well use for its own setup."""
+
+    def start(self) -> None:
+        pass
+
+
+def test_a_module_with_its_own_start_method_still_subscribes(node, build):
+    build(f"{__name__}:WithItsOwnStart")
+    assert len(node.subscriptions) == 1
+
+
 @pytest.mark.parametrize(
     ("qos", "error"), [({"reliability": "best-effort"}, "reliability"), ({"depth": 0}, "depth"), ({"deph": 5}, "deph")]
 )
