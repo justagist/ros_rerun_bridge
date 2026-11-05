@@ -39,6 +39,9 @@ class RosoutModule(TopicToComponentModule):
     PARAMS = RosoutParams
     params: RosoutParams  # type hint for self.params
 
+    def clear(self) -> None:
+        """Keep the log: it is history, which the viewer shows over time."""
+
     @classmethod
     def ros_msg_type(cls):
         return Log

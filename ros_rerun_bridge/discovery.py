@@ -52,10 +52,6 @@ SHARED_ENTITY_PATHS = {"tf", "tf_static"}
 """Entity paths a discovered module may share with a configured one: frame relations from /tf and /tf_static belong on
 them, whichever module logs them, e.g. a configured `joint_states` on `tf`."""
 
-KEPT_MODULES = {"tf", "scalars", "diagnostics", "rosout"}
-"""Modules whose drawing is not cleared when their topic is dropped: `tf`, as every frame relation shares its entity,
-and those drawing history, plots and logs, which their views show over time."""
-
 
 def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], auto: AutoConfig) -> dict[str, Any] | None:
     """Pick how to bridge a topic, from its message type and name.
@@ -73,18 +69,19 @@ def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], auto: AutoCo
         # Hidden topics, by ROS convention
         return None
     entry = {"name": topic, "topic": topic, "entity_path": topic.strip("/")}
-    if (mapped := auto.modules.get(msg_type)) is not None:
-        return {**entry, "module": mapped.module, "msg_type": msg_type.replace("/", "."), "params": mapped.params}
-    if msg_type in MODULES_BY_TYPE:
-        return {**entry, **MODULES_BY_TYPE[msg_type]}
     # Only the root namespace's: Rerun's URDF importer logs the robot's joint defaults on `tf_static`, and the bridge
-    # holds one robot model, so several robots' models and frames would mix
+    # holds one robot model, so several robots' models and frames would mix. Not remapped by `auto.modules`, as the
+    # scene's frames and robot model depend on them.
     if msg_type == "tf2_msgs/msg/TFMessage" and topic == "/tf":
         return {**entry, "module": "tf", "params": auto.frames.model_dump()}
     if msg_type == "tf2_msgs/msg/TFMessage" and topic == "/tf_static":
         return {**entry, "module": "tf", "params": {"static": True, **auto.frames.model_dump()}}
     if msg_type == "std_msgs/msg/String" and topic == "/robot_description":
         return {**entry, "module": "robot_description"}
+    if (mapped := auto.modules.get(msg_type)) is not None:
+        return {**entry, "module": mapped.module, "msg_type": msg_type.replace("/", "."), "params": mapped.params}
+    if msg_type in MODULES_BY_TYPE:
+        return {**entry, **MODULES_BY_TYPE[msg_type]}
     if msg_type == "sensor_msgs/msg/Image":
         # Only the name tells depth from other single-channel images. A depth image shown as an image still shows.
         # Segmentation masks are images too, and are left to a config.
@@ -121,7 +118,6 @@ class _Bridged:
     """A discovered topic's module, and what it was built for."""
 
     module: TopicToComponentModule
-    module_id: str
     msg_type: str
     qos: QoSConfig
     missing_since: Time | None = None
@@ -165,15 +161,16 @@ class TopicDiscovery:
         )
 
     def _check_modules(self, builder: BridgeBuilder) -> None:
-        """Check the modules mapped to message types, so a config error stops the bridge before a viewer opens rather
-        than when a topic of the type appears.
+        """Check that the modules mapped to message types exist and their params are valid, so a config error stops the
+        bridge before a viewer opens rather than when a topic of the type appears. Checks of params against the message
+        type, e.g. `scalars`'s fields, are left to when a topic appears.
 
         Args:
             builder: Resolves the modules.
 
         Raises:
             ValueError: If a module cannot be found, or its params are invalid, named in the message.
-            ImportError: If a module or a message type cannot be imported, named in the message.
+            ImportError: If a module or a message type cannot be imported, or does not exist, named in the message.
         """
         for msg_type, mapped in self._auto.modules.items():
             try:
@@ -181,8 +178,9 @@ class TopicDiscovery:
                 cls = builder._resolve_class(mapped.module)
                 if cls.PARAMS is not None:
                     cls.PARAMS.model_validate(mapped.params)
-            except (ValueError, ImportError) as e:
-                error = ImportError if isinstance(e, ImportError) else ValueError
+            # AttributeError: a module of the path has no class of the name, e.g. a misspelled message type
+            except (ValueError, ImportError, AttributeError) as e:
+                error = ValueError if isinstance(e, ValueError) else ImportError
                 raise error(f"[auto.modules: {msg_type}] {e}") from e
 
     @property
@@ -229,7 +227,7 @@ class TopicDiscovery:
                 self._rejected.add(topic)
                 self._node.get_logger().warn(f"[auto] not bridging {topic}: {type(e).__name__}: {e}")
                 continue
-            self._bridged[topic] = _Bridged(module, entry["module"], types[0], qos)
+            self._bridged[topic] = _Bridged(module, types[0], qos)
         for topic, bridged in list(self._bridged.items()):
             # e.g. a compressed image, once its raw image is bridged too
             if topic in eligible and suggest(topic, bridged.msg_type, self._shown(eligible), self._auto) is None:
@@ -291,11 +289,11 @@ class TopicDiscovery:
             topic: The bridged topic.
             reason: Why, for the log.
             clear_at: When to clear what the module drew, on ROS time, so the viewer shows nothing stale from then on.
-                Not for `KEPT_MODULES`. Not cleared if None.
+                Not cleared if None.
         """
         bridged = self._bridged.pop(topic)
         bridged.module.close()
-        if clear_at is not None and bridged.module_id not in KEPT_MODULES:
+        if clear_at is not None:
             set_rr_time_from_ros(clear_at)
             bridged.module.clear()
         self._node.get_logger().info(f"[auto] dropped {topic}: {reason}")

@@ -190,7 +190,8 @@ class TopicToComponentModule:
     def clear(self) -> None:
         """Clear what the module drew, when automatic discovery drops its topic, at the current Rerun time. Only the
         module's own entity: a recursive clear would also clear other modules' entities beneath it. A module drawing
-        beneath its entity extends it to clear those too."""
+        beneath its entity extends it to clear those too, and one whose drawing stays true, e.g. history, overrides it
+        to keep it."""
         rr.log(self.entity_path, rr.Clear(recursive=False))
 
     def _resubscribe(self, qos: QoSConfig) -> None:

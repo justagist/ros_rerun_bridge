@@ -142,6 +142,9 @@ class ScalarsModule(TopicToComponentModule):
         header = getattr(msg, "header", None)
         return Time.from_msg(header.stamp) if header is not None else None
 
+    def clear(self) -> None:
+        """Keep the plots: they are history, which the viewer shows over time."""
+
     def handle(self, msg: Any) -> None:
         if self._names is not None:
             self._log_named(msg)

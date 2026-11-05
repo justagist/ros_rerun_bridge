@@ -17,6 +17,8 @@ from ros_rerun_bridge.modules.compressed_image import CompressedImageModule
 from ros_rerun_bridge.modules.image import ImageModule
 from ros_rerun_bridge.modules.laserscan import LaserScanModule
 from ros_rerun_bridge.modules.range import RangeModule
+from ros_rerun_bridge.modules.scalars import ScalarsModule
+from ros_rerun_bridge.modules.tf import TFModule
 
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
 AUTO = AutoConfig()
@@ -545,3 +547,52 @@ def test_a_mapped_module_that_cannot_be_used_stops_the_bridge_at_start(discover,
 def test_a_mapping_must_name_a_message_type():
     with pytest.raises(ValidationError, match="'Odometry' is not a message type"):
         BridgeConfig(auto={"modules": {"Odometry": "scalars"}})
+
+
+class CustomTF(TFModule):
+    """A TF module of the user's own."""
+
+
+def test_a_tf_mapping_leaves_the_root_tf_topics_to_the_bridge(node, discover):
+    # The scene's frames and robot model depend on them, e.g. /tf_static's transforms being static
+    discovery = discover(auto={"modules": {"tf2_msgs/msg/TFMessage": f"{__name__}:CustomTF"}})
+    node.advertise("/tf_static", "tf2_msgs/msg/TFMessage", LATCHED)
+    node.advertise("/robot1/tf", "tf2_msgs/msg/TFMessage")
+    discovery.scan()
+    modules = {module.entity_path: module for module in discovery.modules}
+    assert type(modules["tf_static"]) is TFModule and modules["tf_static"].params.static
+    assert type(modules["robot1/tf"]) is CustomTF
+
+
+class CustomScalars(ScalarsModule):
+    """A plotting module of the user's own, keeping its plots as the one it extends does."""
+
+
+def test_a_module_of_your_own_keeps_what_the_module_it_extends_keeps(node, discover, recording):
+    discovery = discover(
+        auto={
+            "modules": {
+                "sensor_msgs/msg/JointState": {
+                    "module": f"{__name__}:CustomScalars",
+                    "params": {"fields": ["position"]},
+                }
+            }
+        }
+    )
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    drop_after_grace(node, discovery, "/joint_states")
+    assert discovery.modules == []
+    assert all("Clear:is_recursive" not in row for row in recording.rows("/joint_states"))
+
+
+@pytest.mark.parametrize(
+    ("modules", "match"),
+    [
+        ({"nav_msgs/msg/Odomtry": "scalars"}, "Odomtry"),
+        ({"sensor_msgs/msg/LaserScan": "ros_rerun_bridge.modules.laserscan:LaserScanModul"}, "LaserScanModul"),
+    ],
+)
+def test_a_misspelled_class_stops_the_bridge_at_start(discover, modules, match):
+    with pytest.raises(ImportError, match=match):
+        discover(auto={"modules": modules})

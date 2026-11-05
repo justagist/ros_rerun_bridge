@@ -87,7 +87,7 @@ The name must match the file name (`my_pose` in `ros_rerun_bridge/modules/my_pos
 
 Automatic discovery calls a module's `close()` when its topic goes away. If the module holds ROS resources besides its subscription, such as a timer, override `close()` to release them, and call `super().close()`.
 
-It then calls `clear()`, to clear what the module drew. The default clears the module's own entity only, so that other modules' entities beneath it are kept. If the module draws on entities beneath its own, such as `marker_array`'s markers, override `clear()` to clear those as well.
+It then calls `clear()`, to clear what the module drew. The default clears the module's own entity only, so that other modules' entities beneath it are kept. If the module draws on entities beneath its own, such as `marker_array`'s markers, override `clear()` to clear those as well. If what it drew stays true after the topic goes, such as history, override `clear()` to do nothing, as the built-in `tf`, `scalars`, `diagnostics` and `rosout` modules do.
 
 The test fixtures in [tests/conftest.py](../tests/conftest.py) run a module without a ROS graph and read back what it logged:
 

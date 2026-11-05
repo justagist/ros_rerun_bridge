@@ -45,6 +45,9 @@ class TFModule(TopicToComponentModule):
         super().__init__(node, config, context)
         self._frame_axes = FrameAxes(self.params)
 
+    def clear(self) -> None:
+        """Keep the frames: every frame relation shares the `tf` entities, and other modules' data is placed by them."""
+
     @classmethod
     def ros_msg_type(cls):
         return TFMessage
