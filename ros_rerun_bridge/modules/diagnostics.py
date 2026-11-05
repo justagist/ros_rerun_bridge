@@ -33,6 +33,9 @@ class DiagnosticsModule(TopicToComponentModule):
     # No params, so any given are an error
     PARAMS = StrictParamsModel
 
+    def clear(self) -> None:
+        """Keep the statuses: they are history, which the viewer shows over time."""
+
     @classmethod
     def ros_msg_type(cls):
         return DiagnosticArray

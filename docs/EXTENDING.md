@@ -85,9 +85,9 @@ class MyPoseModule(TopicToComponentModule): ...
 
 The name must match the file name (`my_pose` in `ros_rerun_bridge/modules/my_pose.py`): the builder imports a built-in module only when a config uses it. Document it in [MODULES.md](MODULES.md).
 
-Automatic discovery calls a built-in module's `close()` when its topic goes away. If the module holds ROS resources besides its subscription, such as a timer, override `close()` to release them, and call `super().close()`.
+Automatic discovery calls a module's `close()` when its topic goes away. If the module holds ROS resources besides its subscription, such as a timer, override `close()` to release them, and call `super().close()`.
 
-It then calls `clear()`, to clear what the module drew. The default clears the module's own entity only, so that other modules' entities beneath it are kept. If the module draws on entities beneath its own, such as `marker_array`'s markers, override `clear()` to clear those as well.
+It then calls `clear()`, to clear what the module drew. The default clears the module's own entity only, so that other modules' entities beneath it are kept. If the module draws on entities beneath its own, such as `marker_array`'s markers, override `clear()` to clear those as well. If what it drew stays true after the topic goes, such as history, override `clear()` to do nothing, as the built-in `tf`, `scalars`, `diagnostics` and `rosout` modules do.
 
 The test fixtures in [tests/conftest.py](../tests/conftest.py) run a module without a ROS graph and read back what it logged:
 
@@ -119,4 +119,4 @@ Yes. Derive the paths from `self.entity_path`, or add params to control them.
 Modules are created at startup. With [automatic discovery](CONFIGURATION.md#automatic-discovery), they are also created when a topic appears, and closed when it goes away. Do your setup in `__init__`, after calling `super().__init__`. The module is only subscribed once `__init__` returns, so no message arrives before your setup is done.
 
 **Is my module used by automatic discovery?**
-No. Discovery only uses built-in modules. List your module's topics in the config.
+Only if you name it for a message type in `auto.modules` ([Settings](CONFIGURATION.md#settings)). Discovery then shows every topic of that type with your module. When a topic goes away, it calls your module's `close()` and `clear()` as for a built-in one: override `clear()` to keep what your module drew, e.g. for a plot.
