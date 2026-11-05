@@ -5,13 +5,15 @@ Automatic discovery: bridges the topics a config does not name, each with the bu
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from typing import TYPE_CHECKING, Any
 
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.clock import Clock, ClockType
 from rclpy.qos import DurabilityPolicy, ReliabilityPolicy
 
-from .base import ModuleConfig, QoSConfig
+from .config import ModuleConfig, QoSConfig
+from .modules.joint_states import JointStatesModule, JointStatesParams
 from .utils.utils import _import_module_by_path, set_rr_time_from_ros
 
 if TYPE_CHECKING:
@@ -19,8 +21,9 @@ if TYPE_CHECKING:
     from rclpy.time import Time
     from rclpy.topic_endpoint_info import TopicEndpointInfo
 
-    from .base import AutoConfig, BridgeConfig, TopicToComponentModule
+    from .base import TopicToComponentModule
     from .builder import BridgeBuilder
+    from .config import AutoConfig, BridgeConfig
     from .context import BridgeContext
 
 MODULES_BY_TYPE: dict[str, dict[str, Any]] = {
@@ -45,6 +48,20 @@ MODULES_BY_TYPE: dict[str, dict[str, Any]] = {
 SHARED_ENTITY_PATHS = {"tf", "tf_static"}
 """Entity paths a discovered module may share with a configured one: frame relations from /tf and /tf_static belong on
 them, whichever module logs them, e.g. a configured `joint_states` on `tf`."""
+
+
+def entity_paths(entry: dict[str, Any]) -> list[str]:
+    """The entity paths a config entry logs on: its own and, for a `joint_states` module that plots, its plots'.
+
+    Args:
+        entry: The config entry, with its params as in the config.
+    """
+    paths = [entry["entity_path"].strip("/")]
+    if entry["module"] == "joint_states":
+        params = JointStatesParams.model_validate(entry.get("params", {}))
+        if params.plot:
+            paths.append(params.plot_entity_path.strip("/"))
+    return paths
 
 
 def suggest(
@@ -81,17 +98,18 @@ def suggest(
     if (mapped := auto.modules.get(msg_type)) is not None:
         return [{**entry, "module": mapped.module, "msg_type": msg_type.replace("/", "."), "params": mapped.params}]
     if msg_type == "sensor_msgs/msg/JointState":
+        joint_states = auto.joint_states
+        if not any(fnmatchcase(topic, pattern) for pattern in joint_states.topics):
+            return []
         # Moved on /tf's entity: Rerun takes a frame relation's changes over time on one entity only, so a joint that
-        # robot_state_publisher also puts on /tf is then one relation, whose latest value wins, as in tf2
-        return [
-            {
-                **entry,
-                "module": "scalars",
-                "msg_type": "sensor_msgs.msg.JointState",
-                "params": {"fields": ["position", "velocity", "effort"], "names_field": "name"},
-            },
-            {**entry, "module": "joint_states", "entity_path": tf_entity, "params": auto.frames.model_dump()},
-        ]
+        # robot_state_publisher also puts on /tf is one relation, logged from the preferred source
+        params = {
+            **auto.frames.model_dump(),
+            "prefer": joint_states.prefer,
+            "plot": joint_states.plot,
+            "plot_entity_path": entry["entity_path"],
+        }
+        return [{**entry, "module": "joint_states", "entity_path": tf_entity, "params": params}]
     # Types only one module draws, whatever the topic's name
     if msg_type in MODULES_BY_TYPE:
         return [{**entry, **MODULES_BY_TYPE[msg_type]}]
@@ -157,7 +175,7 @@ class TopicDiscovery:
         self._builder = builder
         self._context = context
         self._configured = {node.resolve_topic_name(m.topic) for m in cfg.modules}
-        self._configured_paths = {m.entity_path.strip("/") for m in cfg.modules}
+        self._configured_paths = {path for m in cfg.modules for path in entity_paths(m.model_dump())}
         self._tf_entity = next(
             (m.entity_path.strip("/") for m in cfg.modules if node.resolve_topic_name(m.topic) == "/tf"), "tf"
         )
@@ -244,13 +262,19 @@ class TopicDiscovery:
                 continue
             # Two modules on one entity path would mix their data, except on the TF entities, where frame relations
             # from several sources belong together. A configured /tf's own entity is shared with joint states only: any
-            # other topic there could clear its frame relations.
+            # other topic there could clear its frame relations. Joint states' plots have an entity path of their own.
             in_use = self._configured_paths | {module.entity_path for module in self.modules}
+            in_use |= {
+                module.params.plot_entity_path.strip("/")
+                for module in self.modules
+                if isinstance(module, JointStatesModule) and module.params.plot
+            }
             if taken := [
-                entry["entity_path"]
+                path
                 for entry in entries
-                if entry["entity_path"] in in_use - SHARED_ENTITY_PATHS
-                and not (entry["module"] == "joint_states" and entry["entity_path"] == self._tf_entity)
+                for path in entity_paths(entry)
+                if path in in_use - SHARED_ENTITY_PATHS
+                and not (entry["module"] == "joint_states" and path == self._tf_entity)
             ]:
                 self._rejected.add(topic)
                 self._node.get_logger().warn(f"[auto] not bridging {topic}: entity path '{taken[0]}' is already in use")

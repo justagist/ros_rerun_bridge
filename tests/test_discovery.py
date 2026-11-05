@@ -11,8 +11,8 @@ from std_msgs.msg import String
 from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import Marker, MarkerArray
 
-from ros_rerun_bridge.base import AutoConfig, BridgeConfig
 from ros_rerun_bridge.builder import BridgeBuilder
+from ros_rerun_bridge.config import AutoConfig, BridgeConfig
 from ros_rerun_bridge.discovery import MODULES_BY_TYPE, TopicDiscovery, suggest
 from ros_rerun_bridge.modules.compressed_image import CompressedImageModule
 from ros_rerun_bridge.modules.image import ImageModule
@@ -114,7 +114,7 @@ URDF = """<robot name="arm">
 </robot>"""
 
 
-def test_joint_states_move_the_robot_and_plot_the_fields_they_have(node, discover, recording):
+def test_joint_states_move_the_robot_and_plot_positions_only(node, discover, recording):
     discovery = discover()
     node.advertise("/robot_description", "std_msgs/msg/String", LATCHED)
     node.advertise("/joint_states", "sensor_msgs/msg/JointState")
@@ -122,9 +122,25 @@ def test_joint_states_move_the_robot_and_plot_the_fields_they_have(node, discove
     deliver(node, "/robot_description", String(data=URDF))
     deliver(node, "/joint_states", JointState(name=["elbow"], position=[0.5], effort=[2.0]))
     assert [row["Transform3D:child_frame"] for row in recording.rows("/tf")] == [["arm"]]
-    assert {"/joint_states/position/elbow", "/joint_states/effort/elbow"} <= recording.entities()
-    # Left empty, as by a publisher that does not measure it
-    assert "/joint_states/velocity/elbow" not in recording.entities()
+    assert {entity for entity in recording.entities() if entity.startswith("/joint_states/")} == {
+        "/joint_states/position/elbow"
+    }
+
+
+def test_joint_state_settings_apply_to_the_topics_they_name(node, discover):
+    joint_states = {"topics": ["/joint_states"], "prefer": "joint_states", "plot": ["velocity", "effort"]}
+    discovery = discover(auto={"joint_states": joint_states})
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    # e.g. commands, which would draw the robot at its targets
+    node.advertise("/joint_command", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    [module] = discovery.modules
+    assert module.params.model_dump(include={"prefer", "plot", "plot_entity_path"}) == {
+        "prefer": "joint_states",
+        "plot": ["velocity", "effort"],
+        "plot_entity_path": "joint_states",
+    }
+    assert "/joint_command" not in subscribed(node)
 
 
 def test_each_joint_state_topic_moves_the_robot(node, discover):
@@ -287,8 +303,49 @@ def test_leaves_topics_whose_entity_path_the_config_uses(node, discover):
     assert ("warn", "[auto] not bridging /scan: entity path 'scan' is already in use") in node.log_messages
 
 
+def test_leaves_joint_states_whose_plots_entity_path_the_config_uses(node, discover):
+    discovery = discover(
+        modules=[{"name": "range", "module": "range", "topic": "/range", "entity_path": "joint_states"}]
+    )
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert discovery.modules == []
+    assert (
+        "warn",
+        "[auto] not bridging /joint_states: entity path 'joint_states' is already in use",
+    ) in node.log_messages
+
+
+def test_joint_states_without_plots_leave_their_plots_entity_path_free(node, discover):
+    discovery = discover(
+        auto={"joint_states": {"plot": []}},
+        modules=[{"name": "range", "module": "range", "topic": "/range", "entity_path": "joint_states"}],
+    )
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert [type(module) for module in discovery.modules] == [JointStatesModule]
+
+
+def test_leaves_joint_states_whose_plots_a_configured_joint_states_module_plots_on(node, discover):
+    # The configured module plots on the default `joint_states`, as the found topic would
+    joints = {"name": "arm", "module": "joint_states", "topic": "/arm_states", "entity_path": "tf"}
+    discovery = discover(modules=[{**joints, "params": {"plot": ["position"]}}])
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert discovery.modules == []
+
+
+def test_leaves_joint_states_whose_plots_a_found_topic_plots_on(node, discover):
+    mapped = {"module": "joint_states", "params": {"plot": ["position"], "plot_entity_path": "joints"}}
+    discovery = discover(auto={"modules": {"sensor_msgs/msg/JointState": mapped}})
+    node.advertise("/arm/joint_states", "sensor_msgs/msg/JointState")
+    node.advertise("/gripper/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert len(discovery.modules) == 1
+
+
 def test_tf_shares_its_entity_with_a_configured_module(node, discover):
-    # As the joint_states module's docs advise, so the latest transform wins
+    # As the joint_states module's docs advise, so that a joint on both is one frame relation
     discovery = discover(
         modules=[{"name": "joints", "module": "joint_states", "topic": "/joint_states", "entity_path": "tf"}]
     )
@@ -583,6 +640,13 @@ def test_a_mapped_module_that_cannot_be_used_stops_the_bridge_at_start(discover,
 def test_a_mapping_must_name_a_message_type():
     with pytest.raises(ValidationError, match="'Odometry' is not a message type"):
         BridgeConfig(auto={"modules": {"Odometry": "scalars"}})
+
+
+def test_joint_state_settings_cannot_be_given_with_a_module_mapped_to_joint_states():
+    with pytest.raises(ValidationError, match="'auto.joint_states' does nothing when 'auto.modules' maps"):
+        BridgeConfig(
+            auto={"joint_states": {"plot": []}, "modules": {"sensor_msgs/msg/JointState": "scalars"}},
+        )
 
 
 class CustomTF(TFModule):

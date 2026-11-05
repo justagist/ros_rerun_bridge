@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import time
+
 from rclpy.node import Node
 from rclpy.time import Time
 from tf2_msgs.msg import TFMessage
 
 import rerun as rr
 
-from ..base import ModuleConfig, TopicToComponentModule
-from ..context import BridgeContext
+from ..base import TopicToComponentModule
+from ..config import ModuleConfig
+from ..context import HANDOVER, BridgeContext
 from ..registry import REGISTRY
 from ..utils.frame_axes import FrameAxes, FrameAxesParams
 from ..utils.utils import set_rr_time_from_ros, stamp_or_now
@@ -53,9 +56,16 @@ class TFModule(TopicToComponentModule):
         return TFMessage
 
     def handle(self, msg: TFMessage) -> None:
+        received = time.monotonic()
         # One row per transform: each has its own stamp
         for tf in msg.transforms:
+            self._frame_axes.add(tf.header.frame_id, tf.child_frame_id)
             if not self.params.static:
+                self.context.tf_frame_times[tf.child_frame_id] = received
+                moved = self.context.joint_state_frame_times.get(tf.child_frame_id)
+                if moved is not None and received - moved < HANDOVER:
+                    # A joint_states module that prefers joint states moves it
+                    continue
                 set_rr_time_from_ros(stamp_or_now(Time.from_msg(tf.header.stamp), self.node))
             t = tf.transform.translation
             q = tf.transform.rotation
@@ -69,4 +79,3 @@ class TFModule(TopicToComponentModule):
                 ),
                 static=self.params.static,
             )
-            self._frame_axes.add(tf.header.frame_id, tf.child_frame_id)

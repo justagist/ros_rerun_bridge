@@ -2,12 +2,17 @@
 
 import math
 import re
+import time
 from pathlib import Path
 
 import pytest
 from builtin_interfaces.msg import Time as TimeMsg
+from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
+from tf2_msgs.msg import TFMessage
+
+from ros_rerun_bridge.context import HANDOVER
 
 from ros_rerun_bridge.utils.meshes import collada_unit
 
@@ -147,6 +152,84 @@ def test_mimic_joints_given_in_the_message_keep_their_own_position(robot, node, 
     build("joint_states", entity_path="tf")
     node.publish(JointState(name=["shoulder", "finger_joint"], position=[1.0, 0.7]))
     assert joints_by_child(recording)["finger"]["Transform3D:quaternion"] == z_rotation(0.7)
+
+
+def arm_on_tf() -> TFMessage:
+    """The arm joint's frame, as robot_state_publisher would send it on /tf, at the joint's zero position."""
+    transform = TransformStamped(child_frame_id="arm")
+    transform.header.frame_id = "base"
+    return TFMessage(transforms=[transform])
+
+
+def arm_angles(recording) -> list[float]:
+    """The arm joint's logged angles about z, sorted."""
+    rows = [row for row in recording.rows("/tf") if row["Transform3D:child_frame"] == ["arm"]]
+    return sorted(round(2 * math.asin(row["Transform3D:quaternion"][0][2]), 6) for row in rows)
+
+
+@pytest.mark.parametrize(
+    ("prefer", "angles"),
+    [
+        # The joint states lose to the /tf before and after them
+        ("tf", [0.0, 0.0]),
+        # The first /tf comes before any joint states, and the second loses to them
+        ("joint_states", [0.0, 0.5]),
+        ("both", [0.0, 0.0, 0.5]),
+    ],
+)
+def test_a_joint_on_tf_and_in_joint_states_is_logged_from_the_preferred_source(
+    robot, node, build, recording, prefer, angles
+):
+    build("tf", entity_path="tf", topic="/tf")
+    build("joint_states", entity_path="tf", params={"prefer": prefer})
+    node.publish(arm_on_tf(), index=-2)
+    node.publish(JointState(name=["shoulder"], position=[0.5]))
+    node.publish(arm_on_tf(), index=-2)
+    assert arm_angles(recording) == angles
+
+
+def wait_for_handover(monkeypatch) -> None:
+    """Let the time after which a source that stopped sending a joint hands it to the other pass."""
+    later = time.monotonic() + HANDOVER
+    monkeypatch.setattr(time, "monotonic", lambda: later)
+
+
+def test_joint_states_move_a_joint_once_tf_stops_sending_it(robot, node, build, recording, monkeypatch):
+    build("tf", entity_path="tf", topic="/tf")
+    build("joint_states", entity_path="tf", params={"prefer": "tf"})
+    node.publish(arm_on_tf(), index=-2)
+    wait_for_handover(monkeypatch)
+    node.publish(JointState(name=["shoulder"], position=[0.5]))
+    assert arm_angles(recording) == [0.0, 0.5]
+
+
+def test_tf_moves_a_joint_once_joint_states_stop_sending_it(robot, node, build, recording, monkeypatch):
+    build("tf", entity_path="tf", topic="/tf")
+    build("joint_states", entity_path="tf", params={"prefer": "joint_states"})
+    node.publish(JointState(name=["shoulder"], position=[0.5]))
+    wait_for_handover(monkeypatch)
+    node.publish(arm_on_tf(), index=-2)
+    assert arm_angles(recording) == [0.0, 0.5]
+
+
+def test_joint_states_plot_the_fields_asked_for_even_without_a_robot_model(node, build, recording):
+    build("joint_states", entity_path="tf", params={"plot": ["position", "velocity"], "plot_entity_path": "arm"})
+    # Velocity left empty, as by a publisher that does not measure it
+    node.publish(JointState(name=["shoulder", "elbow"], position=[0.5, 1.0], effort=[2.0, 3.0]))
+    assert {entity for entity in recording.entities() if entity.startswith("/arm/")} == {
+        "/arm/position/shoulder",
+        "/arm/position/elbow",
+    }
+    names, values = recording.rows("/arm/position/elbow")
+    assert names["SeriesLines:names"] == ["elbow"]
+    assert values["Scalars:scalars"] == [1.0]
+
+
+def test_joint_states_that_cannot_be_plotted_still_move_the_robot(robot, node, build, recording):
+    build("joint_states", entity_path="tf", params={"plot": ["velocity"]})
+    node.publish(JointState(name=["shoulder"], position=[0.5], velocity=[1.0, 2.0]))
+    assert arm_angles(recording) == [0.5]
+    assert any(level == "error" and "'velocity' has 2 values" in message for level, message in node.log_messages)
 
 
 def test_joint_states_wait_for_the_robot_model_warning_once(node, build, recording):

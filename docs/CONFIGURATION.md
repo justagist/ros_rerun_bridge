@@ -56,7 +56,7 @@ Every 2 seconds by default, the bridge looks for new topics. It shows a topic if
 | `String` on `/robot_description` | `robot_description` |
 | `Image` | `depth_image` if the topic name contains `depth`, otherwise `image` |
 | `CompressedImage` | `compressed_depth_image` for topics ending in `compressedDepth`, otherwise `compressed_image` |
-| `JointState` | `joint_states`, moving the robot, and `scalars`, plotting each joint's position, velocity and effort |
+| `JointState` | `joint_states`, moving the robot and plotting each joint's position (see [Settings](#settings)) |
 | `Marker`, `MarkerArray` | `marker_array` |
 | `CameraInfo` | `camera_info` |
 | `PointCloud2` | `pointcloud2` |
@@ -74,11 +74,11 @@ Every 2 seconds by default, the bridge looks for new topics. It shows a topic if
 
 Each topic is logged under its own name: `/camera/image_raw` becomes `camera/image_raw`. The bridge picks QoS that works with every publisher of the topic, so best-effort sensor topics and latched topics such as `/map` need no settings.
 
-Joint states move the robot on the same entity as `/tf`, so the bridge shows the robot moving with or without robot_state_publisher. With it, a joint arrives both ways, and the latest value wins, as in tf2. Every `JointState` topic moves the joints it names, so exclude any that carry commands rather than states, e.g. Isaac Sim's `/joint_command` (see [Settings](#settings)): the robot would be drawn at their targets. Velocity and effort are plotted only if published.
+Joint states move the robot on the same entity as `/tf`, so the bridge shows the robot moving with or without robot_state_publisher. With it, a joint arrives both ways, and by default only `/tf`'s is logged, as the other only adds load. Every `JointState` topic moves the joints it names, so leave out any that carry commands rather than states, e.g. Isaac Sim's `/joint_command`, with `joint_states.topics` (see [Settings](#settings)): the robot would be drawn at their targets.
 
 ### What is not shown
 
-* **Topics the config lists.** They keep their config. A topic whose entity path a configured module already uses is skipped too, except `tf` and `tf_static`, which are meant to be shared.
+* **Topics the config lists.** They keep their config. A topic whose entity path a configured module already uses is skipped too, except `tf` and `tf_static`, which are meant to be shared. So is a `JointState` topic whose plots' entity path another module logs or plots on.
 * **Compressed copies of a raw image.** image_transport publishes both. If the raw image is shown, its compressed copy is not. A compressed copy shown before its raw image appeared is removed once the raw image is shown.
 * **A second robot.** The bridge holds one robot model, so `/robot_description` is skipped if the config has a `robot_description` module, and only the root `/tf`, `/tf_static` and `/robot_description` are found, not e.g. `/robot1/tf`.
 * **Hidden topics** (a part of the name starts with `_`), and topics published with more than one message type.
@@ -109,6 +109,10 @@ auto:
   frames:                                         # how TF frames are drawn
     axis_length: 0.1                              # the default; null draws no axes
     frame_names: false                            # the default
+  joint_states:                                   # how JointState topics are shown
+    topics: ["*"]                                 # topics shown (the default: all); the others are not shown
+    prefer: tf                                    # which source logs a joint that is also on /tf: tf (the default), joint_states or both
+    plot: [position]                              # fields plotted (the default); also velocity and effort
   scan_period: 2.0                                # seconds between looks for topics (the default)
   stale_scans: 3                                  # scans without a publisher before a topic is removed (the default)
   never_stale: ["/camera/*"]                      # topics never removed or cleared (the default: none)
@@ -123,8 +127,10 @@ auto:
 * `scan_period` and `stale_scans` set how quickly topics are found and removed. A topic is removed at most `scan_period` x `stale_scans` seconds after its last publisher goes.
 * `never_stale` takes patterns too. A matching topic stays subscribed, and its data stays in view, while it has no publisher. Use it for a topic you want to keep seeing, such as a sensor that is only started now and then.
 * `modules` shows every topic of a message type with the module you name: a [module of your own](EXTENDING.md), by its Python path, or a built-in one, by its name. Give `params` if the module takes any. When the bridge starts, it checks that each message type and module exists, and the module's `params`. Checks that need the message itself, e.g. that `scalars`' `fields` exist in it, run when a topic appears: a topic failing them logs a warning and is not shown.
-  * It replaces the bridge's own choice for that type, including the rules above, and both of `JointState`'s modules. It does not apply to the root `/tf`, `/tf_static` and `/robot_description`, as the scene's frames and robot model depend on them. So it also changes how built-in types are shown: `sensor_msgs/msg/Image: image` shows depth images as plain images, and mapping a type to its usual built-in module with `params` changes how that module draws it.
+  * It replaces the bridge's own choice for that type, including the rules above, and `joint_states`, so mapping `JointState` cannot be combined with the `joint_states` settings. It does not apply to the root `/tf`, `/tf_static` and `/robot_description`, as the scene's frames and robot model depend on them. So it also changes how built-in types are shown: `sensor_msgs/msg/Image: image` shows depth images as plain images, and mapping a type to its usual built-in module with `params` changes how that module draws it.
 * `frames` takes the [`tf`](MODULES.md#tf) module's `axis_length` and `frame_names`, for every frame discovery draws: those on found TF topics, and the robot's links moved by joint states. A configured `tf` module keeps its own settings, so give it the same ones. Names are off by default, as many frames crowd the view. To show one frame's name, select its axes under `frames` in the viewer and override *Show frame*.
+
+* `joint_states` sets the [`joint_states`](MODULES.md#joint_states) module's `prefer` and `plot` for every `JointState` topic in `topics`, which takes patterns too. Each topic is plotted on `<topic>/<field>/<joint>`. Each plotted field adds a series per joint, so only position is plotted by default.
 
 `--auto` without a config uses these defaults, and the `map` frame unless `--global-frame` names another. With a config, `--auto` uses the config's `auto` settings, if it has any.
 

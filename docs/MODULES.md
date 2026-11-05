@@ -73,16 +73,34 @@ Loads the URDF from `/robot_description` with Rerun's URDF importer and logs eac
 
 ## `joint_states`
 
-Moves the robot model's joints from `/joint_states`. Needs the [`robot_description`](#robot_description) module. Joint positions are shown as reported, even outside the URDF's limits. Mimic joints follow the joint they mimic, as with `robot_state_publisher`, unless the message gives their position. Joints the model does not have are skipped. Until the model arrives, joint states are skipped, with one warning.
+Moves the robot model's joints from `/joint_states`, and plots their positions, velocities or efforts over time if asked. Moving the joints needs the [`robot_description`](#robot_description) module. Joint positions are shown as reported, even outside the URDF's limits. Mimic joints follow the joint they mimic, as with `robot_state_publisher`, unless the message gives their position. Joints the model does not have are skipped. Until the model arrives, joints are not moved, with one warning; plots do not need the model.
 
-It only moves the robot model: it does not plot the joint states. To plot positions, velocities or efforts over time, use [`scalars`](#scalars) on `/joint_states`, e.g. `fields: [position]` with the joint names as `names`; to show them as bars at the time cursor, use [`bar_chart`](#bar_chart).
+Give it the `tf` module's `entity_path` (`tf`): Rerun only lets a joint's transform change over time on one entity, and `robot_state_publisher` may put the same joints on `/tf`. `/tf` can still carry other frames, such as a camera's. A joint on both is logged from one source, set by `prefer`:
 
-Not needed if `robot_state_publisher` already publishes the joints on `/tf`. Give it the `tf` module's `entity_path` (`tf`). A joint can then arrive on both `/tf` and `/joint_states` without conflict (the latest value wins, as in tf2), and `/tf` can still carry other frames, such as a camera's.
+* `tf` (the default) leaves the joints `/tf` sends to the `tf` module, and moves the others. With `robot_state_publisher`, it logs the fewest rows.
+* `joint_states` leaves the joints it moves out of the `tf` module's logging, e.g. when joint states come more often than `/tf`.
+* `both` logs the joint from both, and the latest value wins, as in tf2. It logs the most rows.
+
+A joint whose preferred source stops sending it is moved by the other a second later, e.g. once `robot_state_publisher` stops.
+
+```yaml
+- name: joint_states
+  module: joint_states
+  topic: /joint_states
+  entity_path: tf
+  params:
+    plot: [position, velocity]   # plotted on joint_states/position/<joint> and joint_states/velocity/<joint>
+```
 
 | Param | Default | |
 | --- | --- | --- |
+| `prefer` | `tf` | Which source logs a joint that also arrives on `/tf`: `tf`, `joint_states` or `both`. |
+| `plot` | none | The fields to plot over time, of `position`, `velocity` and `effort`. Each joint is a series of its own, named after it, on `<plot_entity_path>/<field>/<joint>`. A field the message leaves empty, as velocity and effort may be, is skipped. |
+| `plot_entity_path` | `joint_states` | The entity path the plots are logged beneath. |
 | `axis_length` | none | Draw every link's frame in the robot model as axes, fixed links included, this long in metres, as for [`tf`](#tf). |
 | `frame_names` | `false` | Label each frame's axes with its name. Needs `axis_length`. |
+
+To show joint states as bars at the time cursor, use [`bar_chart`](#bar_chart).
 
 ## `image`
 

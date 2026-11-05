@@ -11,7 +11,7 @@ from .utils.utils import _import_module_by_path
 if TYPE_CHECKING:
     from rclpy.node import Node
 
-    from .base import BridgeConfig, ModuleConfig
+    from .config import BridgeConfig, ModuleConfig
     from .context import BridgeContext
 
 

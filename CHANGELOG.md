@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [0.18.0] - 2026-11-05
+
+### Added
+
+- `joint_states` plots joints' positions, velocities or efforts, with `plot` and `plot_entity_path`, each joint as a series of its own. Plots do not need the robot model.
+- `joint_states` takes `prefer`, setting which source logs a joint that also arrives on `/tf`: `tf`, `joint_states` or `both`. A joint whose preferred source stops sending it is moved by the other a second later.
+- `auto.joint_states`: `topics`, the `JointState` topics to show, and the `prefer` and `plot` their `joint_states` modules get. It cannot be combined with a module mapped to `JointState` in `auto.modules`, which would replace it.
+
+### Changed
+
+- A joint on both `/tf` and a `JointState` topic is logged from `/tf` only by default, not from both, which made the viewer sluggish with robot_state_publisher at high rates. Set `prefer: both` for the old behaviour.
+- Discovered `JointState` topics are shown with one `joint_states` module, plotting only position by default, not with `joint_states` and `scalars`. Set `auto.joint_states.plot` to plot velocity and effort too.
+- The config models and `load_config` are in `ros_rerun_bridge.config`. `ModuleConfig` and `QoSConfig` can still be imported from `ros_rerun_bridge.base`.
+
 ## [0.17.1] - 2026-11-05
 
 ### Added
@@ -260,6 +274,7 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 
 First version: a config-driven bridge with `image`, `camera_info`, `laserscan`, `pointcloud2`, `particle_cloud`, `odometry`, `robot_description` and `joint_states` modules.
 
+[0.18.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/justagist/ros_rerun_bridge/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/justagist/ros_rerun_bridge/compare/v0.16.0...v0.16.1

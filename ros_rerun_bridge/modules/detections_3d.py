@@ -6,7 +6,8 @@ from vision_msgs.msg import Detection3DArray
 
 import rerun as rr
 
-from ..base import ModuleConfig, TopicToComponentModule
+from ..base import TopicToComponentModule
+from ..config import ModuleConfig
 from ..context import BridgeContext
 from ..registry import REGISTRY
 from ..utils.detections import DetectionClasses, DetectionParams

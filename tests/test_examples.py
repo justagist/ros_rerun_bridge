@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from ros_rerun_bridge.builder import BridgeBuilder
-from ros_rerun_bridge.main import load_config
+from ros_rerun_bridge.config import load_config
 
 EXAMPLES = Path(__file__).parents[1] / "examples"
 CONFIGS = sorted(EXAMPLES.glob("*/config.yaml"))
