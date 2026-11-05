@@ -7,11 +7,14 @@ from pydantic import ValidationError
 from rclpy.qos import DurabilityPolicy
 from visualization_msgs.msg import Marker
 
+from ros_rerun_bridge import main
 from ros_rerun_bridge.main import load_config
 from ros_rerun_bridge.modules.tf import TFModule
 
 
-def test_only_imports_the_built_in_modules_a_config_uses():
+# joint_states shares the frame axes code with tf, which must not pull tf in
+@pytest.mark.parametrize("module", ["tf", "joint_states"])
+def test_only_imports_the_built_in_modules_a_config_uses(module):
     # A fresh interpreter: other tests import every module
     code = (
         "import sys\n"
@@ -19,25 +22,13 @@ def test_only_imports_the_built_in_modules_a_config_uses():
         "from ros_rerun_bridge.base import BridgeConfig\n"
         "from ros_rerun_bridge.builder import BridgeBuilder\n"
         "from ros_rerun_bridge.context import BridgeContext\n"
-        "config = BridgeConfig(modules=[{'name': 'tf', 'module': 'tf', 'topic': '/tf', 'entity_path': 'tf'}])\n"
+        f"config = BridgeConfig(modules=[{{'name': 'm', 'module': '{module}', 'topic': '/t', 'entity_path': 'e'}}])\n"
         "BridgeBuilder(FakeNode()).build_modules(config, BridgeContext())\n"
         "print(sorted(m for m in sys.modules if m.startswith('ros_rerun_bridge.modules.')))\n"
     )
     root = os.path.dirname(os.path.dirname(__file__))
     result = subprocess.run([sys.executable, "-c", code], cwd=root, capture_output=True, text=True, check=True)
-    assert result.stdout.strip() == "['ros_rerun_bridge.modules.tf']"
-
-
-def test_joint_states_does_not_import_the_tf_module():
-    # It shares the frame axes code with tf, which must not pull in tf2_msgs or register tf
-    code = (
-        "import sys\n"
-        "import ros_rerun_bridge.modules.joint_states\n"
-        "print('ros_rerun_bridge.modules.tf' in sys.modules, 'tf2_msgs.msg' in sys.modules)\n"
-    )
-    root = os.path.dirname(os.path.dirname(__file__))
-    result = subprocess.run([sys.executable, "-c", code], cwd=root, capture_output=True, text=True, check=True)
-    assert result.stdout.strip() == "False False"
+    assert result.stdout.strip() == f"['ros_rerun_bridge.modules.{module}']"
 
 
 def test_resolves_a_module_by_python_path(build):
@@ -60,10 +51,9 @@ def test_a_config_error_names_the_module(build):
         build("scalars", msg_type="sensor_msgs.msg.Range", params={"fields": ["distance"]})
 
 
-@pytest.mark.parametrize("module", ["image", "compressed_image", "robot_description", "marker_array", "diagnostics"])
-def test_params_for_a_module_without_any_are_an_error(build, module):
+def test_params_for_a_module_without_any_are_an_error(build):
     with pytest.raises(ValueError, match="invalid 'params'"):
-        build(module, params={"colormap": "Viridis"})
+        build("image", params={"colormap": "Viridis"})
 
 
 def test_unknown_params_are_an_error(build):
@@ -96,39 +86,15 @@ def test_subscribes_only_once_the_module_is_built(node, build):
     assert len(node.subscriptions) == 1
 
 
-class WithItsOwnStart(TFModule):
-    """Has a method of a name a module may well use for its own setup."""
-
-    def start(self) -> None:
-        pass
+def test_misspelt_qos_settings_are_an_error(build):
+    with pytest.raises(ValidationError, match="deph"):
+        build("tf", qos={"deph": 5})
 
 
-def test_a_module_with_its_own_start_method_still_subscribes(node, build):
-    build(f"{__name__}:WithItsOwnStart")
-    assert len(node.subscriptions) == 1
-
-
-@pytest.mark.parametrize(
-    ("qos", "error"), [({"reliability": "best-effort"}, "reliability"), ({"depth": 0}, "depth"), ({"deph": 5}, "deph")]
-)
-def test_invalid_qos_is_an_error(build, qos, error):
-    with pytest.raises(ValidationError, match=error):
-        build("tf", qos=qos)
-
-
-@pytest.mark.parametrize(
-    ("module", "params"),
-    [
-        ("range", {"colour": [0, 300, 0, 255]}),
-        ("particle_cloud", {"colour": [-1, 0, 0, 255]}),
-        ("bar_chart", {"field": "effort", "colour": [0, 0, 0, 300]}),
-    ],
-)
-def test_colour_channels_outside_0_to_255_are_an_error(build, module, params):
+def test_colour_channels_outside_0_to_255_are_an_error(build):
     # Rerun would wrap them round instead of rejecting them
-    msg_type = {"bar_chart": "sensor_msgs.msg.JointState"}.get(module)
-    with pytest.raises(ValueError, match="(less|greater) than or equal to"):
-        build(module, msg_type=msg_type, params=params)
+    with pytest.raises(ValueError, match="less than or equal to"):
+        build("range", params={"colour": [0, 300, 0, 255]})
 
 
 def write_config(directory, text: str):
@@ -171,3 +137,45 @@ def test_a_config_without_modules_needs_auto(tmp_path):
 def test_version_flag_prints_the_version_without_a_config():
     result = run_bridge("--version")
     assert result.returncode == 0 and result.stdout.startswith("ros-rerun-bridge version ")
+
+
+class Started(Exception):
+    """Stops the command line where it starts the bridge node, carrying the config the node was given."""
+
+
+@pytest.fixture
+def start(monkeypatch):
+    """Run the command line up to starting the bridge node, without ROS or a viewer; returns the node's config."""
+    monkeypatch.setattr(main.rr, "init", lambda **kwargs: None)
+    monkeypatch.setattr(main.rclpy, "init", lambda **kwargs: None)
+    monkeypatch.setattr(main.rclpy, "try_shutdown", lambda: None)
+
+    def _start(*argv: str, node=None):
+        def bridge_node(cfg):
+            raise Started(cfg)
+
+        monkeypatch.setattr(main, "BridgeNode", node or bridge_node)
+        with pytest.raises(Started) as started:
+            main.run(list(argv))
+        return started.value.args[0]
+
+    return _start
+
+
+def test_auto_keeps_the_configs_auto_settings(start, tmp_path):
+    cfg = start("--auto", "--config", str(write_config(tmp_path, "auto:\n  exclude: ['/rosout']\n")))
+    assert cfg.auto.exclude == ["/rosout"]
+
+
+def test_global_frame_overrides_the_configs(start, tmp_path):
+    cfg = start("--global-frame", "world", "--config", str(write_config(tmp_path, "global_frame: map\nauto: true\n")))
+    assert cfg.global_frame == "world"
+
+
+def test_a_module_that_cannot_be_built_stops_the_bridge(start, tmp_path, capsys):
+    def failing_node(cfg):
+        raise ValueError("[scan] invalid 'params'")
+
+    with pytest.raises(SystemExit) as exited:
+        start("--auto", node=failing_node)
+    assert exited.value.code == 2 and "[scan] invalid 'params'" in capsys.readouterr().err

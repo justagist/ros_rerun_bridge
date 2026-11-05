@@ -68,8 +68,8 @@ class FakeNode:
         self.publishers.setdefault(topic, []).append(qos or QoSProfile(depth=10))
 
     def withdraw(self, topic: str) -> None:
-        """Remove a topic's publishers from the graph."""
-        del self.topics[topic], self.publishers[topic]
+        """Remove a topic's publishers, leaving it in the graph, as the bridge's own subscription keeps it there."""
+        self.publishers[topic] = []
 
     def get_topic_names_and_types(self) -> list[tuple[str, list[str]]]:
         return list(self.topics.items())

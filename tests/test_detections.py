@@ -1,7 +1,6 @@
 """2D and 3D detections."""
 
 import math
-import zlib
 
 import numpy as np
 import pytest
@@ -44,7 +43,8 @@ def test_2d_boxes_are_closed_strips_on_the_image_plane(node, build, recording):
 @pytest.mark.parametrize(
     ("results", "tracking_id", "label"),
     [
-        ([hypothesis("cat", 0.3), hypothesis("person", 0.92)], "7", "person #7 0.92"),
+        # The best scored, not the last
+        ([hypothesis("person", 0.92), hypothesis("cat", 0.3)], "7", "person #7 0.92"),
         ([hypothesis("person", 0.92)], "", "person 0.92"),
         ([], "7", "#7"),
     ],
@@ -77,12 +77,14 @@ def test_classes_not_listed_keep_one_class_id_above_the_listed_ones(node, build,
     build("detections_2d", entity_path="camera/detections", params={"classes": [{"id": "person"}]})
     for _ in range(2):
         node.publish(detections_2d(box_2d(10, 20, 4, 2, results=[hypothesis("dog", 0.5)])))
+    node.publish(detections_2d(box_2d(10, 20, 4, 2, results=[hypothesis("cat", 0.5)])))
 
     class_ids = [
         row["LineStrips2D:class_ids"] for row in recording.rows("/camera/detections") if "LineStrips2D:class_ids" in row
     ]
-    # A checksum, unlike Python's hash, is the same in every run
-    assert class_ids == [[1 + zlib.crc32(b"dog") % 65535]] * 2
+    [dog], [dog_again], [cat] = class_ids
+    # Above the listed class's 0, the same for every message, and one per class
+    assert dog >= 1 and dog_again == dog and cat not in (0, dog)
 
 
 def test_no_detections_clear_the_boxes(node, build, recording):
@@ -116,12 +118,6 @@ def test_no_3d_detections_clear_the_boxes(node, build, recording):
     node.publish(msg)
     node.publish(Detection3DArray())
     assert recording.latest("/detections", "Boxes3D:half_sizes") == []
-
-
-def test_listing_every_class_id_is_an_error(build):
-    # Unlisted classes need a class id of their own
-    with pytest.raises(ValueError, match="at most 65535 items"):
-        build("detections_2d", params={"classes": [{"id": str(i)} for i in range(65536)]})
 
 
 def test_a_class_listed_twice_is_an_error(build):

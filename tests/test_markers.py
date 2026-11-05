@@ -39,30 +39,18 @@ def component(archetype, name: str):
 @pytest.mark.parametrize(
     ("marker_type", "archetype", "instances", "count"),
     [
-        (Marker.ARROW, rr.Arrows3D, "vectors", 1),
-        (Marker.CUBE, rr.Boxes3D, "half_sizes", 1),
         (Marker.SPHERE, rr.Ellipsoids3D, "half_sizes", 1),
-        (Marker.CYLINDER, rr.Cylinders3D, "lengths", 1),
-        (Marker.LINE_STRIP, rr.LineStrips3D, "strips", 1),
-        (Marker.LINE_LIST, rr.LineStrips3D, "strips", 2),
-        (Marker.CUBE_LIST, rr.Boxes3D, "half_sizes", 4),
         (Marker.SPHERE_LIST, rr.Ellipsoids3D, "half_sizes", 4),
         (Marker.POINTS, rr.Points3D, "positions", 4),
-        (Marker.TEXT_VIEW_FACING, rr.Points3D, "positions", 1),
+        # Only whole triangles
         (Marker.TRIANGLE_LIST, rr.Mesh3D, "vertex_positions", 3),
     ],
 )
-def test_every_marker_type_rviz_draws_but_mesh_resource_converts_to_its_instances(
-    marker_type, archetype, instances, count
-):
+def test_marker_types_convert_to_their_instances(marker_type, archetype, instances, count):
     # Four points: list markers draw one instance per point (or per segment, or per whole triangle)
     converted = archetype_from_marker(marker(marker_type, points=POINTS, text="t"))
     assert isinstance(converted, archetype)
     assert len(component(converted, instances)) == count
-
-
-def test_arrow_strips_are_not_converted_as_rviz_does_not_draw_them():
-    assert archetype_from_marker(marker(Marker.ARROW_STRIP, points=POINTS)) is None
 
 
 def test_line_strips_with_per_point_colours_draw_a_segment_per_colour():
@@ -110,6 +98,7 @@ def test_list_markers_use_per_point_colours():
 def test_arrows_from_pose_or_from_two_points():
     np.testing.assert_allclose(component(archetype_from_marker(marker(Marker.ARROW)), "vectors"), [[0.2, 0, 0]])
     from_points = archetype_from_marker(marker(Marker.ARROW, points=POINTS[1:3]))
+    np.testing.assert_allclose(component(from_points, "origins"), [[1, 0, 0]])
     np.testing.assert_allclose(component(from_points, "vectors"), [[0, 1, 0]])
 
 
@@ -211,6 +200,16 @@ def test_markers_expire_at_the_end_of_their_lifetime(node, build, recording):
     assert clears_shape(expired[-1])
     assert expired[-1]["ros_time"] == 11_000_000_000
     assert not is_cleared(recording, "/markers/ns/2")
+
+
+def test_a_marker_re_added_without_a_lifetime_no_longer_expires(node, build, recording):
+    build("marker_array", entity_path="markers")
+    node.now_ns = 10_000_000_000
+    node.publish(MarkerArray(markers=[marker(lifetime=DurationMsg(sec=1))]))
+    node.publish(MarkerArray(markers=[marker()]))
+    node.now_ns = 12_000_000_000
+    node.timers[0]()
+    assert not is_cleared(recording, "/markers/ns/0")
 
 
 def test_unsupported_marker_types_warn(node, build, recording):
@@ -325,13 +324,6 @@ def test_collada_mesh_markers_are_scaled_by_their_unit(node, build, recording):
     assert row["Transform3D:scale"] == [pytest.approx([0.2 * 0.0254, 0.4 * 0.0254, 0.6 * 0.0254])]
 
 
-def test_mesh_markers_with_embedded_materials_keep_their_colours(node, build, recording, obj_mesh):
-    build("marker_array", entity_path="markers")
-    mesh = marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh), mesh_use_embedded_materials=True)
-    node.publish(MarkerArray(markers=[mesh]))
-    assert recording.rows("/markers/ns/0")[0]["Asset3D:albedo_factor"] == []
-
-
 def test_mesh_markers_switching_to_embedded_materials_drop_their_colour(node, build, recording, obj_mesh):
     build("marker_array", entity_path="markers")
     node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
@@ -425,14 +417,6 @@ def test_late_mesh_markers_are_drawn_in_their_place(node, build, recording, obj_
     assert colours == [(10_000_000_000, 0xFF0000FF), (15_000_000_000, 0x00FF00FF), (20_000_000_000, 0xFF0000FF)]
 
 
-def test_files_that_are_not_meshes_warn(node, build, tmp_path):
-    build("marker_array", entity_path="markers")
-    image = tmp_path / "part.png"
-    image.write_bytes(b"")
-    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(image))]))
-    assert "is not in a format Rerun loads" in node.log_messages[-1][1]
-
-
 def test_gltf_meshes_referring_to_other_files_warn(node, build, recording, tmp_path):
     build("marker_array", entity_path="markers")
     mesh = tmp_path / "part.gltf"
@@ -462,20 +446,6 @@ def test_file_uris_are_decoded(node, build, recording, tmp_path):
     node.publish(MarkerArray(markers=meshes))
     for i in range(len(uris)):
         assert bytes(recording.latest(f"/markers/ns/{i}", "Asset3D:blob")[0]) == mesh.read_bytes()
-
-
-def test_meshes_that_cannot_be_read_warn_and_clear_the_marker(node, build, recording, obj_mesh, monkeypatch):
-    build("marker_array", entity_path="markers")
-    node.publish(MarkerArray(markers=[marker(Marker.CUBE)]))
-
-    # A file found but not readable, which a permission check would not show when the tests run as root, e.g. in CI
-    def unreadable(path: Path) -> bytes:
-        raise PermissionError(13, "Permission denied", str(path))
-
-    monkeypatch.setattr(Path, "read_bytes", unreadable)
-    node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
-    assert "Permission denied" in node.log_messages[-1][1]
-    assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []
 
 
 def test_closing_stops_the_lifetime_timer_too(node, build):

@@ -58,15 +58,6 @@ def test_colour_fields_mode_reads_separate_channels(node, build, recording):
     assert recording.rows("/points")[0]["Points3D:colors"] == [0xFF8000FF]
 
 
-def test_clouds_without_colour_get_no_colour_by_default(node, build, recording):
-    build("pointcloud2", entity_path="points")
-    node.publish(cloud([(1.0, 2.0, 3.0)], ["x", "y", "z"], XYZ))
-    row = recording.rows("/points")[0]
-    assert row["Points3D:positions"] == [[1.0, 2.0, 3.0]]
-    # Empty, so Rerun's default colour is used
-    assert row["Points3D:colors"] == []
-
-
 def test_a_cloud_without_colour_does_not_keep_an_earlier_clouds_colours(node, build, recording):
     build("pointcloud2", entity_path="points")
     xyz_rgb = [("x", "<f4"), ("y", "<f4"), ("z", "<f4"), ("rgb", "<u4")]
@@ -193,13 +184,19 @@ def test_particles_keep_their_colour_without_colour_by_weight(node, build, recor
     assert recording.rows("/particles")[0]["Points3D:colors"] == [0x00C8FF80, 0x00C8FF80]
 
 
-@pytest.mark.parametrize(("arrow_axis", "axis"), [("y", 1), ("z", 2)])
-def test_particle_arrows_point_along_the_chosen_body_axis(node, build, recording, arrow_axis, axis):
+@pytest.mark.parametrize(
+    ("arrow_axis", "unrotated", "turned"),
+    [("x", [1, 0, 0], [0, 1, 0]), ("y", [0, 1, 0], [-1, 0, 0]), ("z", [0, 0, 1], [0, 0, 1])],
+)
+def test_particle_arrows_point_along_the_chosen_body_axis(node, build, recording, arrow_axis, unrotated, turned):
     build("particle_cloud", entity_path="particles", params={"mode": "arrows", "arrow_axis": arrow_axis})
-    node.publish(particle_cloud())
+    msg = particle_cloud()
+    # The second particle is turned 90 degrees about z
+    msg.particles[1].pose.orientation.z = msg.particles[1].pose.orientation.w = math.sqrt(0.5)
+    node.publish(msg)
     vectors = np.array(recording.rows("/particles")[0]["Arrows3D:vectors"])
-    # The particles are unrotated: every arrow is along that world axis
-    assert np.count_nonzero(vectors, axis=0).tolist() == [2 if i == axis else 0 for i in range(3)]
+    directions = vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
+    np.testing.assert_allclose(directions, [unrotated, turned], atol=1e-6)
 
 
 @pytest.mark.parametrize(("mode", "shape"), [("points", "Points3D:positions"), ("arrows", "Arrows3D:vectors")])

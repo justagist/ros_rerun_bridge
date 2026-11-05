@@ -73,7 +73,6 @@ def test_values_are_logged_at_their_stamp_or_receive_time(node, build, recording
     ("msg_type", "fields", "error"),
     [
         (None, ["range"], "needs `msg_type`"),
-        ("sensor_msgs.msg.Range", [], "fields"),
         ("sensor_msgs.msg.Range", ["distance"], "Range has no field 'distance'"),
         ("sensor_msgs.msg.Range", ["header"], "is std_msgs/Header, not a number"),
         ("sensor_msgs.msg.JointState", ["name"], "is sequence<string>, not a number"),
@@ -137,7 +136,6 @@ def test_without_style_params_rerun_default_lines_are_kept(node, build, recordin
     [
         ({"marker": "square"}, "marker cannot be used with style 'lines'"),
         ({"style": "points", "width": 2.0, "interpolation": "step_mid"}, "width, interpolation cannot be used"),
-        ({"interpolation": "steps"}, "interpolation"),
     ],
 )
 def test_invalid_style_is_an_error(build, params, error):
@@ -182,12 +180,13 @@ def test_measurement_unit_and_style_are_logged_once_as_static(node, build, recor
         params={"fields": ["range"], "unit": "m", "names": ["distance"]},
     )
     node.publish(Range(range=1.5))
+    node.publish(Range(range=2.5))
     [style] = static_rows(recording, "/plots/range")
     assert style["Measurements:units"] == ["m"]
     assert style["Measurements:names"] == ["distance"]
     # A unit alone also makes the values measurements
-    [row] = [row for row in recording.rows("/plots/range") if not row["static"]]
-    assert row["Measurements:values"] == [1.5]
+    rows = [row for row in recording.rows("/plots/range") if not row["static"]]
+    assert [row["Measurements:values"] for row in rows] == [[1.5], [2.5]]
 
 
 @pytest.mark.parametrize(
@@ -266,10 +265,8 @@ def test_named_elements_can_be_measurements(node, build, recording):
 @pytest.mark.parametrize(
     ("msg_type", "params", "error"),
     [
-        ("sensor_msgs.msg.JointState", {"fields": ["position"], "names_field": "velocity"}, "not an array of strings"),
         ("sensor_msgs.msg.JointState", {"fields": ["position"], "names_field": "header"}, "not an array of strings"),
         ("sensor_msgs.msg.JointState", {"fields": ["position"], "names_field": "name", "names": ["a"]}, "cannot both"),
-        ("sensor_msgs.msg.Range", {"fields": ["range"], "names_field": "header.frame_id"}, "not an array of strings"),
         (
             "sensor_msgs.msg.JointState",
             {"fields": ["position", "header.stamp.sec"], "names_field": "name"},

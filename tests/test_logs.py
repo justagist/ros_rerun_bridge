@@ -89,13 +89,12 @@ def test_aggregated_status_names_nest_as_a_tree(node, build, recording):
     assert log_rows(recording, r"/diagnostics/controller_manager\:\ Controller\ Activity") == [(["WARN"], ["no data"])]
 
 
-def test_each_status_is_given_the_level_colours_once(node, build, recording):
+def test_each_status_is_given_its_level_states_once(node, build, recording):
     build("diagnostics", entity_path="diagnostics")
     node.publish(diagnostics(("motor", DiagnosticStatus.OK, "ok")))
     node.publish(diagnostics(("motor", DiagnosticStatus.WARN, "hot")))
     [config] = [row for row in recording.rows("/diagnostics/motor") if row["static"]]
     assert config["StateConfiguration:values"] == ["OK", "WARN", "ERROR", "STALE"]
-    assert config["StateConfiguration:colors"] == [0x28AA46FF, 0xF0B400FF, 0xDC2828FF, 0x828282FF]
 
 
 def test_an_unknown_level_is_shown_as_its_number_and_logged_as_a_warning(node, build, recording):

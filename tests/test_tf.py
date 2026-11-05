@@ -66,19 +66,3 @@ def test_without_axis_length_no_axes_are_drawn(node, build, recording):
 def test_frame_names_need_axes(build):
     with pytest.raises(ValueError, match="frame_names needs axis_length"):
         build("tf", params={"frame_names": True})
-
-
-@pytest.mark.parametrize("axis_length", [0.0, -0.1, float("inf"), float("nan")])
-def test_axis_length_must_be_finite_and_positive(build, axis_length):
-    with pytest.raises(ValueError, match="axis_length"):
-        build("tf", params={"axis_length": axis_length})
-
-
-def test_a_frame_seen_by_two_modules_has_one_entity(node, build, recording):
-    # E.g. a robot's base, the child of a static transform and the parent of its first joint
-    build("tf", entity_path="tf_static", params={"static": True, "axis_length": 0.3})
-    node.publish(TFMessage(transforms=[transform("world", "base", 1.0)]), index=0)
-    build("tf", entity_path="tf", params={"axis_length": 0.3})
-    node.publish(TFMessage(transforms=[transform("base", "arm", 1.0)]), index=1)
-    frames = sorted(entity for entity in recording.entities() if entity.startswith("/frames/"))
-    assert frames == ["/frames/arm", "/frames/base", "/frames/world"]

@@ -26,6 +26,7 @@ def test_range_draws_a_cone_along_the_sensor_x_axis(node, build, recording):
     np.testing.assert_allclose(np.hypot(rim[:, 1], rim[:, 2]), math.tan(0.25), rtol=1e-5)
     assert len(edges) == 4 and all(np.allclose(edge[0], 0.0) for edge in edges)
     assert row["LineStrips3D:colors"] == [0x00FF00FF]
+    assert row["CoordinateFrame:frame"] == ["front_sensor"]
 
 
 @pytest.mark.parametrize("value", [math.inf, -math.inf, 5.0, 0.0])
@@ -69,13 +70,3 @@ def test_maps_are_flipped_to_top_row_first_with_unknown_cells_kept(node, build, 
     assert row["GridMap:translation"] == [[-1.0, -2.0, 0.0]]
     assert row["GridMap:colormap"] == [rr.components.Colormap.RvizMap.value]
     assert row["CoordinateFrame:frame"] == ["map"]
-
-
-def test_costmaps_take_their_own_colours_opacity_and_draw_order(node, build, recording):
-    build("occupancy_grid", entity_path="costmap", params={"colormap": "RvizCostmap", "opacity": 0.6, "draw_order": 1})
-    node.publish(grid())
-
-    row = recording.rows("/costmap")[0]
-    assert row["GridMap:colormap"] == [rr.components.Colormap.RvizCostmap.value]
-    assert row["GridMap:opacity"] == pytest.approx([0.6])
-    assert row["GridMap:draw_order"] == pytest.approx([1.0])

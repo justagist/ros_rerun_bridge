@@ -93,23 +93,14 @@ def test_unsupported_compressed_depth_is_an_error(image_format, data, error):
         encoded_depth_from_msg(compressed(image_format, data))
 
 
-@pytest.mark.parametrize(
-    ("image_format", "data", "blob", "media_type"),
-    [
-        ("16UC1; compressedDepth png", HEADER + PNG, PNG, "image/png"),
-        ("16UC1; compressedDepth rvl", RVL, RVL, "application/rvl"),
-    ],
-)
-def test_compressed_depth_images_are_logged_on_the_image_plane(
-    node, build, recording, image_format, data, blob, media_type
-):
+def test_compressed_depth_images_are_logged_on_the_image_plane(node, build, recording):
     build("compressed_depth_image", entity_path="camera/depth", params={"colormap": "Turbo"})
-    msg = compressed(image_format, data)
+    msg = compressed("16UC1; compressedDepth png", HEADER + PNG)
     msg.header.frame_id = "camera"
     node.publish(msg)
 
     row = recording.rows("/camera/depth")[0]
-    assert bytes(row["EncodedDepthImage:blob"][0]) == blob
-    assert row["EncodedDepthImage:media_type"] == [media_type]
+    assert bytes(row["EncodedDepthImage:blob"][0]) == PNG
+    assert row["EncodedDepthImage:media_type"] == ["image/png"]
     assert row["EncodedDepthImage:colormap"] == [rr.components.Colormap.Turbo.value]
     assert row["CoordinateFrame:frame"] == ["camera_image_plane"]

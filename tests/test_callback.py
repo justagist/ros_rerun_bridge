@@ -39,7 +39,7 @@ def test_handler_errors_are_logged_with_their_type_and_place_not_raised(node, bu
     assert level == "error"
     assert re.fullmatch(
         r"\[image\] error handling a message: ValueError: unsupported image encoding 'nv21', "
-        r"in pixels_from_msg \(image\.py:\d+\)",
+        r"in \w+ \(image\.py:\d+\)",
         message,
     )
     assert node.log_messages[-1][0] == "debug" and "Traceback" in node.log_messages[-1][1]

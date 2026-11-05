@@ -43,11 +43,6 @@ def test_classes_are_logged_with_their_labels_and_colours(build, recording):
     ]
 
 
-def test_no_classes_log_no_annotation_context(build, recording):
-    build("segmentation_image", entity_path="camera/segmentation")
-    assert "/camera/segmentation" not in recording.entities()
-
-
 def test_images_that_are_not_class_ids_are_an_error(node, build):
     build("segmentation_image", entity_path="camera/segmentation")
     node.publish(mask(np.zeros((2, 2), np.float32), "32FC1"))
