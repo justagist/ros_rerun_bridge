@@ -6,16 +6,18 @@ from geometry_msgs.msg import TransformStamped
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import JointState
 from tf2_msgs.msg import TFMessage
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 
-from ros_rerun_bridge.base import AutoFrameAxesParams, BridgeConfig
+from ros_rerun_bridge.base import AutoConfig, AutoFrameAxesParams, BridgeConfig
 from ros_rerun_bridge.builder import BridgeBuilder
 from ros_rerun_bridge.discovery import MODULES_BY_TYPE, TopicDiscovery, suggest
 from ros_rerun_bridge.modules.compressed_image import CompressedImageModule
 from ros_rerun_bridge.modules.laserscan import LaserScanModule
+from ros_rerun_bridge.modules.range import RangeModule
 
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
 FRAMES = AutoFrameAxesParams()
+STALE_SCANS = AutoConfig().stale_scans
 
 
 @pytest.fixture
@@ -286,3 +288,205 @@ def test_a_topic_that_fails_to_bridge_does_not_stop_the_others(node, discover, m
 def test_auto_is_a_switch_or_its_filters(auto, expected):
     cfg = BridgeConfig(auto=auto)
     assert (cfg.auto.include if cfg.auto else None) == expected
+
+
+def drop_after_grace(node, discovery, topic: str) -> None:
+    """Withdraw a topic's publishers and scan until discovery drops it."""
+    node.withdraw(topic)
+    for _ in range(STALE_SCANS):
+        discovery.scan()
+
+
+def test_keeps_a_topic_whose_publishers_return_within_the_grace_period(node, discover):
+    # A restarting publisher keeps its topic's module
+    discovery = discover()
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    [module] = discovery.modules
+    node.withdraw("/scan")
+    for _ in range(STALE_SCANS - 1):
+        discovery.scan()
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    assert discovery.modules == [module] and len(node.subscriptions) == 1
+
+
+def test_drops_a_topic_once_its_publishers_have_gone_and_bridges_it_again_when_they_return(node, discover):
+    discovery = discover()
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    drop_after_grace(node, discovery, "/scan")
+    assert discovery.modules == [] and node.subscriptions == []
+    assert ("info", "[auto] dropped /scan: it has no publishers") in node.log_messages
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    assert set(subscribed(node)) == {"/scan"}
+
+
+def test_clears_what_a_dropped_stream_drew_from_when_its_publishers_went(node, discover, recording):
+    discovery = discover()
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    node.withdraw("/scan")
+    went_ns = node.now_ns
+    discovery.scan()
+    node.now_ns += 5_000_000_000
+    for _ in range(STALE_SCANS - 1):
+        discovery.scan()
+    [clear] = [row for row in recording.rows("/scan") if "Clear:is_recursive" in row]
+    assert clear["Clear:is_recursive"] == [False] and clear["ros_time"] == went_ns
+
+
+@pytest.mark.parametrize(
+    ("topic", "msg_type"),
+    [
+        # Every frame relation shares the tf entity
+        ("/tf", "tf2_msgs/msg/TFMessage"),
+        # Plots and logs show history, which stays true
+        ("/joint_states", "sensor_msgs/msg/JointState"),
+        ("/diagnostics", "diagnostic_msgs/msg/DiagnosticArray"),
+    ],
+)
+def test_keeps_what_dropped_tf_or_history_drew(node, discover, recording, topic, msg_type):
+    discovery = discover()
+    node.advertise(topic, msg_type)
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    drop_after_grace(node, discovery, topic)
+    assert discovery.modules[0].entity_path == "scan"
+    assert all("Clear:is_recursive" not in row for row in recording.rows(topic))
+
+
+def test_never_drops_a_latched_topic(node, discover, recording):
+    # Its last message stays true, e.g. a map, and its module keeps what it needs to update it, e.g. a robot model's
+    # links to replace
+    discovery = discover()
+    node.advertise("/robot_description", "std_msgs/msg/String", LATCHED)
+    discovery.scan()
+    [module] = discovery.modules
+    drop_after_grace(node, discovery, "/robot_description")
+    assert discovery.modules == [module] and len(node.subscriptions) == 1
+    assert all("Clear:is_recursive" not in row for row in recording.rows("/robot_description"))
+
+
+def test_subscribes_again_keeping_the_module_when_its_publishers_qos_changed(node, discover):
+    discovery = discover()
+    node.advertise("/map", "nav_msgs/msg/OccupancyGrid", LATCHED)
+    discovery.scan()
+    [module] = discovery.modules
+    # A transient local subscription receives nothing from the volatile publisher
+    node.advertise("/map", "nav_msgs/msg/OccupancyGrid", QoSProfile(depth=10))
+    discovery.scan()
+    # The same module keeps its state, e.g. markers to delete or expire later
+    assert discovery.modules == [module]
+    [subscription] = node.subscriptions
+    assert subscription.qos.durability == DurabilityPolicy.VOLATILE
+    assert ("info", "[auto] subscribed to /map again: its publishers' QoS changed") in node.log_messages
+
+
+def test_rebuilds_a_topic_whose_type_changed(node, discover):
+    discovery = discover()
+    node.advertise("/sensor", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    node.topics["/sensor"] = ["sensor_msgs/msg/Range"]
+    discovery.scan()
+    assert [type(m) for m in discovery.modules] == [RangeModule] and len(node.subscriptions) == 1
+
+
+def test_drops_a_compressed_image_once_its_raw_image_is_published(node, discover, recording):
+    discovery = discover()
+    node.advertise("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage")
+    discovery.scan()
+    node.advertise("/camera/image_raw", "sensor_msgs/msg/Image")
+    discovery.scan()
+    assert set(subscribed(node)) == {"/camera/image_raw"}
+    assert any("Clear:is_recursive" in row for row in recording.rows("/camera/image_raw/compressed"))
+
+
+def test_tries_a_topic_that_failed_to_bridge_again_once_it_returns(node, discover, monkeypatch):
+    monkeypatch.setitem(MODULES_BY_TYPE, "sensor_msgs/msg/LaserScan", {"module": "missing_msgs.module:Thing"})
+    discovery = discover()
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    discovery.scan()
+    assert node.subscriptions == []
+    # As when the missing package is installed and the publisher restarted
+    monkeypatch.undo()
+    node.withdraw("/scan")
+    discovery.scan()
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    assert set(subscribed(node)) == {"/scan"}
+
+
+def test_scans_as_often_as_auto_sets(node, discover):
+    discover(auto={"scan_period": 0.5})
+    assert node.timer_periods[-1] == 0.5
+
+
+def test_a_topic_is_stale_after_as_many_scans_as_auto_sets(node, discover):
+    discovery = discover(auto={"stale_scans": 1})
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    node.withdraw("/scan")
+    discovery.scan()
+    assert node.subscriptions == []
+
+
+def test_never_stale_topics_stay_bridged_without_publishers(node, discover, recording):
+    discovery = discover(auto={"never_stale": ["/camera/*"]})
+    node.advertise("/camera/image_raw", "sensor_msgs/msg/Image")
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    node.withdraw("/camera/image_raw")
+    node.withdraw("/scan")
+    for _ in range(STALE_SCANS + 1):
+        discovery.scan()
+    assert set(subscribed(node)) == {"/camera/image_raw"}
+    assert all("Clear:is_recursive" not in row for row in recording.rows("/camera/image_raw"))
+
+
+def test_clears_what_the_old_type_drew_when_a_topic_changes_type(node, discover, recording):
+    discovery = discover()
+    node.advertise("/sensor", "sensor_msgs/msg/PointCloud2")
+    discovery.scan()
+    node.topics["/sensor"] = ["sensor_msgs/msg/Image"]
+    changed_ns = node.now_ns
+    discovery.scan()
+    [clear] = [row for row in recording.rows("/sensor") if "Clear:is_recursive" in row]
+    assert clear["ros_time"] == changed_ns
+
+
+def test_keeps_a_compressed_image_while_its_raw_image_is_not_shown(node, discover):
+    # The raw image's entity path is taken, so it is not bridged
+    discovery = discover(
+        modules=[{"name": "other", "module": "range", "topic": "/range", "entity_path": "camera/image_raw"}]
+    )
+    node.advertise("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage")
+    discovery.scan()
+    node.advertise("/camera/image_raw", "sensor_msgs/msg/Image")
+    discovery.scan()
+    assert set(subscribed(node)) == {"/range", "/camera/image_raw/compressed"}
+
+
+def test_clearing_a_dropped_topic_leaves_topics_beneath_it(node, discover, recording):
+    discovery = discover()
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    node.advertise("/scan/filtered", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    drop_after_grace(node, discovery, "/scan")
+    assert set(subscribed(node)) == {"/scan/filtered"}
+    # A recursive clear on scan would also clear scan/filtered
+    [clear] = [row for row in recording.rows("/scan") if "Clear:is_recursive" in row]
+    assert clear["Clear:is_recursive"] == [False]
+
+
+def test_clears_each_marker_of_a_dropped_marker_topic(node, discover, recording):
+    discovery = discover()
+    node.advertise("/markers", "visualization_msgs/msg/MarkerArray")
+    discovery.scan()
+    marker = Marker(ns="ns", id=0, type=Marker.CUBE, action=Marker.ADD)
+    marker.scale.x = marker.scale.y = marker.scale.z = 1.0
+    node.publish(MarkerArray(markers=[marker]))
+    drop_after_grace(node, discovery, "/markers")
+    assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []

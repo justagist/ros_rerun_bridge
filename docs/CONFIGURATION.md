@@ -5,7 +5,7 @@ A config is a YAML file listing the topics to show and how. The bridge checks it
 ```yaml
 global_frame: map          # optional: the TF frame the 3D view is rendered in (default: map)
 blueprint: layout.rbl      # optional: viewer layout to open with, relative to this file
-auto: true                 # optional: also bridge the topics modules does not name; see Automatic discovery below
+auto: true                 # optional: also show topics not listed here; see Automatic discovery
 modules:                   # optional with auto
   - name: scan             # required: a name for logs
     module: laserscan      # required: a built-in module, or a Python path to your own
@@ -38,44 +38,87 @@ A subscription only receives messages from publishers with compatible QoS. Check
 
 ## Automatic discovery
 
-With `auto: true`, or `--auto` on the command line, the bridge also shows the topics `modules` does not name. It looks at the ROS graph every two seconds and bridges each new topic that has a publisher, if a built-in module draws its message type:
+Instead of listing every topic, you can let the bridge find them. Turn it on with `--auto` on the command line, or `auto: true` in the config:
 
-| Topics | Module |
+```bash
+ros-rerun-bridge --auto --global-frame world
+```
+
+No config is needed. With a config, the bridge shows its topics as configured, and finds the rest.
+
+### What is shown
+
+Every 2 seconds by default, the bridge looks for new topics. It shows a topic if the topic has a publisher and a built-in module can draw its message type:
+
+| Message type | Shown with |
 | --- | --- |
-| `/tf` | `tf`, on `tf`, drawing each frame's axes as `auto.frames` sets |
-| `/tf_static` | the same, with `static: true`, on `tf_static` |
-| `/robot_description` | `robot_description` |
-| `Image` | `depth_image` if the topic's name contains `depth`, otherwise `image`. Segmentation masks are images too, and show as plain ones: configure [`segmentation_image`](MODULES.md#segmentation_image) for their class colours. |
-| `CompressedImage` | `compressed_depth_image` for `.../compressedDepth`, otherwise `compressed_image`. Left out when the raw image it was made from is published and bridged, as image_transport publishes both. |
-| `JointState` | `scalars`, plotting each joint's position by its name |
+| `TFMessage` on `/tf` and `/tf_static` | `tf`, with each frame drawn as axes (see [Settings](#settings)) |
+| `String` on `/robot_description` | `robot_description` |
+| `Image` | `depth_image` if the topic name contains `depth`, otherwise `image` |
+| `CompressedImage` | `compressed_depth_image` for topics ending in `compressedDepth`, otherwise `compressed_image` |
+| `JointState` | `scalars`, plotting each joint's position |
 | `Marker`, `MarkerArray` | `marker_array` |
-| `CameraInfo`, `PointCloud2`, `LaserScan`, `Range`, `PoseStamped`, `PoseArray`, `WrenchStamped`, `OccupancyGrid`, `ParticleCloud`, `Log`, `DiagnosticArray`, `Detection2DArray`, `Detection3DArray` | the module for the type |
+| `CameraInfo` | `camera_info` |
+| `PointCloud2` | `pointcloud2` |
+| `LaserScan` | `laserscan` |
+| `Range` | `range` |
+| `PoseStamped` | `pose` |
+| `PoseArray` | `pose_array` |
+| `WrenchStamped` | `wrench` |
+| `OccupancyGrid` | `occupancy_grid` |
+| `ParticleCloud` | `particle_cloud` |
+| `Log` | `rosout` |
+| `DiagnosticArray` | `diagnostics` |
+| `Detection2DArray` | `detections_2d` |
+| `Detection3DArray` | `detections_3d` |
 
-Each topic is logged on its name as entity path, e.g. `/camera/image_raw` on `camera/image_raw`, and subscribed with QoS every publisher accepts: best effort if any publishes best effort, and transient local, for a latched topic's last message, only if all publish transient local.
+Each topic is logged under its own name: `/camera/image_raw` becomes `camera/image_raw`. The bridge picks QoS that works with every publisher of the topic, so best-effort sensor topics and latched topics such as `/map` need no settings.
 
-The bridge leaves:
+### What is not shown
 
-* Topics `modules` names, and topics whose entity path a module already uses, except `tf` and `tf_static`, which all frame relations share. Modules that log beneath their entity path, e.g. `scalars` on `<entity_path>/<field>`, can still meet a discovered topic there: `exclude` it if they do.
-* `/robot_description` if `modules` has a `robot_description` module: the bridge holds one robot model.
-* Hidden topics (a name part starting with `_`), and topics with several message types.
-* TF and robot descriptions outside the root namespace, e.g. `/robot1/tf`: the bridge holds one robot model.
-* Joint states as robot motion: robot_state_publisher puts the joints on `/tf`, and two sources would disagree. Without it, configure the [`joint_states`](MODULES.md#joint_states) module.
-* Types no module draws alone, e.g. `Odometry`: configure them with [`scalars`](MODULES.md#scalars) or a [module of your own](EXTENDING.md).
+* **Topics the config lists.** They keep their config. A topic whose entity path a configured module already uses is skipped too, except `tf` and `tf_static`, which are meant to be shared.
+* **Compressed copies of a raw image.** image_transport publishes both. If the raw image is shown, its compressed copy is not. A compressed copy shown before its raw image appeared is removed once the raw image is shown.
+* **Joint states as robot motion.** robot_state_publisher already moves the robot through `/tf`, and two sources would disagree. Joint states are plotted instead. Without robot_state_publisher, configure the [`joint_states`](MODULES.md#joint_states) module.
+* **A second robot.** The bridge holds one robot model, so `/robot_description` is skipped if the config has a `robot_description` module, and only the root `/tf`, `/tf_static` and `/robot_description` are found, not e.g. `/robot1/tf`.
+* **Hidden topics** (a part of the name starts with `_`), and topics published with more than one message type.
+* **Types no module draws on its own**, e.g. `Odometry`. Configure them with [`scalars`](MODULES.md#scalars) or a [module of your own](EXTENDING.md).
 
-A topic that fails to bridge, e.g. as `nav2_msgs` is not installed, is logged as a warning and left. To limit what is bridged, for instance high-bandwidth camera streams, give `auto` the topics it may bridge as [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) patterns, where `*` also matches `/`. `frames` sets how TF frames are drawn, with the [`tf`](MODULES.md#tf) module's `axis_length` and `frame_names`:
+Segmentation masks are images too, so they show as plain images. Configure [`segmentation_image`](MODULES.md#segmentation_image) to see their class colours.
+
+If a configured module logs beneath its entity path, e.g. `scalars` on `<entity_path>/<field>`, a found topic can land on one of those paths and mix with it. Exclude that topic (see [Settings](#settings)).
+
+### When topics come and go
+
+* **A topic is removed** when 3 scans in a row find no publisher for it: 4 to 6 seconds with the default settings. The wait lets a restarting node keep its topic. A topic whose publisher is still running is never removed, however rarely it publishes. To keep a topic even when its publishers go, list it in `never_stale` (see [Settings](#settings)).
+* **Latched topics are never removed**, e.g. a map or the robot model: their last message stays true after the publisher goes.
+* **Stale data is cleared** when a topic is removed, so a stopped camera's last image does not look current. Earlier data stays on the timeline. TF, plots and logs are not cleared, as they stay true or show history. Only the topic's own data is cleared, not another topic's beneath it, e.g. `/scan/filtered` under `/scan`.
+* **A removed topic comes back** when a publisher appears again.
+* **A topic whose message type changes** is shown again with the module for its new type. What the old type drew is cleared.
+* **A topic is subscribed again** when a new publisher needs different QoS, e.g. a volatile publisher joining a latched topic. What it shows stays as it is.
+* **A topic that cannot be shown**, e.g. because `nav2_msgs` is not installed, logs one warning. The bridge tries it again once its publishers go and come back.
+
+### Settings
+
+`auto` also takes settings, all optional:
 
 ```yaml
 auto:
-  include: ["*"]             # optional: the default
-  exclude: ["/camera/*/compressed*", "/rosout"]
-  frames:                    # optional
-    axis_length: 0.1         # the default; null draws no axes
-    frame_names: false       # the default, as many frames would crowd the view
+  include: ["*"]                                  # topics that may be shown (the default: all)
+  exclude: ["/camera/*/compressed*", "/rosout"]   # topics never shown
+  frames:                                         # how TF frames are drawn
+    axis_length: 0.1                              # the default; null draws no axes
+    frame_names: false                            # the default
+  scan_period: 2.0                                # seconds between looks for topics (the default)
+  stale_scans: 3                                  # scans without a publisher before a topic is removed (the default)
+  never_stale: ["/camera/*"]                      # topics never removed or cleared (the default: none)
 ```
 
-With names off, the viewer still shows a frame's name: select its axes under `frames` and override *Show frame*.
+* `include` and `exclude` take [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) patterns. `*` also matches `/`, so `/camera/*` covers every topic under `/camera`. Use `exclude` for high-bandwidth topics you do not need, such as extra camera streams.
+* `scan_period` and `stale_scans` set how quickly topics are found and removed. A topic is removed at most `scan_period` x `stale_scans` seconds after its last publisher goes.
+* `never_stale` takes patterns too. A matching topic stays subscribed, and its data stays in view, while it has no publisher. Use it for a topic you want to keep seeing, such as a sensor that is only started now and then.
+* `frames` takes the [`tf`](MODULES.md#tf) module's `axis_length` and `frame_names`. Names are off by default, as many frames crowd the view. To show one frame's name, select its axes under `frames` in the viewer and override *Show frame*.
 
-`--auto` with no config bridges every topic it can, in the `map` frame unless `--global-frame` names another. With a config, `--auto` uses its `auto` filters if it has them.
+`--auto` without a config uses these defaults, and the `map` frame unless `--global-frame` names another. With a config, `--auto` uses the config's `auto` settings, if it has any.
 
 ## Frames
 
