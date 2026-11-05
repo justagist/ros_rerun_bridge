@@ -3,21 +3,24 @@ topics and entity paths alone."""
 
 import pytest
 from geometry_msgs.msg import TransformStamped
+from nav_msgs.msg import Odometry
+from pydantic import ValidationError
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import JointState
 from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import Marker, MarkerArray
 
-from ros_rerun_bridge.base import AutoConfig, AutoFrameAxesParams, BridgeConfig
+from ros_rerun_bridge.base import AutoConfig, BridgeConfig
 from ros_rerun_bridge.builder import BridgeBuilder
 from ros_rerun_bridge.discovery import MODULES_BY_TYPE, TopicDiscovery, suggest
 from ros_rerun_bridge.modules.compressed_image import CompressedImageModule
+from ros_rerun_bridge.modules.image import ImageModule
 from ros_rerun_bridge.modules.laserscan import LaserScanModule
 from ros_rerun_bridge.modules.range import RangeModule
 
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
-FRAMES = AutoFrameAxesParams()
-STALE_SCANS = AutoConfig().stale_scans
+AUTO = AutoConfig()
+STALE_SCANS = AUTO.stale_scans
 
 
 @pytest.fixture
@@ -51,11 +54,11 @@ def subscribed(node) -> dict[str, object]:
     ],
 )
 def test_picks_the_module_from_the_type_and_name(topic, msg_type, module):
-    assert suggest(topic, msg_type, {topic: [msg_type]}, FRAMES)["module"] == module
+    assert suggest(topic, msg_type, {topic: [msg_type]}, AUTO)["module"] == module
 
 
 def test_tf_static_is_logged_as_static():
-    entry = suggest("/tf_static", "tf2_msgs/msg/TFMessage", {}, FRAMES)
+    entry = suggest("/tf_static", "tf2_msgs/msg/TFMessage", {}, AUTO)
     assert (entry["module"], entry["params"]["static"], entry["entity_path"]) == ("tf", True, "tf_static")
 
 
@@ -96,7 +99,7 @@ def test_auto_frames_without_an_axis_length_draw_no_axes(node, discover, recordi
 
 def test_joint_states_are_plotted_by_joint_name():
     # Not moving the robot model: /tf from robot_state_publisher does that, and both would disagree
-    entry = suggest("/joint_states", "sensor_msgs/msg/JointState", {}, FRAMES)
+    entry = suggest("/joint_states", "sensor_msgs/msg/JointState", {}, AUTO)
     assert entry["module"] == "scalars"
     assert entry["params"] == {"fields": ["position"], "names_field": "name"}
 
@@ -113,13 +116,13 @@ def test_joint_states_are_plotted_by_joint_name():
     ],
 )
 def test_leaves_topics_no_module_draws_or_that_are_hidden_or_namespaced_robots(topic, msg_type):
-    assert suggest(topic, msg_type, {topic: [msg_type]}, FRAMES) is None
+    assert suggest(topic, msg_type, {topic: [msg_type]}, AUTO) is None
 
 
 def test_leaves_image_transport_copies_of_a_raw_image():
     graph = {"/camera/image_raw": ["sensor_msgs/msg/Image"]}
-    assert suggest("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage", graph, FRAMES) is None
-    assert suggest("/camera/image_raw/compressedDepth", "sensor_msgs/msg/CompressedImage", graph, FRAMES) is None
+    assert suggest("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage", graph, AUTO) is None
+    assert suggest("/camera/image_raw/compressedDepth", "sensor_msgs/msg/CompressedImage", graph, AUTO) is None
 
 
 @pytest.mark.parametrize(
@@ -490,3 +493,55 @@ def test_clears_each_marker_of_a_dropped_marker_topic(node, discover, recording)
     node.publish(MarkerArray(markers=[marker]))
     drop_after_grace(node, discovery, "/markers")
     assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []
+
+
+class CustomScan(LaserScanModule):
+    """A module of the user's own."""
+
+
+def test_shows_a_type_with_a_module_of_your_own(node, discover):
+    discovery = discover(auto={"modules": {"sensor_msgs/msg/LaserScan": f"{__name__}:CustomScan"}})
+    node.advertise("/scan", "sensor_msgs/msg/LaserScan")
+    discovery.scan()
+    assert [type(m) for m in discovery.modules] == [CustomScan]
+
+
+def test_shows_a_type_no_built_in_module_draws_alone_with_a_mapped_one_and_its_params(node, discover, recording):
+    discovery = discover(
+        auto={
+            "modules": {"nav_msgs/msg/Odometry": {"module": "scalars", "params": {"fields": ["twist.twist.linear.x"]}}}
+        }
+    )
+    node.advertise("/odom", "nav_msgs/msg/Odometry")
+    discovery.scan()
+    odometry = Odometry()
+    odometry.twist.twist.linear.x = 0.5
+    node.publish(odometry)
+    rows = recording.rows("/odom/twist/twist/linear/x")
+    assert [row["Scalars:scalars"] for row in rows if not row["static"]] == [[0.5]]
+
+
+def test_a_mapped_module_replaces_the_built_in_choice(node, discover):
+    # Not depth_image, which the topic's name would pick
+    discovery = discover(auto={"modules": {"sensor_msgs/msg/Image": "image"}})
+    node.advertise("/camera/depth/image_raw", "sensor_msgs/msg/Image")
+    discovery.scan()
+    assert [type(m) for m in discovery.modules] == [ImageModule]
+
+
+@pytest.mark.parametrize(
+    ("modules", "error", "match"),
+    [
+        ({"sensor_msgs/msg/LaserScan": "laserscn"}, ValueError, r"\[auto.modules: sensor_msgs/msg/LaserScan\] Invalid"),
+        ({"sensor_msgs/msg/LaserScan": {"module": "laserscan", "params": {"mood": "x"}}}, ValueError, "mood"),
+        ({"missing_msgs/msg/Thing": "laserscan"}, ImportError, "missing_msgs"),
+    ],
+)
+def test_a_mapped_module_that_cannot_be_used_stops_the_bridge_at_start(discover, modules, error, match):
+    with pytest.raises(error, match=match):
+        discover(auto={"modules": modules})
+
+
+def test_a_mapping_must_name_a_message_type():
+    with pytest.raises(ValidationError, match="'Odometry' is not a message type"):
+        BridgeConfig(auto={"modules": {"Odometry": "scalars"}})

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import traceback
 from fnmatch import fnmatchcase
 from typing import TYPE_CHECKING, Any, Literal
@@ -56,6 +57,15 @@ class AutoFrameAxesParams(FrameAxesParams):
     crowd the view, and the viewer can show each frame's name."""
 
 
+class AutoModule(StrictParamsModel):
+    """A module automatic discovery shows the topics of a message type with."""
+
+    module: str
+    """A built-in module's name, or the Python path to a module class, e.g. `my_pkg.my_mod:MyModule`."""
+    params: dict = Field(default_factory=dict)
+    """The module's parameters."""
+
+
 class AutoConfig(StrictParamsModel):
     """Settings for automatic discovery: which topics it may bridge, as `fnmatch` globs on the topic name (`*` also
     matches `/`), how often it looks, when a topic is stale, and how it draws TF frames."""
@@ -73,6 +83,20 @@ class AutoConfig(StrictParamsModel):
     publisher keeps its topic."""
     never_stale: list[str] = Field(default_factory=list)
     """Topics never dropped, nor their data cleared, when their publishers go, e.g. a sensor started on demand."""
+    modules: dict[str, AutoModule] = Field(default_factory=dict)
+    """Modules to show the topics of these message types with, by type, e.g. `my_msgs/msg/Thing`. Each replaces the
+    built-in choice for its type."""
+
+    @field_validator("modules", mode="before")
+    @classmethod
+    def _modules_by_name(cls, value: Any) -> Any:
+        """Accept a module's name or path alone, for a module without params, and check the message types' names."""
+        if not isinstance(value, dict):
+            return value
+        for msg_type in value:
+            if not re.fullmatch(r"\w+/msg/\w+", msg_type):
+                raise ValueError(f"'{msg_type}' is not a message type, e.g. 'nav_msgs/msg/Odometry'")
+        return {msg_type: {"module": m} if isinstance(m, str) else m for msg_type, m in value.items()}
 
     def matches(self, topic: str) -> bool:
         """Whether the topic is included and not excluded."""

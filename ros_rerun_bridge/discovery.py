@@ -12,7 +12,7 @@ from rclpy.clock import Clock, ClockType
 from rclpy.qos import DurabilityPolicy, ReliabilityPolicy
 
 from .base import ModuleConfig, QoSConfig
-from .utils.utils import set_rr_time_from_ros
+from .utils.utils import _import_module_by_path, set_rr_time_from_ros
 
 if TYPE_CHECKING:
     from rclpy.node import Node
@@ -22,7 +22,6 @@ if TYPE_CHECKING:
     from .base import AutoConfig, BridgeConfig, TopicToComponentModule
     from .builder import BridgeBuilder
     from .context import BridgeContext
-    from .utils.frame_axes import FrameAxesParams
 
 MODULES_BY_TYPE: dict[str, dict[str, Any]] = {
     "sensor_msgs/msg/CameraInfo": {"module": "camera_info"},
@@ -58,14 +57,14 @@ KEPT_MODULES = {"tf", "scalars", "diagnostics", "rosout"}
 and those drawing history, plots and logs, which their views show over time."""
 
 
-def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], frames: FrameAxesParams) -> dict[str, Any] | None:
+def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], auto: AutoConfig) -> dict[str, Any] | None:
     """Pick how to bridge a topic, from its message type and name.
 
     Args:
         topic: The topic's full name.
         msg_type: Its message type, e.g. `sensor_msgs/msg/Image`.
         graph: The types of the bridged topics with publishers, configured or discovered, by name.
-        frames: How to draw the frames of /tf and /tf_static.
+        auto: The discovery settings: the modules mapped to message types, and how to draw TF frames.
 
     Returns:
         The topic's config entry, without QoS, or None if no module draws it.
@@ -74,14 +73,16 @@ def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], frames: Fram
         # Hidden topics, by ROS convention
         return None
     entry = {"name": topic, "topic": topic, "entity_path": topic.strip("/")}
+    if (mapped := auto.modules.get(msg_type)) is not None:
+        return {**entry, "module": mapped.module, "msg_type": msg_type.replace("/", "."), "params": mapped.params}
     if msg_type in MODULES_BY_TYPE:
         return {**entry, **MODULES_BY_TYPE[msg_type]}
     # Only the root namespace's: Rerun's URDF importer logs the robot's joint defaults on `tf_static`, and the bridge
     # holds one robot model, so several robots' models and frames would mix
     if msg_type == "tf2_msgs/msg/TFMessage" and topic == "/tf":
-        return {**entry, "module": "tf", "params": frames.model_dump()}
+        return {**entry, "module": "tf", "params": auto.frames.model_dump()}
     if msg_type == "tf2_msgs/msg/TFMessage" and topic == "/tf_static":
-        return {**entry, "module": "tf", "params": {"static": True, **frames.model_dump()}}
+        return {**entry, "module": "tf", "params": {"static": True, **auto.frames.model_dump()}}
     if msg_type == "std_msgs/msg/String" and topic == "/robot_description":
         return {**entry, "module": "robot_description"}
     if msg_type == "sensor_msgs/msg/Image":
@@ -152,6 +153,7 @@ class TopicDiscovery:
         """Discovered topics' modules, by topic."""
         self._rejected: set[str] = set()
         """Discovered topics that failed to bridge, left until they lose their publishers, then tried again."""
+        self._check_modules(builder)
         # The bridge holds one robot model: a configured one, e.g. a namespaced robot's, keeps it
         self._has_robot_model = any(m.module == "robot_description" for m in cfg.modules)
         # Steady time: on ROS time, with use_sim_time, discovery would stop while a bag is paused or not playing
@@ -161,6 +163,27 @@ class TopicDiscovery:
             callback_group=MutuallyExclusiveCallbackGroup(),
             clock=Clock(clock_type=ClockType.STEADY_TIME),
         )
+
+    def _check_modules(self, builder: BridgeBuilder) -> None:
+        """Check the modules mapped to message types, so a config error stops the bridge before a viewer opens rather
+        than when a topic of the type appears.
+
+        Args:
+            builder: Resolves the modules.
+
+        Raises:
+            ValueError: If a module cannot be found, or its params are invalid, named in the message.
+            ImportError: If a module or a message type cannot be imported, named in the message.
+        """
+        for msg_type, mapped in self._auto.modules.items():
+            try:
+                _import_module_by_path(msg_type.replace("/", "."))
+                cls = builder._resolve_class(mapped.module)
+                if cls.PARAMS is not None:
+                    cls.PARAMS.model_validate(mapped.params)
+            except (ValueError, ImportError) as e:
+                error = ImportError if isinstance(e, ImportError) else ValueError
+                raise error(f"[auto.modules: {msg_type}] {e}") from e
 
     @property
     def modules(self) -> list[TopicToComponentModule]:
@@ -184,7 +207,7 @@ class TopicDiscovery:
         for topic, types in eligible.items():
             if topic in self._configured or topic in self._bridged or topic in self._rejected or len(types) != 1:
                 continue
-            entry = suggest(topic, types[0], self._shown(eligible), self._auto.frames)
+            entry = suggest(topic, types[0], self._shown(eligible), self._auto)
             if entry is None or (entry["module"] == "robot_description" and self._has_robot_model):
                 continue
             publishers = self._node.get_publishers_info_by_topic(topic)
@@ -209,7 +232,7 @@ class TopicDiscovery:
             self._bridged[topic] = _Bridged(module, entry["module"], types[0], qos)
         for topic, bridged in list(self._bridged.items()):
             # e.g. a compressed image, once its raw image is bridged too
-            if topic in eligible and suggest(topic, bridged.msg_type, self._shown(eligible), self._auto.frames) is None:
+            if topic in eligible and suggest(topic, bridged.msg_type, self._shown(eligible), self._auto) is None:
                 self._drop(topic, "another topic shows it", clear_at=self._node.get_clock().now())
 
     def _shown(self, eligible: dict[str, list[str]]) -> dict[str, list[str]]:

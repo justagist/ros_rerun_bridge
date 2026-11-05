@@ -81,7 +81,7 @@ Each topic is logged under its own name: `/camera/image_raw` becomes `camera/ima
 * **Joint states as robot motion.** robot_state_publisher already moves the robot through `/tf`, and two sources would disagree. Joint states are plotted instead. Without robot_state_publisher, configure the [`joint_states`](MODULES.md#joint_states) module.
 * **A second robot.** The bridge holds one robot model, so `/robot_description` is skipped if the config has a `robot_description` module, and only the root `/tf`, `/tf_static` and `/robot_description` are found, not e.g. `/robot1/tf`.
 * **Hidden topics** (a part of the name starts with `_`), and topics published with more than one message type.
-* **Types no module draws on its own**, e.g. `Odometry`. Configure them with [`scalars`](MODULES.md#scalars) or a [module of your own](EXTENDING.md).
+* **Types no module draws on its own**, e.g. `Odometry`. Give them a module in `modules` (see [Settings](#settings)), or configure their topics.
 
 Segmentation masks are images too, so they show as plain images. Configure [`segmentation_image`](MODULES.md#segmentation_image) to see their class colours.
 
@@ -111,11 +111,18 @@ auto:
   scan_period: 2.0                                # seconds between looks for topics (the default)
   stale_scans: 3                                  # scans without a publisher before a topic is removed (the default)
   never_stale: ["/camera/*"]                      # topics never removed or cleared (the default: none)
+  modules:                                        # modules for message types (the default: none, using the built-in choices in What is shown)
+    my_msgs/msg/Thing: my_pkg.my_thing:ThingModule   # a module of your own, without params
+    my_msgs/msg/Gadget:                              # a module of your own, with params
+      module: my_pkg.my_gadget:GadgetModule
+      params: { radius: 0.05 }
 ```
 
 * `include` and `exclude` take [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) patterns. `*` also matches `/`, so `/camera/*` covers every topic under `/camera`. Use `exclude` for high-bandwidth topics you do not need, such as extra camera streams.
 * `scan_period` and `stale_scans` set how quickly topics are found and removed. A topic is removed at most `scan_period` x `stale_scans` seconds after its last publisher goes.
 * `never_stale` takes patterns too. A matching topic stays subscribed, and its data stays in view, while it has no publisher. Use it for a topic you want to keep seeing, such as a sensor that is only started now and then.
+* `modules` shows every topic of a message type with the module you name: a [module of your own](EXTENDING.md), by its Python path, or a built-in one, by its name. Give `params` if the module takes any. Each module and its `params` are checked when the bridge starts.
+  * It replaces the bridge's own choice for that type, including the rules above. So it also changes how built-in types are shown: `sensor_msgs/msg/Image: image` shows depth images as plain images, and mapping a type to its usual built-in module with `params` changes how that module draws it.
 * `frames` takes the [`tf`](MODULES.md#tf) module's `axis_length` and `frame_names`. Names are off by default, as many frames crowd the view. To show one frame's name, select its axes under `frames` in the viewer and override *Show frame*.
 
 `--auto` without a config uses these defaults, and the `map` frame unless `--global-frame` names another. With a config, `--auto` uses the config's `auto` settings, if it has any.
