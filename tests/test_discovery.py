@@ -614,6 +614,13 @@ def test_a_mapping_must_name_a_message_type():
         BridgeConfig(auto={"modules": {"Odometry": "scalars"}})
 
 
+def test_joint_state_settings_cannot_be_given_with_a_module_mapped_to_joint_states():
+    with pytest.raises(ValidationError, match="'joint_states' does nothing"):
+        BridgeConfig(
+            auto={"joint_states": {"plot": []}, "modules": {"sensor_msgs/msg/JointState": "scalars"}},
+        )
+
+
 class CustomTF(TFModule):
     """A TF module of the user's own."""
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import Field, PositiveInt, field_validator
+from pydantic import Field, PositiveInt, field_validator, model_validator
 
 from .types import StrictParamsModel
 from .utils.frame_axes import FrameAxesParams
@@ -115,6 +115,16 @@ class AutoConfig(StrictParamsModel):
             if not re.fullmatch(r"\w+/msg/\w+", msg_type):
                 raise ValueError(f"'{msg_type}' is not a message type, e.g. 'nav_msgs/msg/Odometry'")
         return {msg_type: {"module": m} if isinstance(m, str) else m for msg_type, m in value.items()}
+
+    @model_validator(mode="after")
+    def _check_joint_states(self) -> AutoConfig:
+        """Reject `joint_states` with a module mapped to `JointState`, which replaces the topics' `joint_states`
+        modules and would leave every setting in `joint_states` unused."""
+        if "joint_states" in self.model_fields_set and "sensor_msgs/msg/JointState" in self.modules:
+            raise ValueError(
+                "'joint_states' does nothing when 'modules' maps sensor_msgs/msg/JointState: set one or the other"
+            )
+        return self
 
     def matches(self, topic: str) -> bool:
         """Whether the topic is included and not excluded."""

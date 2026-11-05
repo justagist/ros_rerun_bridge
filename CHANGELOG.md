@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - `joint_states` plots joints' positions, velocities or efforts, with `plot` and `plot_entity_path`, each joint as a series of its own. Plots do not need the robot model.
 - `joint_states` takes `prefer`, setting which source logs a joint that also arrives on `/tf`: `tf`, `joint_states` or `both`. A joint whose preferred source stops sending it is moved by the other a second later.
-- `auto.joint_states`: `topics`, the `JointState` topics to show, and the `prefer` and `plot` their `joint_states` modules get.
+- `auto.joint_states`: `topics`, the `JointState` topics to show, and the `prefer` and `plot` their `joint_states` modules get. It cannot be combined with a module mapped to `JointState` in `auto.modules`, which would replace it.
 
 ### Changed
 
