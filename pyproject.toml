@@ -1,13 +1,28 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+# 77: licence expressions (PEP 639)
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ros-rerun-bridge"
-version = "0.17.0"
+version = "0.17.1"
 description = "Config-driven, pluggable ROS2 -> Rerun bridge"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Saif Sidhik", email = "mail@saifsidhik.page" }]
 requires-python = ">=3.12"
+keywords = ["ros", "ros2", "rerun", "visualisation", "robotics", "rviz"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
 dependencies = [
     # Pinned: Rerun's API changes between minor versions
     "rerun-sdk==0.40.0",
@@ -20,6 +35,13 @@ dependencies = [
     "empy",
     "lark",
 ]
+
+[project.urls]
+Homepage = "https://github.com/justagist/ros_rerun_bridge"
+Documentation = "https://github.com/justagist/ros_rerun_bridge#readme"
+Repository = "https://github.com/justagist/ros_rerun_bridge"
+Issues = "https://github.com/justagist/ros_rerun_bridge/issues"
+Changelog = "https://github.com/justagist/ros_rerun_bridge/blob/main/CHANGELOG.md"
 
 [project.scripts]
 ros-rerun-bridge = "ros_rerun_bridge:run"

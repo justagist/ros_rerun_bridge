@@ -5,7 +5,8 @@
 **Your ROS 2 topics in Rerun, from one YAML file. No code.**
 
 [![CI](https://github.com/justagist/ros_rerun_bridge/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/justagist/ros_rerun_bridge/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/ros-rerun-bridge.svg)](https://pypi.org/project/ros-rerun-bridge/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/justagist/ros_rerun_bridge/blob/main/LICENSE)
 [![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202-Jazzy-22314E.svg)](https://docs.ros.org/en/jazzy/)
 [![ROS 2 Lyrical](https://img.shields.io/badge/ROS%202-Lyrical-22314E.svg)](https://docs.ros.org/en/lyrical/)
 [![Rerun 0.40](https://img.shields.io/badge/Rerun-0.40-0B8CE9.svg)](https://rerun.io)
@@ -42,11 +43,11 @@ ros-rerun-bridge --auto --global-frame world  # use the global frame you would s
 
 ## Demos
 
-**Nav2:** the [Nav2 getting started demo](https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/) with [this config](examples/nav2_turtlebot3/config.yaml).
+**Nav2:** the [Nav2 getting started demo](https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/) with [this config](https://github.com/justagist/ros_rerun_bridge/blob/main/examples/nav2_turtlebot3/config.yaml).
 
 [![ros_rerun_tb3_sim.mp4](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_tb3_sim.gif)](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_tb3_sim.mp4)
 
-**MoveIt:** `ros2 launch moveit_resources_panda_moveit_config demo.launch.py` with [this config](examples/moveit_panda/config.yaml).
+**MoveIt:** `ros2 launch moveit_resources_panda_moveit_config demo.launch.py` with [this config](https://github.com/justagist/ros_rerun_bridge/blob/main/examples/moveit_panda/config.yaml).
 
 [![ros_rerun_franka_moveit.mp4](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.gif)](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/ros_rerun_franka_moveit.mp4)
 
@@ -60,21 +61,36 @@ ros-rerun-bridge --auto --global-frame world  # use the global frame you would s
 
 ## Quick start
 
-You need ROS 2 and [uv](https://docs.astral.sh/uv/). The bridge runs in its own Python environment, because Rerun needs NumPy 2 and Jazzy ships NumPy 1. uv creates that environment for you.
+You need ROS 2 (Jazzy or Lyrical), and [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/). Install the bridge from PyPI in an environment of its own, which both create, as Rerun needs NumPy 2 and Jazzy ships NumPy 1:
+
+```bash
+uv tool install --python-preference only-system ros-rerun-bridge  # or: pipx install ros-rerun-bridge
+```
+
+Do not `pip install` it into the system Python: on Jazzy, its NumPy 2 would break other ROS nodes.
+
+You can start straight away, with no config. With your robot or simulator running, the bridge shows every topic it can draw, as it appears:
+
+```bash
+source /opt/ros/jazzy/setup.bash  # or lyrical
+ros-rerun-bridge --auto --global-frame world  # use the global frame you would set in rviz
+```
+
+To choose what is shown, and how, list the topics in a [config](#configuration). To see one in action, try an example from a clone of this repo:
 
 ```bash
 git clone https://github.com/justagist/ros_rerun_bridge.git && cd ros_rerun_bridge
 source /opt/ros/jazzy/setup.bash  # or lyrical
-uv run ros-rerun-bridge --config examples/robot_arm/config.yaml
+ros-rerun-bridge --config examples/robot_arm/config.yaml
 # In a second terminal, from the repo root with ROS sourced: publish a small arm's URDF and joint states
 python3 examples/robot_arm/publisher.py
 ```
 
-This opens the Rerun viewer, showing the arm moving and its joint positions plotted. The publisher only provides demo data: with a real robot, the bridge needs just a config listing its topics. [examples](examples) has more, each runnable the same way.
+This opens the Rerun viewer, showing the arm moving and its joint positions plotted. The publisher only provides demo data: with a real robot, the bridge needs just a config listing its topics. [examples](https://github.com/justagist/ros_rerun_bridge/blob/main/examples) has more, each runnable the same way.
 
 ![robot_arm](https://media.githubusercontent.com/media/justagist/_assets/main/ros_rerun_bridge/examples/robot_arm.gif)
 
-See [INSTALLATION.md](docs/INSTALLATION.md) to make the `ros-rerun-bridge` command available everywhere, for other ways to install, and for why the bridge needs its own environment.
+See [INSTALLATION.md](https://github.com/justagist/ros_rerun_bridge/blob/main/docs/INSTALLATION.md) for other ways to install, e.g. running from a clone without installing, and why the bridge needs its own environment.
 
 ## Usage
 
@@ -86,10 +102,10 @@ ros-rerun-bridge --auto [--config <config.yaml>] [options] [-- <ROS arguments>]
 | Option | |
 | --- | --- |
 | *(no option)* | Open a Rerun viewer. |
-| `--auto` | Also show the topics the config does not list, as they appear ([automatic discovery](docs/CONFIGURATION.md#automatic-discovery)). |
+| `--auto` | Also show the topics the config does not list, as they appear ([automatic discovery](https://github.com/justagist/ros_rerun_bridge/blob/main/docs/CONFIGURATION.md#automatic-discovery)). |
 | `--global-frame <frame>` | The TF frame the 3D view is drawn in. Overrides the config's `global_frame`. |
 | `--connect [--url <url>]` | Send to a Rerun viewer that is already running. |
-| `--serve [--allow-origin <pattern>]` | Let viewers on other machines connect ([REMOTE_VIEWING.md](docs/REMOTE_VIEWING.md)). |
+| `--serve [--allow-origin <pattern>]` | Let viewers on other machines connect ([REMOTE_VIEWING.md](https://github.com/justagist/ros_rerun_bridge/blob/main/docs/REMOTE_VIEWING.md)). |
 | `--save <file.rrd>` | Record to a file, to open later with `rerun <file.rrd>`. |
 | `--stdout` | Stream to standard output, to pipe into `rerun -`. |
 | `--headless` | Run without a viewer. |
@@ -128,15 +144,15 @@ modules:
       mode: points
 ```
 
-[CONFIGURATION.md](docs/CONFIGURATION.md) describes every field, and covers frames, QoS and saving a viewer layout. The [examples](examples) are a good starting point: each has a config, an optional viewer layout, and a publisher of demo data that only stands in for a real robot.
+[CONFIGURATION.md](https://github.com/justagist/ros_rerun_bridge/blob/main/docs/CONFIGURATION.md) describes every field, and covers frames, QoS and saving a viewer layout. The [examples](https://github.com/justagist/ros_rerun_bridge/blob/main/examples) are a good starting point: each has a config, an optional viewer layout, and a publisher of demo data that only stands in for a real robot.
 
 ## Modules
 
-Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `depth_image`, `compressed_depth_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `pose`, `pose_array`, `wrench`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, `bar_chart` draws an array field as bars, and `states` shows a field as states over time. `rosout` shows ROS log entries, and `diagnostics` each component's diagnostic status over time. `segmentation_image` draws segmentation masks with their class names and colours, and `detections_2d` and `detections_3d` draw detection boxes labelled with their class, tracking id and score. See [MODULES.md](docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](docs/EXTENDING.md) to add your own.
+Built-in modules cover rviz's common displays: `tf`, `robot_description`, `joint_states`, `image`, `compressed_image`, `depth_image`, `compressed_depth_image`, `camera_info`, `pointcloud2`, `laserscan`, `range`, `marker_array`, `pose`, `pose_array`, `wrench`, `occupancy_grid` and `particle_cloud`. The `scalars` module plots numeric fields of any message as time series, `bar_chart` draws an array field as bars, and `states` shows a field as states over time. `rosout` shows ROS log entries, and `diagnostics` each component's diagnostic status over time. `segmentation_image` draws segmentation masks with their class names and colours, and `detections_2d` and `detections_3d` draw detection boxes labelled with their class, tracking id and score. See [MODULES.md](https://github.com/justagist/ros_rerun_bridge/blob/main/docs/MODULES.md) for what each shows and its parameters, and [EXTENDING.md](https://github.com/justagist/ros_rerun_bridge/blob/main/docs/EXTENDING.md) to add your own.
 
 ## Known limitations
 
-The bridge shows one robot, and some message types have no module yet. Automatic discovery infers what it can from topic names and types, so a few topics need configuring by hand. [LIMITATIONS.md](docs/LIMITATIONS.md) lists them, with what to do instead.
+The bridge shows one robot, and some message types have no module yet. Automatic discovery infers what it can from topic names and types, so a few topics need configuring by hand. [LIMITATIONS.md](https://github.com/justagist/ros_rerun_bridge/blob/main/docs/LIMITATIONS.md) lists them, with what to do instead.
 
 ## Development
 
@@ -151,4 +167,4 @@ Tests drive each module with real ROS messages and check what it logs to an in-m
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/justagist/ros_rerun_bridge/blob/main/LICENSE)
