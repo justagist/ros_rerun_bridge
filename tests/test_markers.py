@@ -480,5 +480,7 @@ def test_meshes_that_cannot_be_read_warn_and_clear_the_marker(node, build, recor
 
 def test_closing_stops_the_lifetime_timer_too(node, build):
     # As when automatic discovery drops the topic
-    build("marker_array").close()
+    module = build("marker_array")
+    assert len(node.subscriptions) == len(node.timers) == 1
+    module.close()
     assert node.subscriptions == [] and node.timers == []

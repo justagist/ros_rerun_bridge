@@ -77,7 +77,7 @@ Each topic is logged under its own name: `/camera/image_raw` becomes `camera/ima
 ### What is not shown
 
 * **Topics the config lists.** They keep their config. A topic whose entity path a configured module already uses is skipped too, except `tf` and `tf_static`, which are meant to be shared.
-* **Compressed copies of a raw image.** image_transport publishes both. If the raw image is shown, its compressed copy is not.
+* **Compressed copies of a raw image.** image_transport publishes both. If the raw image is shown, its compressed copy is not. A compressed copy shown before its raw image appeared is removed once the raw image is shown.
 * **Joint states as robot motion.** robot_state_publisher already moves the robot through `/tf`, and two sources would disagree. Joint states are plotted instead. Without robot_state_publisher, configure the [`joint_states`](MODULES.md#joint_states) module.
 * **A second robot.** The bridge holds one robot model, so `/robot_description` is skipped if the config has a `robot_description` module, and only the root `/tf`, `/tf_static` and `/robot_description` are found, not e.g. `/robot1/tf`.
 * **Hidden topics** (a part of the name starts with `_`), and topics published with more than one message type.
@@ -90,9 +90,11 @@ If a configured module logs beneath its entity path, e.g. `scalars` on `<entity_
 ### When topics come and go
 
 * **A topic is removed** when 3 scans in a row find no publisher for it: 4 to 6 seconds with the default settings. The wait lets a restarting node keep its topic. A topic whose publisher is still running is never removed, however rarely it publishes. To keep a topic even when its publishers go, list it in `never_stale` (see [Settings](#settings)).
-* **Stale data is cleared** when a topic is removed, so a stopped camera's last image does not look current. Earlier data stays on the timeline. Some data is kept, because it stays true or is history: latched topics such as a map, TF, plots and logs.
+* **Latched topics are never removed**, e.g. a map or the robot model: their last message stays true after the publisher goes.
+* **Stale data is cleared** when a topic is removed, so a stopped camera's last image does not look current. Earlier data stays on the timeline. TF, plots and logs are not cleared, as they stay true or show history. Only the topic's own data is cleared, not another topic's beneath it, e.g. `/scan/filtered` under `/scan`.
 * **A removed topic comes back** when a publisher appears again.
-* **A topic is subscribed again** when its message type changes, or when a new publisher needs different QoS, e.g. a volatile publisher joining a latched topic.
+* **A topic whose message type changes** is shown again with the module for its new type. What the old type drew is cleared.
+* **A topic is subscribed again** when a new publisher needs different QoS, e.g. a volatile publisher joining a latched topic. What it shows stays as it is.
 * **A topic that cannot be shown**, e.g. because `nav2_msgs` is not installed, logs one warning. The bridge tries it again once its publishers go and come back.
 
 ### Settings

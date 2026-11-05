@@ -201,6 +201,10 @@ class MarkerArrayModule(TopicToComponentModule):
         super().close()
         self.node.destroy_timer(self._timer)
 
+    def clear(self) -> None:
+        """Clear every marker drawn, each on its own entity."""
+        self._clear(list(self._shapes))
+
     @classmethod
     def ros_msg_type(cls):
         return MarkerArray

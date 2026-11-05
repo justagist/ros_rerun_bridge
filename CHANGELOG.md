@@ -7,10 +7,10 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - Automatic discovery, with `--auto` or `auto: true`. The bridge also shows the topics a config does not list, as they appear, picking a built-in module for each by its message type, and QoS that works with its publishers.
-- Discovered topics follow the ROS graph. A topic is removed when a few scans in a row find no publisher for it, and comes back with a new one. Stale data is cleared when a topic is removed, except for latched topics, TF, plots and logs. A topic is subscribed again if its type or its publishers' QoS changes.
+- Discovered topics follow the ROS graph. A topic is removed when a few scans in a row find no publisher for it, and comes back with a new one. Latched topics are never removed. Stale data is cleared when a topic is removed, except for TF, plots and logs. A topic is shown again with a new module if its type changes, and subscribed again if its publishers' QoS changes.
 - `auto` settings: `include` and `exclude` topic patterns; `frames`, setting how TF frames are drawn (as axes, without names, by default); `scan_period` and `stale_scans`, setting how often the bridge looks and when a topic is removed; and `never_stale`, for topics never removed.
 - `--global-frame`, overriding the config's `global_frame`.
-- Modules have a `close()`, which releases their subscription and any other ROS resources.
+- Modules have a `close()`, which releases their subscription and any other ROS resources, and a `clear()`, which clears what they drew.
 
 ### Changed
 

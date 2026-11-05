@@ -163,6 +163,22 @@ class TopicToComponentModule:
         timer, extends it to release them."""
         self.node.destroy_subscription(self._sub)
 
+    def clear(self) -> None:
+        """Clear what the module drew, when automatic discovery drops its topic, at the current Rerun time. Only the
+        module's own entity: a recursive clear would also clear other modules' entities beneath it. A module drawing
+        beneath its entity extends it to clear those too."""
+        rr.log(self.entity_path, rr.Clear(recursive=False))
+
+    def _resubscribe(self, qos: QoSConfig) -> None:
+        """Subscribe again with another QoS, keeping the module's state, e.g. markers to delete later.
+
+        Args:
+            qos: The new subscription QoS.
+        """
+        self.node.destroy_subscription(self._sub)
+        self._qos_profile = make_qos(qos)
+        self._subscribe()
+
     # Overridables
     @classmethod
     def ros_msg_type(cls):
