@@ -11,7 +11,7 @@ from .utils.utils import _import_module_by_path
 if TYPE_CHECKING:
     from rclpy.node import Node
 
-    from .base import BridgeConfig
+    from .base import BridgeConfig, ModuleConfig
     from .context import BridgeContext
 
 
@@ -38,17 +38,29 @@ class BridgeBuilder:
             ValueError: If a module's config is invalid, named in the message.
             ImportError: If a module, or a package it needs, cannot be imported, named in the message.
         """
-        instances: List[TopicToComponentModule] = []
-        for module_spec in cfg.modules:
-            try:
-                cls = self._resolve_class(module_spec.module)
-                inst = cls(self.node, module_spec, context=context)
-            except (ValueError, ImportError) as e:
-                # Name the module: a config often has several of one kind
-                error = ImportError if isinstance(e, ImportError) else ValueError
-                raise error(f"[{module_spec.name}] {e}") from e
-            instances.append(inst)
-        return instances
+        return [self.build_module(module_spec, context) for module_spec in cfg.modules]
+
+    def build_module(self, module_spec: ModuleConfig, context: BridgeContext) -> TopicToComponentModule:
+        """Build one module and subscribe it to its topic.
+
+        Args:
+            module_spec: The module's config entry.
+            context: Shared context for all modules.
+        Returns:
+            The module, subscribed.
+        Raises:
+            ValueError: If the module's config is invalid, named in the message.
+            ImportError: If the module, or a package it needs, cannot be imported, named in the message.
+        """
+        try:
+            cls = self._resolve_class(module_spec.module)
+            inst = cls(self.node, module_spec, context=context)
+        except (ValueError, ImportError) as e:
+            # Name the module: a config often has several of one kind
+            error = ImportError if isinstance(e, ImportError) else ValueError
+            raise error(f"[{module_spec.name}] {e}") from e
+        inst.start()
+        return inst
 
     def _resolve_class(self, module_id: str):
         # Built-ins are imported only when used, so a missing optional dependency (e.g. nav2_msgs) only affects the

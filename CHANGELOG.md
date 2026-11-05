@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [Unreleased]
+
+### Changed
+
+- Modules subscribe in `start()`, which the builder calls once a module is built, so no message reaches a half-built module. A module constructed without the builder no longer subscribes by itself.
+
 ## [0.16.1] - 2026-11-04
 
 ### Added
@@ -231,6 +237,7 @@ Requires Rerun 0.40 (pinned), and therefore NumPy 2: run the bridge in its own e
 
 First version: a config-driven bridge with `image`, `camera_info`, `laserscan`, `pointcloud2`, `particle_cloud`, `odometry`, `robot_description` and `joint_states` modules.
 
+[Unreleased]: https://github.com/justagist/ros_rerun_bridge/compare/v0.16.1...HEAD
 [0.16.1]: https://github.com/justagist/ros_rerun_bridge/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/justagist/ros_rerun_bridge/compare/v0.14.0...v0.15.0

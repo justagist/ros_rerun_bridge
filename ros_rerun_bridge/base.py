@@ -94,18 +94,21 @@ class TopicToComponentModule:
                 raise ValueError(f"invalid 'params' config for {self.__class__.__name__}: {e}") from e
 
         self._sub = None
-
-        qos_profile = make_qos(config.qos)
-
-        msg_type = self._resolve_msg_type()
+        self._topic = config.topic
+        self._qos_profile = make_qos(config.qos)
+        self._msg_class = self._resolve_msg_type()
         # One group per module: topics are handled in parallel, but each module sees its messages one at a time.
         # Modules add their own timers to it to keep that guarantee.
         self.callback_group = MutuallyExclusiveCallbackGroup()
-        self._sub = node.create_subscription(
-            msg_type, config.topic, self._callback, qos_profile, callback_group=self.callback_group
+
+    def start(self) -> None:
+        """Subscribe to the topic. The builder calls it once the module is fully initialised: with automatic discovery,
+        modules are built while the executor runs, and a message could otherwise reach a half-built module."""
+        self._sub = self.node.create_subscription(
+            self._msg_class, self._topic, self._callback, self._qos_profile, callback_group=self.callback_group
         )
-        node.get_logger().info(
-            f"[{config.name}] subscribed to {config.topic} with {msg_type.__name__} -> {config.entity_path}"
+        self.node.get_logger().info(
+            f"[{self.name}] subscribed to {self._topic} with {self._msg_class.__name__} -> {self.entity_path}"
         )
 
     # Overridables

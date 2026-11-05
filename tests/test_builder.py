@@ -81,6 +81,21 @@ def test_subscribes_with_the_configured_topic_qos_and_message_type(node, build):
     assert subscription.qos.durability == DurabilityPolicy.TRANSIENT_LOCAL
 
 
+class SubscriptionsSeenInInit(TFModule):
+    """Records the subscriptions that exist once its own initialisation is done."""
+
+    def __init__(self, node, config, context) -> None:
+        super().__init__(node, config, context)
+        self.subscriptions_in_init = list(node.subscriptions)
+
+
+def test_subscribes_only_once_the_module_is_built(node, build):
+    # With automatic discovery, modules are built while the executor runs: a message must not reach a half-built one
+    module = build(f"{__name__}:SubscriptionsSeenInInit")
+    assert module.subscriptions_in_init == []
+    assert len(node.subscriptions) == 1
+
+
 @pytest.mark.parametrize(
     ("qos", "error"), [({"reliability": "best-effort"}, "reliability"), ({"depth": 0}, "depth"), ({"deph": 5}, "deph")]
 )
