@@ -56,11 +56,11 @@ def subscribed(node) -> dict[str, object]:
     ],
 )
 def test_picks_the_module_from_the_type_and_name(topic, msg_type, module):
-    assert suggest(topic, msg_type, {topic: [msg_type]}, AUTO)["module"] == module
+    assert [entry["module"] for entry in suggest(topic, msg_type, {topic: [msg_type]}, AUTO)] == [module]
 
 
 def test_tf_static_is_logged_as_static():
-    entry = suggest("/tf_static", "tf2_msgs/msg/TFMessage", {}, AUTO)
+    [entry] = suggest("/tf_static", "tf2_msgs/msg/TFMessage", {}, AUTO)
     assert (entry["module"], entry["params"]["static"], entry["entity_path"]) == ("tf", True, "tf_static")
 
 
@@ -101,7 +101,7 @@ def test_auto_frames_without_an_axis_length_draw_no_axes(node, discover, recordi
 
 def test_joint_states_are_plotted_by_joint_name():
     # Not moving the robot model: /tf from robot_state_publisher does that, and both would disagree
-    entry = suggest("/joint_states", "sensor_msgs/msg/JointState", {}, AUTO)
+    [entry] = suggest("/joint_states", "sensor_msgs/msg/JointState", {}, AUTO)
     assert entry["module"] == "scalars"
     assert entry["params"] == {"fields": ["position"], "names_field": "name"}
 
@@ -118,13 +118,13 @@ def test_joint_states_are_plotted_by_joint_name():
     ],
 )
 def test_leaves_topics_no_module_draws_or_that_are_hidden_or_namespaced_robots(topic, msg_type):
-    assert suggest(topic, msg_type, {topic: [msg_type]}, AUTO) is None
+    assert suggest(topic, msg_type, {topic: [msg_type]}, AUTO) == []
 
 
 def test_leaves_image_transport_copies_of_a_raw_image():
     graph = {"/camera/image_raw": ["sensor_msgs/msg/Image"]}
-    assert suggest("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage", graph, AUTO) is None
-    assert suggest("/camera/image_raw/compressedDepth", "sensor_msgs/msg/CompressedImage", graph, AUTO) is None
+    assert suggest("/camera/image_raw/compressed", "sensor_msgs/msg/CompressedImage", graph, AUTO) == []
+    assert suggest("/camera/image_raw/compressedDepth", "sensor_msgs/msg/CompressedImage", graph, AUTO) == []
 
 
 @pytest.mark.parametrize(
