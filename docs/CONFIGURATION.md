@@ -5,7 +5,8 @@ A config is a YAML file listing the topics to show and how. The bridge checks it
 ```yaml
 global_frame: map          # optional: the TF frame the 3D view is rendered in (default: map)
 blueprint: layout.rbl      # optional: viewer layout to open with, relative to this file
-modules:
+auto: true                 # optional: also bridge the topics modules does not name; see Automatic discovery below
+modules:                   # optional with auto
   - name: scan             # required: a name for logs
     module: laserscan      # required: a built-in module, or a Python path to your own
     topic: /scan           # required: the topic to subscribe to
@@ -34,6 +35,47 @@ A subscription only receives messages from publishers with compatible QoS. Check
 
 * **Reliability:** a `reliable` subscription (the default) receives nothing from `best_effort` publishers, which many sensor drivers use (`SensorDataQoS`). `best_effort` receives from both, so it is a safe choice for sensor topics.
 * **Durability:** latched topics (`/map`, `/robot_description`, `/tf_static`, Nav2 costmaps) are published `transient_local`. Subscribe `transient_local` too, to get their last message when the bridge starts after the publisher. A `transient_local` subscription receives nothing from a `volatile` publisher.
+
+## Automatic discovery
+
+With `auto: true`, or `--auto` on the command line, the bridge also shows the topics `modules` does not name. It looks at the ROS graph every two seconds and bridges each new topic that has a publisher, if a built-in module draws its message type:
+
+| Topics | Module |
+| --- | --- |
+| `/tf` | `tf`, on `tf`, drawing each frame's axes as `auto.frames` sets |
+| `/tf_static` | the same, with `static: true`, on `tf_static` |
+| `/robot_description` | `robot_description` |
+| `Image` | `depth_image` if the topic's name contains `depth`, otherwise `image`. Segmentation masks are images too, and show as plain ones: configure [`segmentation_image`](MODULES.md#segmentation_image) for their class colours. |
+| `CompressedImage` | `compressed_depth_image` for `.../compressedDepth`, otherwise `compressed_image`. Left out when the raw image it was made from is published and bridged, as image_transport publishes both. |
+| `JointState` | `scalars`, plotting each joint's position by its name |
+| `Marker`, `MarkerArray` | `marker_array` |
+| `CameraInfo`, `PointCloud2`, `LaserScan`, `Range`, `PoseStamped`, `PoseArray`, `WrenchStamped`, `OccupancyGrid`, `ParticleCloud`, `Log`, `DiagnosticArray`, `Detection2DArray`, `Detection3DArray` | the module for the type |
+
+Each topic is logged on its name as entity path, e.g. `/camera/image_raw` on `camera/image_raw`, and subscribed with QoS every publisher accepts: best effort if any publishes best effort, and transient local, for a latched topic's last message, only if all publish transient local.
+
+The bridge leaves:
+
+* Topics `modules` names, and topics whose entity path a module already uses, except `tf` and `tf_static`, which all frame relations share. Modules that log beneath their entity path, e.g. `scalars` on `<entity_path>/<field>`, can still meet a discovered topic there: `exclude` it if they do.
+* `/robot_description` if `modules` has a `robot_description` module: the bridge holds one robot model.
+* Hidden topics (a name part starting with `_`), and topics with several message types.
+* TF and robot descriptions outside the root namespace, e.g. `/robot1/tf`: the bridge holds one robot model.
+* Joint states as robot motion: robot_state_publisher puts the joints on `/tf`, and two sources would disagree. Without it, configure the [`joint_states`](MODULES.md#joint_states) module.
+* Types no module draws alone, e.g. `Odometry`: configure them with [`scalars`](MODULES.md#scalars) or a [module of your own](EXTENDING.md).
+
+A topic that fails to bridge, e.g. as `nav2_msgs` is not installed, is logged as a warning and left. To limit what is bridged, for instance high-bandwidth camera streams, give `auto` the topics it may bridge as [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) patterns, where `*` also matches `/`. `frames` sets how TF frames are drawn, with the [`tf`](MODULES.md#tf) module's `axis_length` and `frame_names`:
+
+```yaml
+auto:
+  include: ["*"]             # optional: the default
+  exclude: ["/camera/*/compressed*", "/rosout"]
+  frames:                    # optional
+    axis_length: 0.1         # the default; null draws no axes
+    frame_names: false       # the default, as many frames would crowd the view
+```
+
+With names off, the viewer still shows a frame's name: select its axes under `frames` and override *Show frame*.
+
+`--auto` with no config bridges every topic it can, in the `map` frame unless `--global-frame` names another. With a config, `--auto` uses its `auto` filters if it has them.
 
 ## Frames
 

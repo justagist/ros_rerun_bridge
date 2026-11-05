@@ -19,9 +19,10 @@ from rclpy.node import Node
 import rerun as rr
 
 from . import __version__
-from .base import BridgeConfig
+from .base import AutoConfig, BridgeConfig
 from .builder import BridgeBuilder
 from .context import BridgeContext
+from .discovery import TopicDiscovery
 
 
 class BridgeNode(Node):
@@ -48,6 +49,7 @@ class BridgeNode(Node):
         # build modules
         builder = BridgeBuilder(self)
         self.modules = builder.build_modules(cfg, bridge_context)
+        self.discovery = TopicDiscovery(self, cfg, builder, bridge_context) if cfg.auto else None
 
 
 def load_config(path: str | Path) -> BridgeConfig:
@@ -129,7 +131,16 @@ def run(argv: list[str] | None = None) -> None:
     # Group: app options
     bridge_grp = parser.add_argument_group()
     bridge_grp.add_argument("-v", "--version", action="store_true", help="Show version and exit")
-    bridge_grp.add_argument("--config", required=True, help="Path to YAML config")
+    bridge_grp.add_argument("--config", help="Path to YAML config. Optional with --auto.")
+    bridge_grp.add_argument(
+        "--auto",
+        action="store_true",
+        help="Also bridge every topic the config does not name, if a built-in module draws its type. The config's "
+        "`auto` filters apply.",
+    )
+    bridge_grp.add_argument(
+        "--global-frame", metavar="FRAME", help="TF frame the 3D view is rendered in, overriding the config's"
+    )
     bridge_grp.add_argument(
         "--allow-origin",
         action="append",
@@ -145,10 +156,18 @@ def run(argv: list[str] | None = None) -> None:
     # Parse known so leftover go to rclpy, without the `--` separating them
     args, unknownargs = parser.parse_known_args(argv)
     unknownargs = [arg for arg in unknownargs if arg != "--"]
+    if args.config is None and not args.auto:
+        parser.error("--config is required, unless --auto is given")
     try:
-        cfg = load_config(args.config)
+        cfg = load_config(args.config) if args.config else BridgeConfig()
     except (ValidationError, FileNotFoundError) as e:
         parser.exit(2, f"{parser.prog}: error: {e}\n")
+    if args.auto:
+        cfg.auto = cfg.auto or AutoConfig()
+    if args.global_frame:
+        cfg.global_frame = args.global_frame
+    if not cfg.modules and not cfg.auto:
+        parser.error("the config lists no modules: add some, or use --auto")
 
     # What the modules log while they are built is kept until the viewer is opened, so a config error stops the bridge
     # before a viewer window opens

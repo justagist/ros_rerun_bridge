@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable
 
 import pyarrow as pa
 import pytest
+from rclpy.qos import QoSProfile
 from rclpy.time import Time
 
 import rerun as rr
@@ -52,12 +54,35 @@ class FakeNode:
     subscriptions: list[FakeSubscription] = field(default_factory=list)
     timers: list[Callable[[], None]] = field(default_factory=list)
     log_messages: list[tuple[str, str]] = field(default_factory=list)
+    topics: dict[str, list[str]] = field(default_factory=dict)
+    """The ROS graph's topics, with their types."""
+    publishers: dict[str, list[QoSProfile]] = field(default_factory=dict)
+    """Each topic's publishers, by their QoS."""
+
+    def advertise(self, topic: str, msg_type: str, qos: QoSProfile | None = None) -> None:
+        """Add a publisher to the graph, e.g. advertise("/scan", "sensor_msgs/msg/LaserScan")."""
+        types = self.topics.setdefault(topic, [])
+        if msg_type not in types:
+            types.append(msg_type)
+        self.publishers.setdefault(topic, []).append(qos or QoSProfile(depth=10))
+
+    def get_topic_names_and_types(self) -> list[tuple[str, list[str]]]:
+        return list(self.topics.items())
+
+    def count_publishers(self, topic: str) -> int:
+        return len(self.publishers.get(topic, []))
+
+    def get_publishers_info_by_topic(self, topic: str) -> list[SimpleNamespace]:
+        return [SimpleNamespace(qos_profile=qos) for qos in self.publishers.get(topic, [])]
+
+    def resolve_topic_name(self, topic: str) -> str:
+        return topic if topic.startswith("/") else f"/{topic}"
 
     def create_subscription(self, msg_type, topic, callback, qos, callback_group=None):
         self.subscriptions.append(FakeSubscription(msg_type, topic, callback, qos))
         return self.subscriptions[-1]
 
-    def create_timer(self, period_s, callback, callback_group=None):
+    def create_timer(self, period_s, callback, callback_group=None, clock=None):
         self.timers.append(callback)
 
     def get_logger(self) -> FakeLogger:

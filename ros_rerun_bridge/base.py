@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import os
 import traceback
+from fnmatch import fnmatchcase
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field, PositiveInt, ValidationError
+from pydantic import BaseModel, Field, PositiveInt, ValidationError, field_validator
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 import rerun as rr
 
 from .types import StrictParamsModel
+from .utils.frame_axes import FrameAxesParams
 from .utils.utils import _import_module_by_path, make_qos, set_rr_time_from_ros, stamp_or_now
 
 if TYPE_CHECKING:
@@ -46,6 +48,30 @@ class ModuleConfig(StrictParamsModel):
     """Additional parameters for the module."""
 
 
+class AutoFrameAxesParams(FrameAxesParams):
+    """How discovered TF frames are drawn: the `tf` module's frame params, with axes by default."""
+
+    axis_length: float | None = Field(default=0.1, gt=0, allow_inf_nan=False)
+    """Draw each frame's axes, this long in metres, or none if null. Names are off by default, as many frames would
+    crowd the view, and the viewer can show each frame's name."""
+
+
+class AutoConfig(StrictParamsModel):
+    """Settings for automatic discovery: which topics it may bridge, as `fnmatch` globs on the topic name (`*` also
+    matches `/`), and how it draws TF frames."""
+
+    include: list[str] = Field(default_factory=lambda: ["*"])
+    """Topics to bridge, if they have a module for their type."""
+    exclude: list[str] = Field(default_factory=list)
+    """Topics never to bridge, even if included."""
+    frames: AutoFrameAxesParams = Field(default_factory=AutoFrameAxesParams)
+    """How the frames from /tf and /tf_static are drawn."""
+
+    def matches(self, topic: str) -> bool:
+        """Whether the topic is included and not excluded."""
+        return any(fnmatchcase(topic, p) for p in self.include) and not any(fnmatchcase(topic, p) for p in self.exclude)
+
+
 class BridgeConfig(StrictParamsModel):
     """Configuration for the ROS->Rerun bridge."""
 
@@ -53,8 +79,18 @@ class BridgeConfig(StrictParamsModel):
     """TF frame that Rerun's default 3D view is rendered in."""
     blueprint: str | None = None
     """Viewer layout to open with: a .rbl file, e.g. saved from the viewer. Relative paths are to the config file."""
-    modules: list[ModuleConfig]
+    auto: AutoConfig | None = None
+    """Automatic discovery of the topics `modules` does not name: `true`, or the topics it may bridge. Off if unset."""
+    modules: list[ModuleConfig] = Field(default_factory=list)
     """List of bridge modules."""
+
+    @field_validator("auto", mode="before")
+    @classmethod
+    def _auto_from_bool(cls, value: Any) -> Any:
+        """Accept `auto: true` for discovery with the default filters, and `false` for none."""
+        if isinstance(value, bool):
+            return AutoConfig() if value else None
+        return value
 
 
 class TopicToComponentModule:
@@ -94,18 +130,21 @@ class TopicToComponentModule:
                 raise ValueError(f"invalid 'params' config for {self.__class__.__name__}: {e}") from e
 
         self._sub = None
-
-        qos_profile = make_qos(config.qos)
-
-        msg_type = self._resolve_msg_type()
+        self._topic = config.topic
+        self._qos_profile = make_qos(config.qos)
+        self._msg_class = self._resolve_msg_type()
         # One group per module: topics are handled in parallel, but each module sees its messages one at a time.
         # Modules add their own timers to it to keep that guarantee.
         self.callback_group = MutuallyExclusiveCallbackGroup()
-        self._sub = node.create_subscription(
-            msg_type, config.topic, self._callback, qos_profile, callback_group=self.callback_group
+
+    def _subscribe(self) -> None:
+        """Subscribe to the topic. The builder calls it once the module is fully initialised: with automatic discovery,
+        modules are built while the executor runs, and a message could otherwise reach a half-built module."""
+        self._sub = self.node.create_subscription(
+            self._msg_class, self._topic, self._callback, self._qos_profile, callback_group=self.callback_group
         )
-        node.get_logger().info(
-            f"[{config.name}] subscribed to {config.topic} with {msg_type.__name__} -> {config.entity_path}"
+        self.node.get_logger().info(
+            f"[{self.name}] subscribed to {self._topic} with {self._msg_class.__name__} -> {self.entity_path}"
         )
 
     # Overridables

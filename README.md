@@ -32,6 +32,12 @@ modules:
 ros-rerun-bridge --config my_robot.yaml
 ```
 
+Or skip the config and show every topic a built-in module can draw, as they appear:
+
+```bash
+ros-rerun-bridge --auto --global-frame world
+```
+
 > **Status:** I created this repository mainly to get familiar with Rerun and to use it in my own ROS projects. It is under active development, so features, interfaces and behaviour may change. Tested with Rerun 0.40.0 and ROS 2 Jazzy and Lyrical.
 
 ## Demos
@@ -74,11 +80,14 @@ See [INSTALLATION.md](docs/INSTALLATION.md) to make the `ros-rerun-bridge` comma
 
 ```bash
 ros-rerun-bridge --config <config.yaml> [options] [-- <ROS arguments>]
+ros-rerun-bridge --auto [--config <config.yaml>] [options] [-- <ROS arguments>]
 ```
 
 | Option | |
 | --- | --- |
 | *(no option)* | Open a Rerun viewer. |
+| `--auto` | Also show every topic the config does not name, if a built-in module draws its type ([automatic discovery](docs/CONFIGURATION.md#automatic-discovery)). |
+| `--global-frame <frame>` | The TF frame the 3D view is rendered in, overriding the config's. |
 | `--connect [--url <url>]` | Send to a Rerun viewer that is already running. |
 | `--serve [--allow-origin <pattern>]` | Let viewers on other machines connect ([REMOTE_VIEWING.md](docs/REMOTE_VIEWING.md)). |
 | `--save <file.rrd>` | Record to a file, to open later with `rerun <file.rrd>`. |

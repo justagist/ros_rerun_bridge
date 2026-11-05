@@ -81,6 +81,33 @@ def test_subscribes_with_the_configured_topic_qos_and_message_type(node, build):
     assert subscription.qos.durability == DurabilityPolicy.TRANSIENT_LOCAL
 
 
+class SubscriptionsSeenInInit(TFModule):
+    """Records the subscriptions that exist once its own initialisation is done."""
+
+    def __init__(self, node, config, context) -> None:
+        super().__init__(node, config, context)
+        self.subscriptions_in_init = list(node.subscriptions)
+
+
+def test_subscribes_only_once_the_module_is_built(node, build):
+    # With automatic discovery, modules are built while the executor runs: a message must not reach a half-built one
+    module = build(f"{__name__}:SubscriptionsSeenInInit")
+    assert module.subscriptions_in_init == []
+    assert len(node.subscriptions) == 1
+
+
+class WithItsOwnStart(TFModule):
+    """Has a method of a name a module may well use for its own setup."""
+
+    def start(self) -> None:
+        pass
+
+
+def test_a_module_with_its_own_start_method_still_subscribes(node, build):
+    build(f"{__name__}:WithItsOwnStart")
+    assert len(node.subscriptions) == 1
+
+
 @pytest.mark.parametrize(
     ("qos", "error"), [({"reliability": "best-effort"}, "reliability"), ({"depth": 0}, "depth"), ({"deph": 5}, "deph")]
 )
@@ -122,12 +149,25 @@ def test_config_with_a_missing_blueprint_is_an_error(tmp_path):
 
 
 def test_invalid_config_is_an_error(tmp_path):
-    with pytest.raises(ValidationError, match="modules"):
-        load_config(write_config(tmp_path, "global_frame: map\n"))
+    with pytest.raises(ValidationError, match="globl_frame"):
+        load_config(write_config(tmp_path, "globl_frame: map\n"))
+
+
+def run_bridge(*args: str) -> subprocess.CompletedProcess:
+    """Run the bridge's command line in a fresh interpreter."""
+    return subprocess.run([sys.executable, "-m", "ros_rerun_bridge.main", *args], capture_output=True, text=True)
+
+
+def test_without_a_config_or_auto_is_an_error():
+    result = run_bridge()
+    assert result.returncode == 2 and "--config is required, unless --auto is given" in result.stderr
+
+
+def test_a_config_without_modules_needs_auto(tmp_path):
+    result = run_bridge("--config", str(write_config(tmp_path, "global_frame: world\n")))
+    assert result.returncode == 2 and "the config lists no modules" in result.stderr
 
 
 def test_version_flag_prints_the_version_without_a_config():
-    result = subprocess.run(
-        [sys.executable, "-m", "ros_rerun_bridge.main", "--version"], capture_output=True, text=True
-    )
+    result = run_bridge("--version")
     assert result.returncode == 0 and result.stdout.startswith("ros-rerun-bridge version ")
