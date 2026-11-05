@@ -267,7 +267,7 @@ class TopicDiscovery:
                 self._node.get_logger().warn(f"[auto] not bridging {topic}: {type(e).__name__}: {e}")
                 continue
             self._bridged[topic] = _Bridged(modules, types[0], qos)
-        # 3. Topics names changed: their choice depends on what else is shown, which step 2 may have changed
+        # 3. Topics no longer shown: their choice depends on what else is shown, which step 2 may have changed
         for topic, bridged in list(self._bridged.items()):
             # e.g. a compressed image, once its raw image is bridged too
             if topic in eligible and not suggest(
