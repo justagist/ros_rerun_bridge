@@ -4,8 +4,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Automatic discovery, with `--auto` or `auto: true`: also bridges the topics a config does not name, as they appear, each with the built-in module for its message type and QoS its publishers accept. `auto` takes `include` and `exclude` topic patterns.
+- `--global-frame`, overriding the config's `global_frame`.
+
 ### Changed
 
+- `--config` is optional with `--auto`, and a config's `modules` with automatic discovery.
 - Modules subscribe in `start()`, which the builder calls once a module is built, so no message reaches a half-built module. A module constructed without the builder no longer subscribes by itself.
 
 ## [0.16.1] - 2026-11-04

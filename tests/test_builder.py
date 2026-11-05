@@ -137,12 +137,25 @@ def test_config_with_a_missing_blueprint_is_an_error(tmp_path):
 
 
 def test_invalid_config_is_an_error(tmp_path):
-    with pytest.raises(ValidationError, match="modules"):
-        load_config(write_config(tmp_path, "global_frame: map\n"))
+    with pytest.raises(ValidationError, match="globl_frame"):
+        load_config(write_config(tmp_path, "globl_frame: map\n"))
+
+
+def run_bridge(*args: str) -> subprocess.CompletedProcess:
+    """Run the bridge's command line in a fresh interpreter."""
+    return subprocess.run([sys.executable, "-m", "ros_rerun_bridge.main", *args], capture_output=True, text=True)
+
+
+def test_without_a_config_or_auto_is_an_error():
+    result = run_bridge()
+    assert result.returncode == 2 and "--config is required, unless --auto is given" in result.stderr
+
+
+def test_a_config_without_modules_needs_auto(tmp_path):
+    result = run_bridge("--config", str(write_config(tmp_path, "global_frame: world\n")))
+    assert result.returncode == 2 and "the config lists no modules" in result.stderr
 
 
 def test_version_flag_prints_the_version_without_a_config():
-    result = subprocess.run(
-        [sys.executable, "-m", "ros_rerun_bridge.main", "--version"], capture_output=True, text=True
-    )
+    result = run_bridge("--version")
     assert result.returncode == 0 and result.stdout.startswith("ros-rerun-bridge version ")

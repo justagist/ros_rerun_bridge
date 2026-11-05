@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import os
 import traceback
+from fnmatch import fnmatchcase
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field, PositiveInt, ValidationError
+from pydantic import BaseModel, Field, PositiveInt, ValidationError, field_validator
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 import rerun as rr
@@ -46,6 +47,19 @@ class ModuleConfig(StrictParamsModel):
     """Additional parameters for the module."""
 
 
+class AutoConfig(StrictParamsModel):
+    """Which topics automatic discovery may bridge, as `fnmatch` globs on the topic name (`*` also matches `/`)."""
+
+    include: list[str] = Field(default_factory=lambda: ["*"])
+    """Topics to bridge, if they have a module for their type."""
+    exclude: list[str] = Field(default_factory=list)
+    """Topics never to bridge, even if included."""
+
+    def matches(self, topic: str) -> bool:
+        """Whether the topic is included and not excluded."""
+        return any(fnmatchcase(topic, p) for p in self.include) and not any(fnmatchcase(topic, p) for p in self.exclude)
+
+
 class BridgeConfig(StrictParamsModel):
     """Configuration for the ROS->Rerun bridge."""
 
@@ -53,8 +67,18 @@ class BridgeConfig(StrictParamsModel):
     """TF frame that Rerun's default 3D view is rendered in."""
     blueprint: str | None = None
     """Viewer layout to open with: a .rbl file, e.g. saved from the viewer. Relative paths are to the config file."""
-    modules: list[ModuleConfig]
+    auto: AutoConfig | None = None
+    """Automatic discovery of the topics `modules` does not name: `true`, or the topics it may bridge. Off if unset."""
+    modules: list[ModuleConfig] = Field(default_factory=list)
     """List of bridge modules."""
+
+    @field_validator("auto", mode="before")
+    @classmethod
+    def _auto_from_bool(cls, value: Any) -> Any:
+        """Accept `auto: true` for discovery with the default filters, and `false` for none."""
+        if isinstance(value, bool):
+            return AutoConfig() if value else None
+        return value
 
 
 class TopicToComponentModule:

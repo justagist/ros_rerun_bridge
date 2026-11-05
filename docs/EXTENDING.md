@@ -112,4 +112,7 @@ Keep modules to one responsibility. If you need several subscriptions, use separ
 Yes. Derive the paths from `self.entity_path`, or add params to control them.
 
 **What about the module's lifecycle?**
-Modules are created once at startup, and the base class creates the subscription. Do any other setup in `__init__`, after calling `super().__init__`.
+Modules are created once, at startup or, with [automatic discovery](CONFIGURATION.md#automatic-discovery), when their topic appears. The builder subscribes a module only once its `__init__` has returned, so do any other setup in `__init__`, after calling `super().__init__`: no message arrives before it is done.
+
+**Is my module used by automatic discovery?**
+No: discovery only picks built-in modules. Name your module's topics in the config.
