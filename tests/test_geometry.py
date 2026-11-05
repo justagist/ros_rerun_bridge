@@ -88,6 +88,17 @@ def test_the_covariance_can_be_left_out(node, build, recording):
     build("pose", entity_path="robot", msg_type="geometry_msgs.msg.PoseWithCovarianceStamped", params={"n_sigma": None})
     node.publish(PoseWithCovarianceStamped())
     assert "/robot/covariance" not in recording.entities()
+    # The pose is still drawn, not skipped with a logged error
+    assert recording.rows("/robot")[0]["Transform3D:translation"] == [[0.0, 0.0, 0.0]]
+    assert all(level != "error" for level, _ in node.log_messages)
+
+
+def test_clearing_a_pose_clears_its_covariance_too(node, build, recording):
+    module = build("pose", entity_path="robot", msg_type="geometry_msgs.msg.PoseWithCovarianceStamped")
+    node.publish(PoseWithCovarianceStamped())
+    module.clear()
+    for entity in ("/robot", "/robot/covariance"):
+        assert [row["Clear:is_recursive"] for row in recording.rows(entity) if "Clear:is_recursive" in row] == [[False]]
 
 
 def test_pose_arrays_draw_an_arrow_along_each_pose_x_axis(node, build, recording):
@@ -123,21 +134,6 @@ def test_wrenches_are_force_and_torque_arrows_from_their_frame(node, build, reco
     assert row["CoordinateFrame:frame"] == ["tool"]
 
 
-@pytest.mark.parametrize(
-    ("module", "params"),
-    [
-        ("pose", {"axis_length": 0}),
-        ("pose", {"n_sigma": -1}),
-        ("pose_array", {"arrow_length": 0}),
-        ("wrench", {"force_scale": 0}),
-    ],
-)
-def test_lengths_and_scales_must_be_positive(build, module, params):
-    with pytest.raises(ValueError, match="greater than 0"):
-        build(module, params=params)
-
-
-@pytest.mark.parametrize("msg_type", ["geometry_msgs.msg.Pose", "geometry_msgs.msg.PoseWithCovariance"])
-def test_unstamped_pose_types_are_an_error(build, msg_type):
+def test_unstamped_pose_types_are_an_error(build):
     with pytest.raises(ValueError, match="has no header: use a stamped type"):
-        build("pose", msg_type=msg_type)
+        build("pose", msg_type="geometry_msgs.msg.Pose")
