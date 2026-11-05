@@ -114,7 +114,7 @@ URDF = """<robot name="arm">
 </robot>"""
 
 
-def test_joint_states_move_the_robot_and_plot_the_fields_they_have(node, discover, recording):
+def test_joint_states_move_the_robot_and_plot_positions_only(node, discover, recording):
     discovery = discover()
     node.advertise("/robot_description", "std_msgs/msg/String", LATCHED)
     node.advertise("/joint_states", "sensor_msgs/msg/JointState")
@@ -122,9 +122,25 @@ def test_joint_states_move_the_robot_and_plot_the_fields_they_have(node, discove
     deliver(node, "/robot_description", String(data=URDF))
     deliver(node, "/joint_states", JointState(name=["elbow"], position=[0.5], effort=[2.0]))
     assert [row["Transform3D:child_frame"] for row in recording.rows("/tf")] == [["arm"]]
-    assert {"/joint_states/position/elbow", "/joint_states/effort/elbow"} <= recording.entities()
-    # Left empty, as by a publisher that does not measure it
-    assert "/joint_states/velocity/elbow" not in recording.entities()
+    assert {entity for entity in recording.entities() if entity.startswith("/joint_states/")} == {
+        "/joint_states/position/elbow"
+    }
+
+
+def test_joint_state_settings_apply_to_the_topics_they_name(node, discover):
+    joint_states = {"topics": ["/joint_states"], "prefer": "joint_states", "plot": ["velocity", "effort"]}
+    discovery = discover(auto={"joint_states": joint_states})
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    # e.g. commands, which would draw the robot at its targets
+    node.advertise("/joint_command", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    [module] = discovery.modules
+    assert module.params.model_dump(include={"prefer", "plot", "plot_entity_path"}) == {
+        "prefer": "joint_states",
+        "plot": ["velocity", "effort"],
+        "plot_entity_path": "joint_states",
+    }
+    assert "/joint_command" not in subscribed(node)
 
 
 def test_each_joint_state_topic_moves_the_robot(node, discover):
@@ -285,6 +301,19 @@ def test_leaves_topics_whose_entity_path_the_config_uses(node, discover):
     discovery.scan()
     assert discovery.modules == []
     assert ("warn", "[auto] not bridging /scan: entity path 'scan' is already in use") in node.log_messages
+
+
+def test_leaves_joint_states_whose_plots_entity_path_the_config_uses(node, discover):
+    discovery = discover(
+        modules=[{"name": "range", "module": "range", "topic": "/range", "entity_path": "joint_states"}]
+    )
+    node.advertise("/joint_states", "sensor_msgs/msg/JointState")
+    discovery.scan()
+    assert discovery.modules == []
+    assert (
+        "warn",
+        "[auto] not bridging /joint_states: entity path 'joint_states' is already in use",
+    ) in node.log_messages
 
 
 def test_tf_shares_its_entity_with_a_configured_module(node, discover):

@@ -5,6 +5,7 @@ Automatic discovery: bridges the topics a config does not name, each with the bu
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from typing import TYPE_CHECKING, Any
 
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
@@ -81,17 +82,18 @@ def suggest(
     if (mapped := auto.modules.get(msg_type)) is not None:
         return [{**entry, "module": mapped.module, "msg_type": msg_type.replace("/", "."), "params": mapped.params}]
     if msg_type == "sensor_msgs/msg/JointState":
+        joint_states = auto.joint_states
+        if not any(fnmatchcase(topic, pattern) for pattern in joint_states.topics):
+            return []
         # Moved on /tf's entity: Rerun takes a frame relation's changes over time on one entity only, so a joint that
-        # robot_state_publisher also puts on /tf is then one relation, whose latest value wins, as in tf2
-        return [
-            {
-                **entry,
-                "module": "scalars",
-                "msg_type": "sensor_msgs.msg.JointState",
-                "params": {"fields": ["position", "velocity", "effort"], "names_field": "name"},
-            },
-            {**entry, "module": "joint_states", "entity_path": tf_entity, "params": auto.frames.model_dump()},
-        ]
+        # robot_state_publisher also puts on /tf is one relation, logged from the preferred source
+        params = {
+            **auto.frames.model_dump(),
+            "prefer": joint_states.prefer,
+            "plot": joint_states.plot,
+            "plot_entity_path": entry["entity_path"],
+        }
+        return [{**entry, "module": "joint_states", "entity_path": tf_entity, "params": params}]
     # Types only one module draws, whatever the topic's name
     if msg_type in MODULES_BY_TYPE:
         return [{**entry, **MODULES_BY_TYPE[msg_type]}]
@@ -244,13 +246,14 @@ class TopicDiscovery:
                 continue
             # Two modules on one entity path would mix their data, except on the TF entities, where frame relations
             # from several sources belong together. A configured /tf's own entity is shared with joint states only: any
-            # other topic there could clear its frame relations.
+            # other topic there could clear its frame relations. Joint states' plots have an entity path of their own.
             in_use = self._configured_paths | {module.entity_path for module in self.modules}
             if taken := [
-                entry["entity_path"]
+                path
                 for entry in entries
-                if entry["entity_path"] in in_use - SHARED_ENTITY_PATHS
-                and not (entry["module"] == "joint_states" and entry["entity_path"] == self._tf_entity)
+                for path in (entry["entity_path"], entry.get("params", {}).get("plot_entity_path"))
+                if path in in_use - SHARED_ENTITY_PATHS
+                and not (entry["module"] == "joint_states" and path == self._tf_entity)
             ]:
                 self._rejected.add(topic)
                 self._node.get_logger().warn(f"[auto] not bridging {topic}: entity path '{taken[0]}' is already in use")

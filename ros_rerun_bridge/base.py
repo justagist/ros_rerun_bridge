@@ -74,6 +74,19 @@ JointSource = Literal["tf", "joint_states", "both"]
 after it stops sending the joint, or both, the latest value winning."""
 
 
+class AutoJointStates(StrictParamsModel):
+    """How discovered `JointState` topics move the robot and are plotted: the `joint_states` module's params."""
+
+    topics: list[str] = Field(default_factory=lambda: ["*"])
+    """The `JointState` topics to bridge. The others, e.g. commands, which would draw the robot at its targets, are
+    not."""
+    prefer: JointSource = "tf"
+    """Which source moves a joint that also arrives on /tf, as the `joint_states` module's `prefer`."""
+    plot: list[JointField] = Field(default_factory=lambda: ["position"])
+    """The fields to plot, on `<topic>/<field>/<joint>`. Position only by default, as each field adds a series per
+    joint."""
+
+
 class AutoConfig(StrictParamsModel):
     """Settings for automatic discovery: which topics it may bridge, as `fnmatch` globs on the topic name (`*` also
     matches `/`), how often it looks, when a topic is stale, and how it draws TF frames."""
@@ -84,6 +97,8 @@ class AutoConfig(StrictParamsModel):
     """Topics never to bridge, even if included."""
     frames: AutoFrameAxesParams = Field(default_factory=AutoFrameAxesParams)
     """How the frames from /tf and /tf_static are drawn."""
+    joint_states: AutoJointStates = Field(default_factory=AutoJointStates)
+    """How `JointState` topics move the robot and are plotted."""
     scan_period: float = Field(default=2.0, gt=0, allow_inf_nan=False)
     """Seconds between looks at the ROS graph."""
     stale_scans: PositiveInt = 3

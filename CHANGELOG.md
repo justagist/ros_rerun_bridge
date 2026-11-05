@@ -8,10 +8,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - `joint_states` plots joints' positions, velocities or efforts, with `plot` and `plot_entity_path`, each joint as a series of its own. Plots do not need the robot model.
 - `joint_states` takes `prefer`, setting which source logs a joint that also arrives on `/tf`: `tf`, `joint_states` or `both`. A joint whose preferred source stops sending it is moved by the other a second later.
+- `auto.joint_states`: `topics`, the `JointState` topics to show, and the `prefer` and `plot` their `joint_states` modules get.
 
 ### Changed
 
 - A joint on both `/tf` and a `JointState` topic is logged from `/tf` only by default, not from both, which made the viewer sluggish with robot_state_publisher at high rates. Set `prefer: both` for the old behaviour.
+- Discovered `JointState` topics are shown with one `joint_states` module, plotting only position by default, not with `joint_states` and `scalars`. Set `auto.joint_states.plot` to plot velocity and effort too.
 
 ## [0.17.1] - 2026-11-05
 
