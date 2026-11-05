@@ -9,12 +9,15 @@ All notable changes to this project are documented here. The format follows [Kee
 - Automatic discovery, with `--auto` or `auto: true`. The bridge also shows the topics a config does not list, as they appear, picking a built-in module for each by its message type, and QoS that works with its publishers.
 - Discovered topics follow the ROS graph. A topic is removed when a few scans in a row find no publisher for it, and comes back with a new one. Latched topics are never removed. Stale data is cleared when a topic is removed, except for TF, plots and logs. A topic is shown again with a new module if its type changes, and subscribed again if its publishers' QoS changes.
 - `auto` settings: `include` and `exclude` topic patterns; `frames`, setting how TF frames are drawn (as axes, without names, by default); `scan_period` and `stale_scans`, setting how often the bridge looks and when a topic is removed; `never_stale`, for topics never removed; and `modules`, naming the module, built-in or your own, to show a message type's topics with.
+- Discovered `JointState` topics move the robot model, on the same entity as `/tf`, with or without robot_state_publisher, and plot each joint's position, velocity and effort.
 - `--global-frame`, overriding the config's `global_frame`.
+- `docs/LIMITATIONS.md`, listing known limitations and what to do instead.
 - Modules have a `close()`, which releases their subscription and any other ROS resources, and a `clear()`, which clears what they drew.
 
 ### Changed
 
 - `--config` is optional with `--auto`, and so is a config's `modules`.
+- `joint_states` warns once, rather than every 5 seconds, while it has no robot model.
 - The builder subscribes a module only once it is fully built, so no message reaches a half-built module. A module constructed without the builder no longer subscribes by itself.
 
 ## [0.16.1] - 2026-11-04

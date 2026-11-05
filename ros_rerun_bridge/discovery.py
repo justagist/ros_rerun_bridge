@@ -28,12 +28,6 @@ MODULES_BY_TYPE: dict[str, dict[str, Any]] = {
     "sensor_msgs/msg/PointCloud2": {"module": "pointcloud2"},
     "sensor_msgs/msg/LaserScan": {"module": "laserscan"},
     "sensor_msgs/msg/Range": {"module": "range"},
-    # Plotted only: moving the robot model from them could disagree with /tf, which robot_state_publisher fills
-    "sensor_msgs/msg/JointState": {
-        "module": "scalars",
-        "msg_type": "sensor_msgs.msg.JointState",
-        "params": {"fields": ["position"], "names_field": "name"},
-    },
     "visualization_msgs/msg/MarkerArray": {"module": "marker_array"},
     "visualization_msgs/msg/Marker": {"module": "marker_array", "msg_type": "visualization_msgs.msg.Marker"},
     "geometry_msgs/msg/PoseStamped": {"module": "pose"},
@@ -53,7 +47,9 @@ SHARED_ENTITY_PATHS = {"tf", "tf_static"}
 them, whichever module logs them, e.g. a configured `joint_states` on `tf`."""
 
 
-def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], auto: AutoConfig) -> list[dict[str, Any]]:
+def suggest(
+    topic: str, msg_type: str, graph: dict[str, list[str]], auto: AutoConfig, tf_entity: str = "tf"
+) -> list[dict[str, Any]]:
     """Pick how to bridge a topic, from its message type and name.
 
     Args:
@@ -61,6 +57,7 @@ def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], auto: AutoCo
         msg_type: Its message type, e.g. `sensor_msgs/msg/Image`.
         graph: The types of the bridged topics with publishers, configured or discovered, by name.
         auto: The discovery settings: the modules mapped to message types, and how to draw TF frames.
+        tf_entity: The entity path /tf's transforms are logged on, for joint states to move the robot model on.
 
     Returns:
         The topic's config entries, without QoS: one per module to show it with, or none if no module draws it.
@@ -69,6 +66,9 @@ def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], auto: AutoCo
         # Hidden topics, by ROS convention
         return []
     entry = {"name": topic, "topic": topic, "entity_path": topic.strip("/")}
+    # The rules run from the most specific to the most general, and the first that applies decides: the root TF and
+    # robot model topics, then the user's mappings, then the built-in choices by type, then those that also need the
+    # topic's name or the other topics shown
     # Only the root namespace's: Rerun's URDF importer logs the robot's joint defaults on `tf_static`, and the bridge
     # holds one robot model, so several robots' models and frames would mix. Not remapped by `auto.modules`, as the
     # scene's frames and robot model depend on them.
@@ -80,6 +80,19 @@ def suggest(topic: str, msg_type: str, graph: dict[str, list[str]], auto: AutoCo
         return [{**entry, "module": "robot_description"}]
     if (mapped := auto.modules.get(msg_type)) is not None:
         return [{**entry, "module": mapped.module, "msg_type": msg_type.replace("/", "."), "params": mapped.params}]
+    if msg_type == "sensor_msgs/msg/JointState":
+        # Moved on /tf's entity: Rerun takes a frame relation's changes over time on one entity only, so a joint that
+        # robot_state_publisher also puts on /tf is then one relation, whose latest value wins, as in tf2
+        return [
+            {
+                **entry,
+                "module": "scalars",
+                "msg_type": "sensor_msgs.msg.JointState",
+                "params": {"fields": ["position", "velocity", "effort"], "names_field": "name"},
+            },
+            {**entry, "module": "joint_states", "entity_path": tf_entity, "params": auto.frames.model_dump()},
+        ]
+    # Types only one module draws, whatever the topic's name
     if msg_type in MODULES_BY_TYPE:
         return [{**entry, **MODULES_BY_TYPE[msg_type]}]
     if msg_type == "sensor_msgs/msg/Image":
@@ -145,6 +158,10 @@ class TopicDiscovery:
         self._context = context
         self._configured = {node.resolve_topic_name(m.topic) for m in cfg.modules}
         self._configured_paths = {m.entity_path.strip("/") for m in cfg.modules}
+        self._tf_entity = next(
+            (m.entity_path.strip("/") for m in cfg.modules if node.resolve_topic_name(m.topic) == "/tf"), "tf"
+        )
+        """The entity path /tf's transforms are logged on: a configured module's, or the one discovery gives it."""
         self._bridged: dict[str, _Bridged] = {}
         """Discovered topics' modules, by topic."""
         self._rejected: set[str] = set()
@@ -191,23 +208,32 @@ class TopicDiscovery:
     def scan(self) -> None:
         """Update bridged topics whose publishers have gone or changed, then bridge each new topic that has publishers,
         passes the filters and has a module for its type. Last, drop topics that another topic now shows."""
+        # Topics with publishers only: a subscriber alone, e.g. a node waiting for a topic, leaves nothing to show
         graph = {
             topic: types
             for topic, types in self._node.get_topic_names_and_types()
             if self._node.count_publishers(topic) > 0
         }
+        # Configured topics are kept even if the filters exclude them, so that a compressed image is left for its raw
+        # image when the config shows that
         eligible = {
             topic: types for topic, types in graph.items() if topic in self._configured or self._auto.matches(topic)
         }
+        # A rejected topic whose publishers have all gone is forgotten, so it is tried again when they return
         self._rejected &= graph.keys()
+
+        # 1. Topics already bridged: drop the stale, rebuild those whose type changed, resubscribe on new QoS
         for topic in list(self._bridged):
             self._update(topic, eligible)
+
+        # 2. New topics: pick their modules, check their entity paths are free, build them with QoS their publishers
+        # accept. A topic with several types is left alone, as no one module could subscribe to all of them.
         for topic, types in eligible.items():
             if topic in self._configured or topic in self._bridged or topic in self._rejected or len(types) != 1:
                 continue
             entries = [
                 entry
-                for entry in suggest(topic, types[0], self._shown(eligible), self._auto)
+                for entry in suggest(topic, types[0], self._shown(eligible), self._auto, self._tf_entity)
                 if not (entry["module"] == "robot_description" and self._has_robot_model)
             ]
             if not entries:
@@ -216,19 +242,24 @@ class TopicDiscovery:
             if not publishers:
                 # Gone since the graph was read: with none to match QoS to, look again on a later scan
                 continue
+            # Two modules on one entity path would mix their data, except on the TF entities, where frame relations
+            # from several sources belong together
             in_use = self._configured_paths | {module.entity_path for module in self.modules}
             if taken := [
-                entry["entity_path"] for entry in entries if entry["entity_path"] in in_use - SHARED_ENTITY_PATHS
+                entry["entity_path"]
+                for entry in entries
+                if entry["entity_path"] in in_use - SHARED_ENTITY_PATHS - {self._tf_entity}
             ]:
                 self._rejected.add(topic)
                 self._node.get_logger().warn(f"[auto] not bridging {topic}: entity path '{taken[0]}' is already in use")
                 continue
             qos = qos_from_publishers(publishers)
+            # All of the topic's modules or none: those built before one fails are closed, so no half-shown topic is
+            # left subscribed
             modules = []
             try:
                 for entry in entries:
                     modules.append(self._builder.build_module(ModuleConfig(**entry, qos=qos), self._context))
-            # Any error: one would stop the executor, and with it the bridge, over a single topic
             except Exception as e:
                 for module in modules:
                     module.close()
@@ -236,9 +267,12 @@ class TopicDiscovery:
                 self._node.get_logger().warn(f"[auto] not bridging {topic}: {type(e).__name__}: {e}")
                 continue
             self._bridged[topic] = _Bridged(modules, types[0], qos)
+        # 3. Topics names changed: their choice depends on what else is shown, which step 2 may have changed
         for topic, bridged in list(self._bridged.items()):
             # e.g. a compressed image, once its raw image is bridged too
-            if topic in eligible and not suggest(topic, bridged.msg_type, self._shown(eligible), self._auto):
+            if topic in eligible and not suggest(
+                topic, bridged.msg_type, self._shown(eligible), self._auto, self._tf_entity
+            ):
                 self._drop(topic, "another topic shows it", clear_at=self._node.get_clock().now())
 
     def _shown(self, eligible: dict[str, list[str]]) -> dict[str, list[str]]:
@@ -265,6 +299,7 @@ class TopicDiscovery:
         """
         bridged = self._bridged[topic]
         types = eligible.get(topic)
+        # No publishers: count the scans before dropping it, so a restarting node keeps its topic
         if types is None:
             # A latched topic's last message stays true, and its module keeps what it needs to update it, e.g. a robot
             # model's links to replace
@@ -279,11 +314,14 @@ class TopicDiscovery:
         bridged.missing_since, bridged.missing_scans = None, 0
         publishers = self._node.get_publishers_info_by_topic(topic)
         if not publishers:
+            # Gone since the graph was read: the next scan counts it as missing
             return
         if types != [bridged.msg_type]:
             # What the old type drew no longer holds
             self._drop(topic, f"its type is now {', '.join(types)}", clear_at=self._node.get_clock().now())
             return
+        # A new publisher can need other QoS, e.g. a best-effort one joining reliable ones, which a reliable
+        # subscription would not hear
         qos = qos_from_publishers(publishers)
         if qos != bridged.qos:
             for module in bridged.modules:
@@ -303,6 +341,8 @@ class TopicDiscovery:
         bridged = self._bridged.pop(topic)
         for module in bridged.modules:
             module.close()
+        # Cleared at a point on the timeline, so earlier data stays for scrubbing back. Each module decides what
+        # clearing means, e.g. TF and plots keep theirs.
         if clear_at is not None:
             set_rr_time_from_ros(clear_at)
             for module in bridged.modules:

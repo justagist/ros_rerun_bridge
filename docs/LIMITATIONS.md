@@ -6,7 +6,7 @@ What the bridge does not do yet, or does differently from rviz, and what to do i
 
 * **One robot.** The bridge holds one robot model at a time: a second `robot_description` replaces the first. Several robots, e.g. in namespaces such as `/robot1`, are not supported.
 * **No collision geometry.** The robot model is drawn from its visual geometry only.
-* **One entity per moving transform.** Rerun only lets the transform between two frames change over time on one entity. Give `/tf` and `/tf_static` an entity each, and give [`joint_states`](MODULES.md#joint_states) the `/tf` module's entity (see [`tf`](MODULES.md#tf)). Automatic discovery sets up `/tf` and `/tf_static` this way.
+* **One entity per moving transform.** Rerun only lets the transform between two frames change over time on one entity. Give `/tf` and `/tf_static` an entity each, and give [`joint_states`](MODULES.md#joint_states) the `/tf` module's entity (see [`tf`](MODULES.md#tf)). Automatic discovery sets up `/tf`, `/tf_static` and joint states this way.
 
 ## Message types
 
@@ -18,7 +18,7 @@ What the bridge does not do yet, or does differently from rviz, and what to do i
 
 See [Automatic discovery](CONFIGURATION.md#automatic-discovery) for what it shows and why.
 
-* **Joint states do not move the robot.** They are plotted. With robot_state_publisher, the robot moves through `/tf`. Without it, the robot is drawn but stays still: configure the [`joint_states`](MODULES.md#joint_states) module.
+* **Every `JointState` topic moves the robot**, including topics of commands rather than states, e.g. Isaac Sim's `/joint_command`, which would draw the robot at its targets. Exclude them with `auto.exclude`.
 * **Rectified images are slightly off in 3D.** A found `camera_info` topic uses the `k` intrinsics, which match raw images. Rectified images (`image_rect*`) need `p`: configure the [`camera_info`](MODULES.md#camera_info) topic with `intrinsics: p`.
 * **Depth images are found by name.** Only an image topic with `depth` in its name is shown as depth. Any other depth image is shown as a plain image: configure [`depth_image`](MODULES.md#depth_image) for it.
 * **Segmentation masks show as plain images.** A mask's encoding is the same as a greyscale image's. Configure [`segmentation_image`](MODULES.md#segmentation_image) to see class colours.
