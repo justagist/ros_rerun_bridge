@@ -66,6 +66,14 @@ class AutoModule(StrictParamsModel):
     """The module's parameters."""
 
 
+JointField = Literal["position", "velocity", "effort"]
+"""A `JointState` field that can be plotted."""
+
+JointSource = Literal["tf", "joint_states", "both"]
+"""Which source moves a joint that arrives both on /tf and as joint states: either, falling back to the other a second
+after it stops sending the joint, or both, the latest value winning."""
+
+
 class AutoConfig(StrictParamsModel):
     """Settings for automatic discovery: which topics it may bridge, as `fnmatch` globs on the topic name (`*` also
     matches `/`), how often it looks, when a topic is stale, and how it draws TF frames."""

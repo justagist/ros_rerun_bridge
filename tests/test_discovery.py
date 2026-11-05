@@ -288,7 +288,7 @@ def test_leaves_topics_whose_entity_path_the_config_uses(node, discover):
 
 
 def test_tf_shares_its_entity_with_a_configured_module(node, discover):
-    # As the joint_states module's docs advise, so the latest transform wins
+    # As the joint_states module's docs advise, so that a joint on both is one frame relation
     discovery = discover(
         modules=[{"name": "joints", "module": "joint_states", "topic": "/joint_states", "entity_path": "tf"}]
     )

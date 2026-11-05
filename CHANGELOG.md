@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): before 1.0, a minor version may break configs or the module API.
 
+## [Unreleased]
+
+### Added
+
+- `joint_states` plots joints' positions, velocities or efforts, with `plot` and `plot_entity_path`, each joint as a series of its own. Plots do not need the robot model.
+- `joint_states` takes `prefer`, setting which source logs a joint that also arrives on `/tf`: `tf`, `joint_states` or `both`. A joint whose preferred source stops sending it is moved by the other a second later.
+
+### Changed
+
+- A joint on both `/tf` and a `JointState` topic is logged from `/tf` only by default, not from both, which made the viewer sluggish with robot_state_publisher at high rates. Set `prefer: both` for the old behaviour.
+
 ## [0.17.1] - 2026-11-05
 
 ### Added
