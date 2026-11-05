@@ -35,7 +35,7 @@ ros-rerun-bridge --config my_robot.yaml
 Or skip the config, and let the bridge find the topics it can show:
 
 ```bash
-ros-rerun-bridge --auto --global-frame world
+ros-rerun-bridge --auto --global-frame world  # use the global frame you would set in rviz
 ```
 
 > **Status:** I created this repository mainly to get familiar with Rerun and to use it in my own ROS projects. It is under active development, so features, interfaces and behaviour may change. Tested with Rerun 0.40.0 and ROS 2 Jazzy and Lyrical.
