@@ -9,7 +9,7 @@ from visualization_msgs.msg import Marker
 
 import ros_rerun_bridge
 from ros_rerun_bridge import main
-from ros_rerun_bridge.main import load_config
+from ros_rerun_bridge.config import load_config
 from ros_rerun_bridge.modules.tf import TFModule
 
 
@@ -20,7 +20,7 @@ def test_only_imports_the_built_in_modules_a_config_uses(module):
     code = (
         "import sys\n"
         "from tests.conftest import FakeNode\n"
-        "from ros_rerun_bridge.base import BridgeConfig\n"
+        "from ros_rerun_bridge.config import BridgeConfig\n"
         "from ros_rerun_bridge.builder import BridgeBuilder\n"
         "from ros_rerun_bridge.context import BridgeContext\n"
         f"config = BridgeConfig(modules=[{{'name': 'm', 'module': '{module}', 'topic': '/t', 'entity_path': 'e'}}])\n"

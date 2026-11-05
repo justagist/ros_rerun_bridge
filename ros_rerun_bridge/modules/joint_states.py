@@ -9,7 +9,8 @@ from sensor_msgs.msg import JointState
 
 import rerun as rr
 
-from ..base import JointField, JointSource, ModuleConfig, TopicToComponentModule
+from ..base import TopicToComponentModule
+from ..config import JointField, JointSource, ModuleConfig
 from ..context import HANDOVER, BridgeContext
 from ..registry import REGISTRY
 from ..utils.frame_axes import FrameAxes, FrameAxesParams

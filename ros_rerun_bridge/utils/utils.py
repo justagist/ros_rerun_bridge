@@ -12,7 +12,7 @@ import rerun as rr
 if TYPE_CHECKING:
     from rclpy.node import Node
 
-    from ..base import QoSConfig
+    from ..config import QoSConfig
 
 IMAGE_PLANE_SUFFIX = "_image_plane"
 """Appended to a camera's frame_id to name the frame its images are in, linked to the camera frame by its pinhole."""

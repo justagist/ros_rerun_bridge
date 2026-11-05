@@ -15,7 +15,7 @@ from rclpy.time import Time
 import rerun as rr
 import rerun.chunk
 
-from ros_rerun_bridge.base import BridgeConfig
+from ros_rerun_bridge.config import BridgeConfig
 from ros_rerun_bridge.builder import BridgeBuilder
 from ros_rerun_bridge.context import BridgeContext
 

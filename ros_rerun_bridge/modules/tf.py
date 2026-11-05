@@ -8,7 +8,8 @@ from tf2_msgs.msg import TFMessage
 
 import rerun as rr
 
-from ..base import ModuleConfig, TopicToComponentModule
+from ..base import TopicToComponentModule
+from ..config import ModuleConfig
 from ..context import HANDOVER, BridgeContext
 from ..registry import REGISTRY
 from ..utils.frame_axes import FrameAxes, FrameAxesParams

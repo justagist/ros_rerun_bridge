@@ -7,11 +7,9 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from pathlib import Path
 from urllib.parse import quote
 
 import rclpy
-import yaml
 from pydantic import ValidationError
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
@@ -19,8 +17,8 @@ from rclpy.node import Node
 import rerun as rr
 
 from . import __version__
-from .base import AutoConfig, BridgeConfig
 from .builder import BridgeBuilder
+from .config import AutoConfig, BridgeConfig, load_config
 from .context import BridgeContext
 from .discovery import TopicDiscovery
 
@@ -50,29 +48,6 @@ class BridgeNode(Node):
         builder = BridgeBuilder(self)
         self.modules = builder.build_modules(cfg, bridge_context)
         self.discovery = TopicDiscovery(self, cfg, builder, bridge_context) if cfg.auto else None
-
-
-def load_config(path: str | Path) -> BridgeConfig:
-    """Load and validate a config, with its blueprint path resolved and checked.
-
-    Args:
-        path: Path to the YAML config.
-
-    Returns:
-        The config, with `blueprint` an absolute path if set.
-
-    Raises:
-        pydantic.ValidationError: If the config is invalid.
-        FileNotFoundError: If the config or its blueprint does not exist.
-    """
-    with open(path) as f:
-        cfg = BridgeConfig.model_validate(yaml.safe_load(f))
-    if cfg.blueprint:
-        blueprint = (Path(path).parent / cfg.blueprint).resolve()
-        if not blueprint.is_file():
-            raise FileNotFoundError(f"blueprint '{blueprint}' not found")
-        cfg.blueprint = str(blueprint)
-    return cfg
 
 
 def open_sink(args: argparse.Namespace) -> None:

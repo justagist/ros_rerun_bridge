@@ -8,7 +8,8 @@ from std_msgs.msg import String
 
 import rerun as rr
 
-from ..base import ModuleConfig, TopicToComponentModule
+from ..base import TopicToComponentModule
+from ..config import ModuleConfig
 from ..context import BridgeContext
 from ..registry import REGISTRY
 from ..types import StrictParamsModel

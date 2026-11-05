@@ -11,8 +11,8 @@ from std_msgs.msg import String
 from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import Marker, MarkerArray
 
-from ros_rerun_bridge.base import AutoConfig, BridgeConfig
 from ros_rerun_bridge.builder import BridgeBuilder
+from ros_rerun_bridge.config import AutoConfig, BridgeConfig
 from ros_rerun_bridge.discovery import MODULES_BY_TYPE, TopicDiscovery, suggest
 from ros_rerun_bridge.modules.compressed_image import CompressedImageModule
 from ros_rerun_bridge.modules.image import ImageModule

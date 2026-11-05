@@ -12,7 +12,7 @@ from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.clock import Clock, ClockType
 from rclpy.qos import DurabilityPolicy, ReliabilityPolicy
 
-from .base import ModuleConfig, QoSConfig
+from .config import ModuleConfig, QoSConfig
 from .utils.utils import _import_module_by_path, set_rr_time_from_ros
 
 if TYPE_CHECKING:
@@ -20,8 +20,9 @@ if TYPE_CHECKING:
     from rclpy.time import Time
     from rclpy.topic_endpoint_info import TopicEndpointInfo
 
-    from .base import AutoConfig, BridgeConfig, TopicToComponentModule
+    from .base import TopicToComponentModule
     from .builder import BridgeBuilder
+    from .config import AutoConfig, BridgeConfig
     from .context import BridgeContext
 
 MODULES_BY_TYPE: dict[str, dict[str, Any]] = {

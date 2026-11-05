@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - A joint on both `/tf` and a `JointState` topic is logged from `/tf` only by default, not from both, which made the viewer sluggish with robot_state_publisher at high rates. Set `prefer: both` for the old behaviour.
 - Discovered `JointState` topics are shown with one `joint_states` module, plotting only position by default, not with `joint_states` and `scalars`. Set `auto.joint_states.plot` to plot velocity and effort too.
+- The config models and `load_config` are in `ros_rerun_bridge.config`. `ModuleConfig` and `QoSConfig` can still be imported from `ros_rerun_bridge.base`.
 
 ## [0.17.1] - 2026-11-05
 
