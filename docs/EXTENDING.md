@@ -85,6 +85,8 @@ class MyPoseModule(TopicToComponentModule): ...
 
 The name must match the file name (`my_pose` in `ros_rerun_bridge/modules/my_pose.py`): the builder imports a built-in module only when a config uses it. Document it in [MODULES.md](MODULES.md).
 
+Automatic discovery calls a built-in module's `close()` when its topic goes away. If the module holds ROS resources besides its subscription, such as a timer, override `close()` to release them, and call `super().close()`.
+
 The test fixtures in [tests/conftest.py](../tests/conftest.py) run a module without a ROS graph and read back what it logged:
 
 ```python
@@ -112,7 +114,7 @@ Keep modules to one responsibility. If you need several subscriptions, use separ
 Yes. Derive the paths from `self.entity_path`, or add params to control them.
 
 **What about the module's lifecycle?**
-Modules are created once, at startup or, with [automatic discovery](CONFIGURATION.md#automatic-discovery), when their topic appears. The builder subscribes a module only once its `__init__` has returned, so do any other setup in `__init__`, after calling `super().__init__`: no message arrives before it is done.
+Modules are created at startup. With [automatic discovery](CONFIGURATION.md#automatic-discovery), they are also created when a topic appears, and closed when it goes away. Do your setup in `__init__`, after calling `super().__init__`. The module is only subscribed once `__init__` returns, so no message arrives before your setup is done.
 
 **Is my module used by automatic discovery?**
-No: discovery only picks built-in modules. Name your module's topics in the config.
+No. Discovery only uses built-in modules. List your module's topics in the config.

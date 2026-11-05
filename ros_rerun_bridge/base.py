@@ -58,7 +58,7 @@ class AutoFrameAxesParams(FrameAxesParams):
 
 class AutoConfig(StrictParamsModel):
     """Settings for automatic discovery: which topics it may bridge, as `fnmatch` globs on the topic name (`*` also
-    matches `/`), and how it draws TF frames."""
+    matches `/`), how often it looks, when a topic is stale, and how it draws TF frames."""
 
     include: list[str] = Field(default_factory=lambda: ["*"])
     """Topics to bridge, if they have a module for their type."""
@@ -66,10 +66,21 @@ class AutoConfig(StrictParamsModel):
     """Topics never to bridge, even if included."""
     frames: AutoFrameAxesParams = Field(default_factory=AutoFrameAxesParams)
     """How the frames from /tf and /tf_static are drawn."""
+    scan_period: float = Field(default=2.0, gt=0, allow_inf_nan=False)
+    """Seconds between looks at the ROS graph."""
+    stale_scans: PositiveInt = 3
+    """Scans in a row a topic may have no publishers before it is stale and dropped. A few, so that a restarting
+    publisher keeps its topic."""
+    never_stale: list[str] = Field(default_factory=list)
+    """Topics never dropped, nor their data cleared, when their publishers go, e.g. a sensor started on demand."""
 
     def matches(self, topic: str) -> bool:
         """Whether the topic is included and not excluded."""
         return any(fnmatchcase(topic, p) for p in self.include) and not any(fnmatchcase(topic, p) for p in self.exclude)
+
+    def is_never_stale(self, topic: str) -> bool:
+        """Whether the topic stays bridged without publishers."""
+        return any(fnmatchcase(topic, p) for p in self.never_stale)
 
 
 class BridgeConfig(StrictParamsModel):
@@ -146,6 +157,11 @@ class TopicToComponentModule:
         self.node.get_logger().info(
             f"[{self.name}] subscribed to {self._topic} with {self._msg_class.__name__} -> {self.entity_path}"
         )
+
+    def close(self) -> None:
+        """Unsubscribe, when automatic discovery drops the module's topic. A module holding other ROS resources, e.g. a
+        timer, extends it to release them."""
+        self.node.destroy_subscription(self._sub)
 
     # Overridables
     @classmethod

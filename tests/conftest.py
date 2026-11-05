@@ -53,6 +53,7 @@ class FakeNode:
     now_ns: int = 1_000_000_000_000
     subscriptions: list[FakeSubscription] = field(default_factory=list)
     timers: list[Callable[[], None]] = field(default_factory=list)
+    timer_periods: list[float] = field(default_factory=list)
     log_messages: list[tuple[str, str]] = field(default_factory=list)
     topics: dict[str, list[str]] = field(default_factory=dict)
     """The ROS graph's topics, with their types."""
@@ -65,6 +66,10 @@ class FakeNode:
         if msg_type not in types:
             types.append(msg_type)
         self.publishers.setdefault(topic, []).append(qos or QoSProfile(depth=10))
+
+    def withdraw(self, topic: str) -> None:
+        """Remove a topic's publishers from the graph."""
+        del self.topics[topic], self.publishers[topic]
 
     def get_topic_names_and_types(self) -> list[tuple[str, list[str]]]:
         return list(self.topics.items())
@@ -84,6 +89,15 @@ class FakeNode:
 
     def create_timer(self, period_s, callback, callback_group=None, clock=None):
         self.timers.append(callback)
+        self.timer_periods.append(period_s)
+        return callback
+
+    def destroy_timer(self, timer) -> None:
+        i = self.timers.index(timer)
+        del self.timers[i], self.timer_periods[i]
+
+    def destroy_subscription(self, subscription: FakeSubscription) -> None:
+        self.subscriptions.remove(subscription)
 
     def get_logger(self) -> FakeLogger:
         return FakeLogger(self.log_messages)

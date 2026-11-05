@@ -194,7 +194,12 @@ class MarkerArrayModule(TopicToComponentModule):
         self._meshes: dict[tuple[str, int], tuple[tuple, int, rr.Asset3D]] = {}
         """Per MESH_RESOURCE marker (ns, id), its latest stamped mesh, the stamp (ns) and asset, so a mesh is only
         logged again when it changes."""
-        self.node.create_timer(0.1, self._expire, callback_group=self.callback_group)
+        self._timer = self.node.create_timer(0.1, self._expire, callback_group=self.callback_group)
+
+    def close(self) -> None:
+        """Unsubscribe and stop expiring markers."""
+        super().close()
+        self.node.destroy_timer(self._timer)
 
     @classmethod
     def ros_msg_type(cls):

@@ -476,3 +476,9 @@ def test_meshes_that_cannot_be_read_warn_and_clear_the_marker(node, build, recor
     node.publish(MarkerArray(markers=[marker(Marker.MESH_RESOURCE, mesh_resource=str(obj_mesh))]))
     assert "Permission denied" in node.log_messages[-1][1]
     assert recording.latest("/markers/ns/0", "Boxes3D:half_sizes") == []
+
+
+def test_closing_stops_the_lifetime_timer_too(node, build):
+    # As when automatic discovery drops the topic
+    build("marker_array").close()
+    assert node.subscriptions == [] and node.timers == []
